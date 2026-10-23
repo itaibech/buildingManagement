@@ -16,6 +16,8 @@ export const HEBREW_MONTHS: readonly string[] = [
 export const he = {
   appName: 'ניהול בניין',
   loading: 'טוען…',
+  profileLoadError: 'לא הצלחנו לטעון את הפרופיל שלך',
+  retry: 'נסה שוב',
   pendingApproval: 'החשבון שלך ממתין לאישור הוועד',
   pendingHint: 'לאחר האישור תוכל להיכנס לאפליקציה. אפשר לסגור את הדף ולחזור מאוחר יותר.',
   signOut: 'התנתקות',

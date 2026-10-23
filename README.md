@@ -75,8 +75,12 @@ one the admin controls and confirms (Google sign-in is verified already).
    `https://itaibech.github.io/buildingManagement/` and add that URL plus
    `http://localhost:5173/buildingManagement/` to **Redirect URLs**.
 
-Google isn't configured on the local stack, so the Google button errors there;
-use email and password locally.
+The Google button only shows when Google is enabled on the Supabase instance.
+It's off on the local stack by default. To enable it locally, put
+`SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID` and
+`SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET` in the git-ignored `supabase/.env`, set
+`enabled = true` under `[auth.external.google]` in `supabase/config.toml`, and add
+`http://127.0.0.1:54321/auth/v1/callback` as a redirect URI on the Google OAuth client.
 
 ## License
 

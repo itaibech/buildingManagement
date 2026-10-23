@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { MantineProvider } from '@mantine/core'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { he } from '../lib/he'
@@ -23,12 +23,16 @@ function makeProfile(over: Partial<Profile>): Profile {
   } as Profile
 }
 
+const retry = vi.fn()
+
 function setAuth(profile: Profile | null): void {
   auth.current = {
     session: profile ? ({ user: { id: 'u1' } } as AuthState['session']) : null,
     profile,
     isAdmin: profile?.role === 'admin',
     loading: false,
+    error: null,
+    retry,
     signOut: async () => undefined,
   }
 }
@@ -65,6 +69,15 @@ describe('guards', () => {
     renderAt('/finance')
     expect(screen.getByText(he.pendingApproval)).toBeInTheDocument()
     expect(screen.queryByText('FINANCE')).not.toBeInTheDocument()
+  })
+
+  it('shows an error screen with retry when the profile fails to load', () => {
+    setAuth(makeProfile({}))
+    auth.current = { ...auth.current, profile: null, error: 'boom' }
+    renderAt('/finance')
+    expect(screen.queryByText(he.pendingApproval)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText(he.retry))
+    expect(retry).toHaveBeenCalled()
   })
 
   it('sends an approved resident away from admin routes', () => {

@@ -1,74 +1,62 @@
 import type { Session } from '@supabase/supabase-js'
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { Database } from '../lib/db.types'
 import { supabase } from '../lib/supabase'
+import { useProfile, type Profile } from './useProfile'
 
-export type Profile = Database['public']['Tables']['profiles']['Row']
+export type { Profile }
 
 export interface AuthState {
   session: Session | null
   profile: Profile | null
   isAdmin: boolean
   loading: boolean
+  error: string | null
+  retry(): void
   signOut(): Promise<void>
 }
 
 const AuthContext = createContext<AuthState | null>(null)
 
+// oxlint-disable-next-line react/only-export-components -- useAuth must live beside its provider
 export function useAuth(): AuthState {
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>')
   return ctx
 }
 
-async function fetchProfile(userId: string): Promise<Profile | null> {
-  const { data } = await supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle()
-  return data
-}
-
-export function AuthProvider({ children }: { children: ReactNode }) {
+function useSession(): { session: Session | null; loaded: boolean } {
   const [session, setSession] = useState<Session | null>(null)
-  const [loaded, setLoaded] = useState<{ userId: string; profile: Profile | null } | null>(null)
-  const [sessionLoaded, setSessionLoaded] = useState(false)
-
+  const [loaded, setLoaded] = useState(false)
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
-      setSessionLoaded(true)
+      setLoaded(true)
     })
     const { data } = supabase.auth.onAuthStateChange((_event, next) => {
       setSession(next)
-      setSessionLoaded(true)
+      setLoaded(true)
     })
     return () => data.subscription.unsubscribe()
   }, [])
+  return { session, loaded }
+}
 
-  const userId = session?.user.id
-  useEffect(() => {
-    if (!userId) return
-    let cancelled = false
-    void fetchProfile(userId).then((row) => {
-      if (!cancelled) setLoaded({ userId, profile: row })
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [userId])
-
-  const profile = userId && loaded?.userId === userId ? loaded.profile : null
-  const profileLoading = Boolean(userId) && loaded?.userId !== userId
-
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const { session, loaded } = useSession()
+  const { profile, loading, error, retry } = useProfile(session?.user.id)
   const value = useMemo<AuthState>(
     () => ({
       session,
       profile,
       isAdmin: profile?.role === 'admin' && profile.status === 'approved',
-      loading: !sessionLoaded || profileLoading,
+      loading: !loaded || loading,
+      error,
+      retry,
       signOut: async () => {
         await supabase.auth.signOut()
       },
     }),
-    [session, profile, sessionLoaded, profileLoading],
+    [session, profile, loaded, loading, error, retry],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

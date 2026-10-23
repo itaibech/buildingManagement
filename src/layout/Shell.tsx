@@ -1,5 +1,5 @@
 import { AppShell, Group, NavLink, Text } from '@mantine/core'
-import { NavLink as RouterLink, Outlet } from 'react-router'
+import { NavLink as RouterLink, Outlet, useLocation } from 'react-router'
 import { he } from '../lib/he'
 
 const NAV = [
@@ -10,7 +10,12 @@ const NAV = [
   { to: '/more', label: he.nav.more },
 ]
 
+function isActive(pathname: string, to: string): boolean {
+  return to === '/' ? pathname === '/' : pathname === to || pathname.startsWith(`${to}/`)
+}
+
 export default function Shell() {
+  const { pathname } = useLocation()
   return (
     <AppShell
       navbar={{ width: 220, breakpoint: 'sm', collapsed: { mobile: true } }}
@@ -20,7 +25,7 @@ export default function Shell() {
       <AppShell.Navbar p="sm" visibleFrom="sm">
         <Text fw={700} mb="sm">{he.appName}</Text>
         {NAV.map((n) => (
-          <NavLink key={n.to} component={RouterLink} to={n.to} label={n.label} end={n.to === '/'} />
+          <NavLink key={n.to} component={RouterLink} to={n.to} label={n.label} active={isActive(pathname, n.to)} />
         ))}
       </AppShell.Navbar>
       <AppShell.Main>
@@ -34,7 +39,7 @@ export default function Shell() {
               component={RouterLink}
               to={n.to}
               label={n.label}
-              end={n.to === '/'}
+              active={isActive(pathname, n.to)}
               ta="center"
               h="100%"
               style={{ justifyContent: 'center' }}
