@@ -715,6 +715,45 @@ isOneToOne: false
 "default_building_id":
 { Args: Record<PropertyKey, never>; Returns: string
                            },
+"import_check":
+{ Args: { "ok": boolean,"what": string }; Returns: undefined
+                           },
+"import_fees":
+{ Args: { "b": string,"p": Json,"y0": string,"y1": string }; Returns: Json
+                           },
+"import_is_amount":
+{ Args: { "j": Json }; Returns: boolean
+                           },
+"import_is_int":
+{ Args: { "hi": number,"j": Json,"lo": number }; Returns: boolean
+                           },
+"import_is_month":
+{ Args: { "j": Json,"y": number }; Returns: boolean
+                           },
+"import_is_text":
+{ Args: { "hi": number,"j": Json,"lo": number }; Returns: boolean
+                           },
+"import_money":
+{ Args: { "b": string,"p": Json }; Returns: Json
+                           },
+"import_people":
+{ Args: { "b": string,"p": Json }; Returns: Json
+                           },
+"import_spending":
+{ Args: { "b": string,"p": Json }; Returns: Json
+                           },
+"import_validate_refs":
+{ Args: { "p": Json }; Returns: undefined
+                           },
+"import_validate_rows":
+{ Args: { "p": Json }; Returns: undefined
+                           },
+"import_validate_shape":
+{ Args: { "p": Json }; Returns: undefined
+                           },
+"import_year":
+{ Args: { "payload": Json }; Returns: Json
+                           },
 "is_admin":
 { Args: Record<PropertyKey, never>; Returns: boolean
                            },

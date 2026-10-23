@@ -171,3 +171,10 @@ insert into public.budgets (year, category_id, amount)
 select 2026, c.id, v.amount
 from (values ('חברת ניהול', 10200), ('ניקיון', 7200), ('חשמל', 2500), ('מעלית', 4800), ('בזק', 1440)) as v(category, amount)
 join public.expense_categories c on c.name = v.category;
+
+-- Rows as the Excel import (Task 11) writes them: source 'import', replaced by the next import of 2026.
+insert into public.payments (apartment_id, paid_on, amount, method, note, source) values
+  ('10000000-0000-0000-0000-000000000006', '2026-01-01', 390, 'other', 'יובא מאקסל', 'import'),
+  ('10000000-0000-0000-0000-000000000006', '2026-02-01', 390, 'other', 'יובא מאקסל', 'import');
+insert into public.expenses (category_id, spent_on, amount, note, source)
+select id, '2026-01-01', 36, 'יובא מאקסל', 'import' from public.expense_categories where name = 'בנק';
