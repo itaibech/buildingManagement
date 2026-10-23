@@ -39,13 +39,27 @@ https://itaibech.github.io/buildingManagement/ (once the first deploy runs)
 
 ## Development
 
-Setup instructions (Supabase project, Google OAuth, GitHub secrets) are
-added here as the app is built.
+Requires Node 22 and Docker (for the local Supabase stack).
 
 ```bash
 npm install
-npm run dev
+npm run db:start            # local Postgres, Auth, Storage; Studio at http://127.0.0.1:54323
+cp .env.example .env.local  # then paste the anon key from `npx supabase status`
+npm run db:reset            # re-applies migrations + supabase/seed.sql
+npm run dev                 # http://localhost:5173/buildingManagement/
 ```
+
+Local test accounts (seeded, local only, password `password123`):
+`admin@example.test` (approved admin) and `resident@example.test`
+(approved resident of apartment 1). Email confirmation is off locally.
+
+Other scripts: `npm run db:test` (pgTAP tests in `supabase/tests`),
+`npm run db:types` (regenerate `src/lib/db.types.ts`), `npm run db:stop`.
+
+Migrations live in `supabase/migrations` and are applied to the hosted
+project by the deploy workflow on push to `main`. The hosted bootstrap admin
+email is set once outside the repo:
+`insert into app_settings values ('bootstrap_admin_email', '<email>')`.
 
 ## License
 
