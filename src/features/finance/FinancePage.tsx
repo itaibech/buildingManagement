@@ -1,6 +1,9 @@
-import { Title } from '@mantine/core'
-import { he } from '../../lib/he'
+import { useAuth } from '../../auth/AuthProvider'
+import { AdminFinance } from './AdminFinance'
+import { ResidentFinance } from './ResidentFinance'
 
+/** "כספים": the admin workspace, or the resident's own view. */
 export default function FinancePage() {
-  return <Title order={2}>{he.nav.finance}</Title>
+  const { isAdmin } = useAuth()
+  return isAdmin ? <AdminFinance /> : <ResidentFinance />
 }

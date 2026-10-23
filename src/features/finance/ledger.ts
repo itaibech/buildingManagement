@@ -1,4 +1,6 @@
 /** Pure finance helpers: ledger grid, budget vs actual, month arithmetic. No I/O here. */
+import { formatILS } from '../../lib/format'
+import { he } from '../../lib/he'
 
 export interface LedgerRow {
   apartment_id: string
@@ -128,4 +130,17 @@ export const RECEIPT_EXT: Readonly<Record<string, string>> = {
 export function receiptPath(expenseId: string, mime: string, id: string = crypto.randomUUID()): string | null {
   const ext = Object.hasOwn(RECEIPT_EXT, mime) ? RECEIPT_EXT[mime] : undefined
   return ext ? `${expenseId}/${id}.${ext}` : null
+}
+
+/** "הכול שולם" / "יתרה לתשלום ₪X" / "זיכוי ₪X". */
+export function balanceSentence(balance: number): string {
+  const state = balanceState(balance)
+  if (state === 'settled') return he.home.allPaid
+  return state === 'owed' ? he.home.balanceDue(formatILS(balance)) : he.finance.creditOf(formatILS(Math.abs(balance)))
+}
+
+/** Hebrew error for a receipt we won't accept, or null. */
+export function receiptError(file: File): string | null {
+  if (!Object.hasOwn(RECEIPT_EXT, file.type)) return he.finance.errors.receiptType
+  return file.size > MAX_RECEIPT_BYTES ? he.finance.errors.receiptSize : null
 }
