@@ -92,3 +92,26 @@ describe('PageHeader secondaryAction', () => {
     expect(onClick).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('export safety and RTL', () => {
+  it('writes formula-like user text as plain strings, never formulas', async () => {
+    const texts = ['=1+1', '+cmd', '-5', '@x']
+    const wb = XLSX.read(await toXlsxBytes({ s: [['כותרת'], ...texts.map((t) => [t])] }), { type: 'array' })
+    const ws = wb.Sheets['s']
+    texts.forEach((t, i) => {
+      const cell = ws?.[`A${i + 2}`]
+      expect(cell?.t).toBe('s')
+      expect(cell?.v).toBe(t)
+      expect(cell).not.toHaveProperty('f')
+    })
+  })
+
+  it('marks every worksheet right-to-left', async () => {
+    const sheets = { א: [['x']], ב: [['y']], ג: [['z']] }
+    const wb = XLSX.read(await toXlsxBytes(sheets), { type: 'array', bookFiles: true })
+    const files = (wb as unknown as { files: Record<string, { content: Uint8Array }> }).files
+    const names = Object.keys(files).filter((n) => /^\/?xl\/worksheets\/sheet\d+\.xml$/.test(n))
+    expect(names).toHaveLength(3)
+    for (const n of names) expect(new TextDecoder().decode(files[n]?.content)).toContain('rightToLeft="1"')
+  })
+})

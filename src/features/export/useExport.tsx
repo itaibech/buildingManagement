@@ -30,9 +30,9 @@ export function useExporter(fileName: string, getRows: GetRows): { run: () => vo
 type SecondaryAction = NonNullable<PageHeaderProps['secondaryAction']>
 
 /** The PageHeader `secondaryAction` for an export; undefined for non-admins. `ready` is false while data loads. */
-export function useExportAction(fileName: string, getRows: GetRows, ready = true): SecondaryAction | undefined {
+export function useExportAction(fileName: string, getRows: GetRows, ready = true, hint?: string): SecondaryAction | undefined {
   const { isAdmin } = useAuth()
   const { run, loading } = useExporter(fileName, getRows)
   if (!isAdmin) return undefined
-  return { label: he.export.action, icon: <IconFileSpreadsheet size={22} stroke={1.75} />, onClick: run, loading, disabled: !ready }
+  return { label: he.export.action, icon: <IconFileSpreadsheet size={22} stroke={1.75} />, onClick: run, loading, disabled: !ready, hint }
 }

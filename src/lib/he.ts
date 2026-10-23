@@ -527,6 +527,7 @@ export const he = {
   },
   export: {
     action: 'ייצוא לאקסל',
+    paymentsNote: 'מייצא את החודש המוצג',
     fullYear: 'ייצוא שנה מלאה',
     fullYearBody: 'הקובץ כולל הכנסות, הוצאות ותקציב בפורמט שאפשר לייבא בחזרה.',
     year: 'שנה',

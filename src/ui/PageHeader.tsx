@@ -3,7 +3,7 @@ import { IconPlus } from '@tabler/icons-react'
 import type { ReactNode } from 'react'
 
 interface PrimaryAction { label: string; onClick: () => void; icon?: ReactNode }
-interface SecondaryAction { label: string; onClick: () => void; icon: ReactNode; loading?: boolean; disabled?: boolean }
+interface SecondaryAction { label: string; onClick: () => void; icon: ReactNode; loading?: boolean; disabled?: boolean; hint?: string }
 
 export interface PageHeaderProps {
   title: string
@@ -12,13 +12,13 @@ export interface PageHeaderProps {
   secondaryAction?: SecondaryAction
 }
 
-function Secondary({ label, onClick, icon, loading, disabled }: SecondaryAction) {
+function Secondary({ label, onClick, icon, loading, disabled, hint }: SecondaryAction) {
   return (
     <>
-      <Button visibleFrom="sm" variant="subtle" leftSection={icon} onClick={onClick} loading={loading} disabled={disabled}>
+      <Button visibleFrom="sm" variant="subtle" title={hint} leftSection={icon} onClick={onClick} loading={loading} disabled={disabled}>
         {label}
       </Button>
-      <ActionIcon hiddenFrom="sm" variant="subtle" size={44} aria-label={label} onClick={onClick} loading={loading} disabled={disabled}>
+      <ActionIcon hiddenFrom="sm" variant="subtle" size={44} title={hint} aria-label={label} onClick={onClick} loading={loading} disabled={disabled}>
         {icon}
       </ActionIcon>
     </>

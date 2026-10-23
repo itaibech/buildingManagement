@@ -38,7 +38,7 @@ export function AdminFinance() {
   const tab: Tab = isTab(raw) ? raw : 'balances'
   const [primary, setPrimary] = useState(false)
   const [source, setSource] = useState<ExportSource | null>(null)
-  const exportAction = useExportAction(source?.fileName ?? '', source?.getRows ?? (() => []), !!source?.ready)
+  const exportAction = useExportAction(source?.fileName ?? '', source?.getRows ?? (() => []), !!source?.ready, source?.hint)
   const close = () => setPrimary(false)
   const select = (v: string | null) => { if (isTab(v)) { setPrimary(false); setParams({ tab: v }, { replace: true }) } }
   return (

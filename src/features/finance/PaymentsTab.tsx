@@ -25,7 +25,7 @@ export function PaymentsTab({ adding, onAddingClose }: { adding: boolean; onAddi
   const info = useApartmentInfo()
   const del = useDeletePayment()
   const [removing, setRemoving] = useState<Payment | null>(null)
-  useRegisterExport(he.export.files.payments, () => paymentsRows(q.data ?? [], info), !!q.data)
+  useRegisterExport(he.export.files.payments, () => paymentsRows(q.data ?? [], info), !!q.data, he.export.paymentsNote)
   const total = (q.data ?? []).reduce((t, p) => t + p.amount, 0)
   const confirm = () => removing && del.mutate(removing.id, { onSuccess: () => { notifySuccess(he.finance.paymentDeleted); setRemoving(null) } })
   return (
