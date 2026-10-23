@@ -90,9 +90,12 @@ as $$
 declare
   is_bootstrap boolean;
 begin
+  -- One-shot: the bootstrap email only grants admin while no admin exists yet.
   select exists (
     select 1 from public.app_settings
     where key = 'bootstrap_admin_email' and lower(trim(value)) = lower(trim(new.email))
+  ) and not exists (
+    select 1 from public.profiles where role = 'admin'
   ) into is_bootstrap;
 
   insert into public.profiles (user_id, building_id, full_name, email, role, status)
@@ -113,21 +116,16 @@ create trigger on_auth_user_created
   for each row execute function public.handle_new_user();
 
 -- ---------------------------------------------------------------- profile guard
--- API users (authenticated/anon) may only change their own full_name; an admin may change anything.
+-- Allow-list: API users (authenticated/anon) who aren't admins may change only full_name;
+-- any other column difference is rejected. An admin may change anything.
 -- Server roles (postgres, service_role) are not restricted.
 create function public.profiles_guard() returns trigger
 language plpgsql set search_path = ''
 as $$
 begin
-  if current_user in ('authenticated', 'anon') and not public.is_admin() and (
-    new.user_id is distinct from old.user_id
-    or new.building_id is distinct from old.building_id
-    or new.email is distinct from old.email
-    or new.role is distinct from old.role
-    or new.status is distinct from old.status
-    or new.resident_id is distinct from old.resident_id
-  ) then
-    raise exception 'Only an admin can change role, status, resident or building'
+  if current_user in ('authenticated', 'anon') and not public.is_admin()
+    and (to_jsonb(new) - 'full_name') is distinct from (to_jsonb(old) - 'full_name') then
+    raise exception 'Only full_name can be changed on your own profile'
       using errcode = '42501';
   end if;
   return new;
