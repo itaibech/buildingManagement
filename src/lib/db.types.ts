@@ -213,14 +213,14 @@ isOneToOne: false
                   ]
                 },"charges": {
                   Row: {
-                    "amount": number,"apartment_id": string,"building_id": string,"created_at": string,"id": string,"kind": string,"label": string,"month": string,"source": string
+                    "amount": number,"apartment_id": string,"building_id": string,"created_at": string,"ev_reading_id": string | null,"id": string,"kind": string,"label": string,"month": string,"source": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount": number,"apartment_id": string,"building_id"?: string,"created_at"?: string,"id"?: string,"kind": string,"label"?: string,"month": string,"source"?: string
+                    "amount": number,"apartment_id": string,"building_id"?: string,"created_at"?: string,"ev_reading_id"?: string | null,"id"?: string,"kind": string,"label"?: string,"month": string,"source"?: string
                   }
                   Update: {
-                    "amount"?: number,"apartment_id"?: string,"building_id"?: string,"created_at"?: string,"id"?: string,"kind"?: string,"label"?: string,"month"?: string,"source"?: string
+                    "amount"?: number,"apartment_id"?: string,"building_id"?: string,"created_at"?: string,"ev_reading_id"?: string | null,"id"?: string,"kind"?: string,"label"?: string,"month"?: string,"source"?: string
                   }
                   Relationships: [
                     {
@@ -252,6 +252,114 @@ isOneToOne: false
       columns: ["building_id"]
 isOneToOne: false
       referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "charges_ev_reading_id_fkey"
+      columns: ["ev_reading_id"]
+isOneToOne: false
+      referencedRelation: "ev_readings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"ev_chargers": {
+                  Row: {
+                    "active": boolean,"apartment_id": string,"building_id": string,"created_at": string,"id": string,"initial_reading": number,"label": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "active"?: boolean,"apartment_id": string,"building_id"?: string,"created_at"?: string,"id"?: string,"initial_reading"?: number,"label"?: string
+                  }
+                  Update: {
+                    "active"?: boolean,"apartment_id"?: string,"building_id"?: string,"created_at"?: string,"id"?: string,"initial_reading"?: number,"label"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "ev_chargers_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: true
+      referencedRelation: "apartment_balances"
+      referencedColumns: ["apartment_id"]
+    },{
+      foreignKeyName: "ev_chargers_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: true
+      referencedRelation: "apartments"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "ev_chargers_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: true
+      referencedRelation: "monthly_fees"
+      referencedColumns: ["apartment_id"]
+    },{
+      foreignKeyName: "ev_chargers_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "ev_chargers_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"ev_rates": {
+                  Row: {
+                    "building_id": string,"created_at": string,"effective_from": string,"id": string,"rate": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "building_id"?: string,"created_at"?: string,"effective_from": string,"id"?: string,"rate": number
+                  }
+                  Update: {
+                    "building_id"?: string,"created_at"?: string,"effective_from"?: string,"id"?: string,"rate"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "ev_rates_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "ev_rates_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"ev_readings": {
+                  Row: {
+                    "amount": number | null,"building_id": string,"charger_id": string,"created_at": string,"id": string,"kwh": number | null,"month": string,"note": string,"rate": number | null,"read_on": string | null,"reading": number,"source": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount"?: number | null,"building_id"?: string,"charger_id": string,"created_at"?: string,"id"?: string,"kwh"?: number | null,"month": string,"note"?: string,"rate"?: number | null,"read_on"?: string | null,"reading": number,"source"?: string
+                  }
+                  Update: {
+                    "amount"?: number | null,"building_id"?: string,"charger_id"?: string,"created_at"?: string,"id"?: string,"kwh"?: number | null,"month"?: string,"note"?: string,"rate"?: number | null,"read_on"?: string | null,"reading"?: number,"source"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "ev_readings_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "ev_readings_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "ev_readings_charger_id_fkey"
+      columns: ["charger_id"]
+isOneToOne: false
+      referencedRelation: "ev_chargers"
       referencedColumns: ["id"]
     }
                   ]
@@ -715,8 +823,35 @@ isOneToOne: false
 "default_building_id":
 { Args: Record<PropertyKey, never>; Returns: string
                            },
+"delete_ev_reading":
+{ Args: { "p_reading_id": string }; Returns: undefined
+                           },
+"ev_charge_reading":
+{ Args: { "p_reading_id": string }; Returns: Json
+                           },
+"ev_import_charger":
+{ Args: { "b": string,"c": Json }; Returns: Json
+                           },
+"ev_import_payments":
+{ Args: { "b": string,"p": Json }; Returns: number
+                           },
+"ev_is_month":
+{ Args: { "j": Json }; Returns: boolean
+                           },
+"ev_is_number":
+{ Args: { "hi": number,"j": Json,"lo": number }; Returns: boolean
+                           },
+"ev_recompute_next":
+{ Args: { "p_charger_id": string,"p_month": string }; Returns: undefined
+                           },
+"ev_validate":
+{ Args: { "p": Json }; Returns: undefined
+                           },
 "import_check":
 { Args: { "ok": boolean,"what": string }; Returns: undefined
+                           },
+"import_ev":
+{ Args: { "payload": Json }; Returns: Json
                            },
 "import_fees":
 { Args: { "b": string,"p": Json,"y0": string,"y1": string }; Returns: Json
@@ -765,6 +900,9 @@ isOneToOne: false
                            },
 "my_apartment_id":
 { Args: Record<PropertyKey, never>; Returns: string
+                           },
+"record_ev_reading":
+{ Args: { "p_charger_id": string,"p_month": string,"p_note"?: string,"p_read_on"?: string,"p_reading": number }; Returns: Json
                            },
 "user_names":
 { Args: { "ids": (string)[] }; Returns: {

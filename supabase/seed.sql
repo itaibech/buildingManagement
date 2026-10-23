@@ -178,3 +178,25 @@ insert into public.payments (apartment_id, paid_on, amount, method, note, source
   ('10000000-0000-0000-0000-000000000006', '2026-02-01', 390, 'other', 'יובא מאקסל', 'import');
 insert into public.expenses (category_id, spent_on, amount, note, source)
 select id, '2026-01-01', 36, 'יובא מאקסל', 'import' from public.expense_categories where name = 'בנק';
+
+-- EV charging (Task 14, invented readings): chargers on apartments 4 and 5, two per-kWh rates.
+-- Apartment 4 already has October's reading; apartment 5 is still waiting for it.
+insert into public.ev_rates (rate, effective_from) values (0.538, '2026-01-01'), (0.574, '2026-07-01');
+insert into public.ev_chargers (id, apartment_id, initial_reading) values
+  ('50000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000004', 1200),
+  ('50000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000005', 350.5);
+insert into public.ev_readings (charger_id, month, reading, read_on) values
+  ('50000000-0000-0000-0000-000000000001', '2026-06-01', 1385.2, '2026-06-30'),
+  ('50000000-0000-0000-0000-000000000001', '2026-07-01', 1561.75, '2026-07-31'),
+  ('50000000-0000-0000-0000-000000000001', '2026-08-01', 1702.4, '2026-08-31'),
+  ('50000000-0000-0000-0000-000000000001', '2026-09-01', 1890, '2026-09-30'),
+  ('50000000-0000-0000-0000-000000000001', '2026-10-01', 2044.35, '2026-10-20'),
+  ('50000000-0000-0000-0000-000000000002', '2026-07-01', 512.8, '2026-07-31'),
+  ('50000000-0000-0000-0000-000000000002', '2026-08-01', 640.15, '2026-08-31'),
+  ('50000000-0000-0000-0000-000000000002', '2026-09-01', 801.9, '2026-09-30');
+-- Same computation as record_ev_reading: sets kWh, rate and amount and creates each month's charge.
+select public.ev_charge_reading(id) from public.ev_readings;
+insert into public.payments (apartment_id, paid_on, amount, method, note) values
+  ('10000000-0000-0000-0000-000000000004', '2026-07-05', 99.62, 'transfer', 'טעינת רכב חשמלי'),
+  ('10000000-0000-0000-0000-000000000004', '2026-08-04', 100, 'transfer', 'טעינת רכב חשמלי'),
+  ('10000000-0000-0000-0000-000000000005', '2026-08-06', 93.1, 'app', 'טעינת רכב חשמלי');
