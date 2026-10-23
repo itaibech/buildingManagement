@@ -34,6 +34,8 @@ function setAuth(profile: Profile | null): void {
     error: null,
     retry,
     signOut: async () => undefined,
+    recovery: false,
+    endRecovery: () => undefined,
   }
 }
 

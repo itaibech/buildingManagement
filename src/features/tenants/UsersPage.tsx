@@ -90,26 +90,39 @@ function PendingRow({ p, residents, options }: { p: Profile; residents: Director
   )
 }
 
-function UserRow({ p, residents, options, isMe }: { p: Profile; residents: DirectoryEntry[]; options: Option[]; isMe: boolean }) {
+function UserControls({ p, options, locked }: { p: Profile; options: Option[]; locked: boolean }) {
   const update = useUpdateProfile()
-  const locked = p.is_super_admin || isMe
-  const linked = residents.find((r) => r.id === p.resident_id)
   const patch = (values: Parameters<typeof update.mutate>[0]['patch']) => update.mutate({ userId: p.user_id, patch: values }, { onSuccess: () => notifySuccess(he.toast.userUpdated) })
+  return (
+    <>
+      <Group align="flex-end" wrap="wrap" gap="sm">
+        <ResidentSelect value={p.resident_id} onChange={(id) => patch({ resident_id: id })} options={options} />
+        <RoleControl value={p.role} onChange={(role) => patch({ role })} disabled={locked} />
+        <Button variant="subtle" color="debt" disabled={locked} onClick={() => patch({ status: 'pending' })}>
+          {he.users.block}
+        </Button>
+      </Group>
+      {update.isError && <Text c="debt.7" size="sm">{he.users.actionError}</Text>}
+    </>
+  )
+}
+
+/** An approved user: read-only by default (role and apartment in words); "עריכה" opens the controls. */
+function UserRow({ p, residents, options, isMe }: { p: Profile; residents: DirectoryEntry[]; options: Option[]; isMe: boolean }) {
+  const [editing, setEditing] = useState(false)
+  const linked = residents.find((r) => r.id === p.resident_id)
+  const summary = [p.role === 'admin' ? he.users.roleAdmin : he.users.roleResident, linked ? he.apartment(linked.apartmentNumber) : he.users.noLink].join(' · ')
   return (
     <Card padding="md" data-testid={`user-${p.user_id}`}>
       <Stack gap="sm">
         <Identity p={p} plate={linked?.apartmentNumber ?? null}>
           {p.is_super_admin && <Badge color="enamel" c="enamel.9">{he.users.superAdmin}</Badge>}
           {isMe && !p.is_super_admin && <Badge color="stone" c="stone.9">{he.users.you}</Badge>}
-        </Identity>
-        <Group align="flex-end" wrap="wrap" gap="sm">
-          <ResidentSelect value={p.resident_id} onChange={(id) => patch({ resident_id: id })} options={options} />
-          <RoleControl value={p.role} onChange={(role) => patch({ role })} disabled={locked} />
-          <Button variant="subtle" color="debt" disabled={locked} onClick={() => patch({ status: 'pending' })}>
-            {he.users.block}
+          <Button variant="subtle" px="xs" onClick={() => setEditing(!editing)} aria-expanded={editing}>
+            {editing ? he.users.done : he.users.edit}
           </Button>
-        </Group>
-        {update.isError && <Text c="debt.7" size="sm">{he.users.actionError}</Text>}
+        </Identity>
+        {editing ? <UserControls p={p} options={options} locked={p.is_super_admin || isMe} /> : <Text size="sm" c="dimmed">{summary}</Text>}
       </Stack>
     </Card>
   )

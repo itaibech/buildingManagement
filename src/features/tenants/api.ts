@@ -89,6 +89,14 @@ export function useSaveApartment() {
   })
 }
 
+/**
+ * Deleting an apartment with money history is refused on purpose: charges/payments restrict the apartment (23503),
+ * and EV charges can't be removed by API roles (42501, charges_guard_ev).
+ */
+export function isMoneyHistoryError(e: unknown): boolean {
+  return e instanceof DbFailure && (e.code === '23503' || e.code === '42501')
+}
+
 export function useDeleteApartment() {
   const invalidate = useInvalidate()
   return useMutation({

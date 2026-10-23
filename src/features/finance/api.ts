@@ -2,8 +2,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { he } from '../../lib/he'
 import { supabase } from '../../lib/supabase'
+import { isFeeMode, type FeeMode } from '../../ui/feeBadge'
 import { notifyError } from '../../ui/notify'
 import { useApartments, useResidents } from '../tenants/api'
+import type { TimelineRow } from './feeTimeline'
 import { RECEIPT_BUCKET, receiptPath, shiftMonth, sortByDebt, type LedgerRow } from './ledger'
 
 export type PaymentMethod = 'cash' | 'transfer' | 'cheque' | 'app' | 'other'
@@ -16,13 +18,16 @@ export interface ApartmentBalance {
   names: string[]
   balance: number
   scheduled: number
+  /** This month's fee and where it comes from (building fee, custom amount, exempt). */
+  fee: number
+  feeMode: FeeMode
 }
 export interface Payment { id: string; apartment_id: string; paid_on: string; amount: number; method: PaymentMethod; note: string }
 export interface PaymentInput { apartment_id: string; paid_on: string; amount: number; method: PaymentMethod; note: string }
-export interface Charge { id: string; apartment_id: string; month: string; amount: number; kind: ChargeKind; label: string }
+export interface Charge { id: string; apartment_id: string; month: string; amount: number; kind: ChargeKind; label: string; ev_reading_id: string | null }
 export interface ChargeInput { apartment_ids: string[]; month: string; amount: number; kind: ChargeKind; label: string }
 export interface Fee { id: string; effective_from: string; amount: number }
-export interface FeeOverride { id: string; apartment_id: string; effective_from: string; amount: number }
+export interface FeeChange { apartment_id: string; effective_from: string; mode: FeeMode; amount: number | null }
 export interface Expense {
   id: string; category_id: string; category: string; spent_on: string; amount: number
   vendor: string; note: string; receipt_path: string | null; source: string; template_id: string | null
@@ -44,6 +49,8 @@ function must<T>({ data, error }: { data: T | null; error: { message: string } |
 }
 const num = (v: number | string | null | undefined): number => Number(v ?? 0)
 const catName = (c: { name: string } | null): string => c?.name ?? ''
+const feeMode = (v: string | null | undefined): FeeMode => (isFeeMode(v) ? v : 'building')
+const BALANCE_COLUMNS = 'apartment_id, balance, scheduled_charges, current_fee, current_fee_mode'
 
 /** Every finance mutation refreshes every finance query: the numbers all depend on each other. */
 function useFinanceMutation<A, R>(fn: (args: A) => Promise<R>) {
@@ -63,7 +70,7 @@ export function useBalances() {
   const residents = useResidents()
   const balances = useQuery({
     queryKey: [...KEY, 'balances'],
-    queryFn: async () => must(await supabase.from('apartment_balances').select('apartment_id, balance, scheduled_charges')),
+    queryFn: async () => must(await supabase.from('apartment_balances').select(BALANCE_COLUMNS)),
   })
   const data = useMemo((): ApartmentBalance[] | undefined => {
     if (!apartments.data || !residents.data || !balances.data) return undefined
@@ -74,6 +81,8 @@ export function useBalances() {
       names: residents.data.filter((r) => r.apartment_id === a.id).map((r) => r.full_name),
       balance: num(byId.get(a.id)?.balance),
       scheduled: num(byId.get(a.id)?.scheduled_charges),
+      fee: num(byId.get(a.id)?.current_fee),
+      feeMode: feeMode(byId.get(a.id)?.current_fee_mode),
     })).sort((x, y) => x.number - y.number))
   }, [apartments.data, residents.data, balances.data])
   const all = [apartments, residents, balances]
@@ -113,9 +122,9 @@ export function useMyBalance() {
     enabled: mine.isSuccess,
     queryFn: async () => {
       if (!id) return null
-      const rows = must(await supabase.from('apartment_balances').select('apartment_id, balance, scheduled_charges').eq('apartment_id', id))
+      const rows = must(await supabase.from('apartment_balances').select(BALANCE_COLUMNS).eq('apartment_id', id))
       const row = rows[0]
-      return { apartmentId: id, balance: num(row?.balance), scheduled: num(row?.scheduled_charges) }
+      return { apartmentId: id, balance: num(row?.balance), scheduled: num(row?.scheduled_charges), fee: num(row?.current_fee), feeMode: feeMode(row?.current_fee_mode) }
     },
   })
   return { ...q, isLoading: mine.isLoading || q.isLoading, isError: mine.isError || q.isError }
@@ -177,14 +186,14 @@ export function useDeletePayment() {
   return useFinanceMutation(async (id: string) => fail((await supabase.from('payments').delete().eq('id', id)).error))
 }
 
-// ---------------------------------------------------------------- charges, fees, overrides
+// ---------------------------------------------------------------- charges, building fees, apartment fee timeline
 
 /** Levies, extras and openings for `year`, newest month first. */
 export function useCharges(year: number) {
   return useQuery({
     queryKey: [...KEY, 'charges', year],
     queryFn: async (): Promise<Charge[]> =>
-      must(await supabase.from('charges').select('id, apartment_id, month, amount, kind, label')
+      must(await supabase.from('charges').select('id, apartment_id, month, amount, kind, label, ev_reading_id')
         .gte('month', `${year}-01-01`).lt('month', `${year + 1}-01-01`).order('month', { ascending: false }))
         .map((c) => ({ ...c, amount: num(c.amount), kind: c.kind as ChargeKind })),
   })
@@ -216,22 +225,42 @@ export function useSaveFee() {
     fail((await supabase.from('fee_schedule').upsert(values, { onConflict: 'building_id,effective_from' })).error))
 }
 
-export function useOverrides() {
+/** Fee timeline rows (every apartment, or one), newest first. Residents only ever get their own (RLS). */
+export function useFeeTimeline(apartmentId?: string) {
   return useQuery({
-    queryKey: [...KEY, 'overrides'],
-    queryFn: async (): Promise<FeeOverride[]> =>
-      must(await supabase.from('apartment_fee_overrides').select('id, apartment_id, effective_from, amount').order('effective_from', { ascending: false }))
-        .map((o) => ({ ...o, amount: num(o.amount) })),
+    queryKey: [...KEY, 'fee-timeline', apartmentId ?? 'all'],
+    queryFn: async (): Promise<TimelineRow[]> => {
+      let q = supabase.from('apartment_fee_overrides').select('id, apartment_id, effective_from, mode, amount').order('effective_from', { ascending: false })
+      if (apartmentId) q = q.eq('apartment_id', apartmentId)
+      return must(await q).map((r) => ({ ...r, mode: feeMode(r.mode), amount: r.amount === null ? null : num(r.amount) }))
+    },
   })
 }
 
-export function useSaveOverride() {
-  return useFinanceMutation(async (values: { apartment_id: string; effective_from: string; amount: number }) =>
-    fail((await supabase.from('apartment_fee_overrides').upsert(values, { onConflict: 'apartment_id,effective_from' })).error))
+/** This month's fee of one apartment (for the apartment page badge). */
+export function useApartmentFee(apartmentId: string) {
+  return useQuery({
+    queryKey: [...KEY, 'apartment-fee', apartmentId],
+    queryFn: async () => {
+      const row = must(await supabase.from('apartment_balances').select(BALANCE_COLUMNS).eq('apartment_id', apartmentId))[0]
+      return { fee: num(row?.current_fee), feeMode: feeMode(row?.current_fee_mode) }
+    },
+  })
 }
 
-/** Reverting an override deletes it; the apartment falls back to the building fee. */
-export function useDeleteOverride() {
+/** rpc('set_apartment_fee'): resolves to false when the change was a no-op (same as what applies already). */
+export function useSetApartmentFee() {
+  return useFinanceMutation(async (c: FeeChange): Promise<boolean> => {
+    const { data, error } = await supabase.rpc('set_apartment_fee', {
+      p_apartment_id: c.apartment_id, p_effective_from: c.effective_from, p_mode: c.mode, ...(c.amount === null ? {} : { p_amount: c.amount }),
+    })
+    fail(error)
+    return data === true
+  })
+}
+
+/** Removes one timeline row: from that month the previous row (or the building fee) applies again. */
+export function useDeleteFeeRow() {
   return useFinanceMutation(async (id: string) => fail((await supabase.from('apartment_fee_overrides').delete().eq('id', id)).error))
 }
 

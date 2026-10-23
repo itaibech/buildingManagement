@@ -9,8 +9,11 @@ export const SHEETS = { income: 'הכנסות', expenses: 'הוצאות', budget
 
 export interface ReadResult { parsed: ParsedWorkbook; warnings: string[] }
 
-/** Parse workbook bytes into the import model. Throws ImportError with a Hebrew message. */
-export async function readWorkbook(data: ArrayBuffer): Promise<ReadResult> {
+/**
+ * Opens untrusted workbook bytes (size-checked, values only, bounded to MAX_ROWS × MAX_COLS) and returns a reader
+ * for a sheet's rows by name, plus the sheet names. Throws ImportError with a Hebrew message.
+ */
+export async function openWorkbook(data: ArrayBuffer): Promise<{ names: string[]; rows: (name: string) => unknown[][] | null }> {
   if (data.byteLength > MAX_FILE_BYTES) throw new ImportError(he.import.errors.tooBig)
   const XLSX = await import('xlsx')
   let wb: ReturnType<typeof XLSX.read>
@@ -30,6 +33,12 @@ export async function readWorkbook(data: ArrayBuffer): Promise<ReadResult> {
     }
     return XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: true })
   }
+  return { names: wb.SheetNames, rows }
+}
+
+/** Parse workbook bytes into the import model. Throws ImportError with a Hebrew message. */
+export async function readWorkbook(data: ArrayBuffer): Promise<ReadResult> {
+  const { rows } = await openWorkbook(data)
   const incomeRows = rows(SHEETS.income)
   if (!incomeRows) throw new ImportError(he.import.errors.noIncome)
   const income = parseIncomeSheet(incomeRows)

@@ -3,9 +3,12 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(33);
+select plan(34);
 
 -- ---------------------------------------------------------------- fixtures
+-- 0013 seeds the bootstrap email (the local seed overrides the value, so only the key is checked).
+select is((select count(*) from public.app_settings where key = 'bootstrap_admin_email'), 1::bigint,
+  'the bootstrap admin email setting exists after migrations');
 -- Start from "no admin yet" (the local seed creates one); bootstrap is one-shot.
 update public.profiles set role = 'resident' where role = 'admin';
 -- Bootstrap email for this test only (overrides any seeded value).
@@ -13,10 +16,11 @@ insert into public.app_settings (key, value)
 values ('bootstrap_admin_email', 'boss@test.local')
 on conflict (key) do update set value = excluded.value;
 
-insert into auth.users (id, email, aud, role) values
-  ('a0000000-0000-0000-0000-000000000001', 'BOSS@test.local', 'authenticated', 'authenticated'),
-  ('a0000000-0000-0000-0000-000000000002', 'pending@test.local', 'authenticated', 'authenticated'),
-  ('a0000000-0000-0000-0000-000000000003', 'resident@test.local', 'authenticated', 'authenticated');
+-- The bootstrap grant needs a Google sign-up (0012): raw_app_meta_data.provider = 'google'.
+insert into auth.users (id, email, aud, role, raw_app_meta_data) values
+  ('a0000000-0000-0000-0000-000000000001', 'BOSS@test.local', 'authenticated', 'authenticated', '{"provider":"google"}'),
+  ('a0000000-0000-0000-0000-000000000002', 'pending@test.local', 'authenticated', 'authenticated', '{"provider":"email"}'),
+  ('a0000000-0000-0000-0000-000000000003', 'resident@test.local', 'authenticated', 'authenticated', '{"provider":"email"}');
 
 -- ---------------------------------------------------------------- seed + bootstrap
 select is((select count(*) from public.buildings), 1::bigint, 'exactly one building is seeded');
@@ -39,8 +43,8 @@ select is(
 
 -- One-shot: once an admin exists, the bootstrap email no longer grants admin.
 update public.app_settings set value = 'boss2@test.local' where key = 'bootstrap_admin_email';
-insert into auth.users (id, email, aud, role) values
-  ('a0000000-0000-0000-0000-000000000004', 'boss2@test.local', 'authenticated', 'authenticated');
+insert into auth.users (id, email, aud, role, raw_app_meta_data) values
+  ('a0000000-0000-0000-0000-000000000004', 'boss2@test.local', 'authenticated', 'authenticated', '{"provider":"google"}');
 select is(
   (select role || '/' || status from public.profiles where user_id = 'a0000000-0000-0000-0000-000000000004'),
   'resident/pending',

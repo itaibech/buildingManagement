@@ -5,7 +5,7 @@ import { he } from '../../lib/he'
 import { notifyError, notifySuccess } from '../../ui'
 import type { PageHeaderProps } from '../../ui'
 import type { Rows } from './buildWorkbook'
-import { exportXlsx } from './exportXlsx'
+import { exportXlsx, type CellFormats } from './exportXlsx'
 
 /** One sheet of rows, or several sheets by name. */
 export type Exportable = Rows | Record<string, Rows>
@@ -14,16 +14,16 @@ export type GetRows = () => Exportable | Promise<Exportable>
 const asSheets = (data: Exportable): Record<string, Rows> => (Array.isArray(data) ? { [he.export.sheet]: data } : data)
 
 /** Runs one export with a loading flag, a success toast and an error toast. */
-export function useExporter(fileName: string, getRows: GetRows): { run: () => void; loading: boolean } {
+export function useExporter(fileName: string, getRows: GetRows, formats?: CellFormats): { run: () => void; loading: boolean } {
   const [loading, setLoading] = useState(false)
   const run = useCallback(() => {
     setLoading(true)
     Promise.resolve()
       .then(getRows)
-      .then((data) => exportXlsx(fileName, asSheets(data)))
+      .then((data) => exportXlsx(fileName, asSheets(data), formats))
       .then(() => notifySuccess(he.export.downloaded), () => notifyError(he.export.failed))
       .finally(() => setLoading(false))
-  }, [fileName, getRows])
+  }, [fileName, getRows, formats])
   return { run, loading }
 }
 
@@ -34,5 +34,5 @@ export function useExportAction(fileName: string, getRows: GetRows, ready = true
   const { isAdmin } = useAuth()
   const { run, loading } = useExporter(fileName, getRows)
   if (!isAdmin) return undefined
-  return { label: he.export.action, icon: <IconFileSpreadsheet size={22} stroke={1.75} />, onClick: run, loading, disabled: !ready, hint }
+  return { label: he.export.action, shortLabel: he.export.short, icon: <IconFileSpreadsheet size={22} stroke={1.75} />, onClick: run, loading, disabled: !ready, hint }
 }

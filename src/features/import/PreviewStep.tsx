@@ -6,16 +6,16 @@ import { formatILS, monthLabel } from '../../lib/format'
 import { he } from '../../lib/he'
 import type { ImportCounts } from './api'
 import { MoneyInput } from '../finance/fields'
-import type { ImportSummary, Overlap } from './buildImport'
+import type { ImportSummary, Overlap, PaymentOverlap } from './buildImport'
 
 const XLSX_TYPES = '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
-interface UploadStepProps { fileName: string; busy: boolean; error: string; onFile: (f: File) => void }
+interface UploadStepProps { fileName: string; busy: boolean; error: string; onFile: (f: File) => void; intro?: string; hint?: string }
 
-export function UploadStep({ fileName, busy, error, onFile }: UploadStepProps) {
+export function UploadStep({ fileName, busy, error, onFile, intro = he.import.intro, hint = he.import.fileHint }: UploadStepProps) {
   return (
     <Stack gap="sm">
-      <Text>{he.import.intro}</Text>
+      <Text>{intro}</Text>
       <FileButton accept={XLSX_TYPES} onChange={(f) => f && onFile(f)}>
         {(props) => (
           <Button {...props} loading={busy} fullWidth variant="light"
@@ -24,7 +24,7 @@ export function UploadStep({ fileName, busy, error, onFile }: UploadStepProps) {
           </Button>
         )}
       </FileButton>
-      <Text size="sm" c="dimmed">{busy ? he.import.reading : fileName ? he.import.fileChosen(fileName) : he.import.fileHint}</Text>
+      <Text size="sm" c="dimmed">{busy ? he.import.reading : fileName ? he.import.fileChosen(fileName) : hint}</Text>
       {error && <Alert color="debt">{error}</Alert>}
     </Stack>
   )
@@ -83,7 +83,7 @@ export function PreviewStep({ summary, warnings, year, budgetYear, onYear, onBud
 
 const DONE = ['apartments', 'residents', 'payments', 'expenses'] as const
 
-export function DoneStep({ counts, year, onAgain }: { counts: ImportCounts; year: number; onAgain: () => void }) {
+export function DoneStep({ counts, year, evSkipped, onAgain }: { counts: ImportCounts; year: number; evSkipped: number; onAgain: () => void }) {
   return (
     <Stack gap="md">
       <Title order={2}>{he.import.doneTitle}</Title>
@@ -91,6 +91,7 @@ export function DoneStep({ counts, year, onAgain }: { counts: ImportCounts; year
       <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm">
         {DONE.map((k) => <Count key={k} label={he.import.doneCounts[k]} value={counts[k] ?? 0} />)}
       </SimpleGrid>
+      {evSkipped > 0 && <Text fw={600} className="bm-num">{he.import.evSkipped(evSkipped)}</Text>}
       <Button component={Link} to="/finance" fullWidth>{he.import.toFinance}</Button>
       <Button variant="default" fullWidth onClick={onAgain}>{he.import.again}</Button>
     </Stack>
@@ -116,12 +117,15 @@ export function LevyNotice({ levy, apartments, onAmount }: { levy: LevyLine; apa
   )
 }
 
-export function EvNotice({ ev, include, onInclude }: { ev: EvInfo; include: boolean; onInclude: (v: boolean) => void }) {
+export function EvNotice({ ev, include, managed, skipped, onInclude }: { ev: EvInfo; include: boolean; managed?: boolean; skipped: number; onInclude: (v: boolean) => void }) {
   if (ev.apartments.length === 0) return null
   return (
     <Paper withBorder radius={12} p="sm">
       <Text fw={600}>{he.import.evTitle}</Text>
       <Text size="sm" className="bm-num">{he.import.evNotice(ev.apartments.join(', '), formatILS(ev.total))}</Text>
+      {managed && <Text size="sm" c="signal.9" mt={4}>{he.import.evManaged}</Text>}
+      {skipped > 0 && <Text size="sm" fw={600} mt={4}>{he.import.evSkipped(skipped)}</Text>}
+      <Text size="sm" c="dimmed" mt={4}>{he.import.evPaymentsKept}</Text>
       <Toggle label={he.import.evInclude} checked={include} onChange={onInclude} />
     </Paper>
   )
@@ -142,6 +146,33 @@ export function OverlapNotice({ overlaps, include, onInclude }: { overlaps: Over
   )
 }
 
+export function PaidNotice({ overlaps, include, onInclude }: { overlaps: PaymentOverlap[]; include: boolean; onInclude: (v: boolean) => void }) {
+  if (overlaps.length === 0) return null
+  return (
+    <Alert color="signal" title={he.import.paidTitle(overlaps.length)}>
+      <Text size="sm">{he.import.paidBody}</Text>
+      <ScrollArea.Autosize mah={160} mt="xs">
+        <List size="sm" spacing={2} className="bm-num">
+          {overlaps.map((o) => (
+            <List.Item key={`${o.apartment}|${o.month}`}>{he.import.paidItem(o.apartment, monthLabel(o.month), formatILS(o.amount), formatILS(o.recorded))}</List.Item>
+          ))}
+        </List>
+      </ScrollArea.Autosize>
+      <Toggle label={he.import.paidInclude} checked={include} onChange={onInclude} />
+    </Alert>
+  )
+}
+
+export function PriorNotice({ prior, keep, onKeep }: { prior: { levy: number; ev: number }; keep: boolean; onKeep: (v: boolean) => void }) {
+  if (prior.levy === 0 && prior.ev === 0) return null
+  return (
+    <Alert color="signal" title={[prior.levy > 0 && he.import.priorLevies(prior.levy), prior.ev > 0 && he.import.priorEv(prior.ev)].filter(Boolean).join(' · ')}>
+      <Text size="sm">{he.import.priorBody}</Text>
+      <Toggle label={he.import.priorKeep} checked={keep} onChange={onKeep} />
+    </Alert>
+  )
+}
+
 export function ReplaceNotes({ fees, budgets }: { fees: number; budgets: number }) {
   if (fees === 0 && budgets === 0) return null
   return (
@@ -149,5 +180,20 @@ export function ReplaceNotes({ fees, budgets }: { fees: number; budgets: number 
       {fees > 0 && <Text size="sm">{he.import.replaceFees(fees)}</Text>}
       {budgets > 0 && <Text size="sm">{he.import.updateBudgets(budgets)}</Text>}
     </Alert>
+  )
+}
+
+/** Apartments with no payment all year: an opt-in exempt row from January of the import year. */
+export function ExemptNotice({ hints, chosen, year, onChange }: { hints: number[]; chosen: number[]; year: number; onChange: (v: number[]) => void }) {
+  if (hints.length === 0) return null
+  const toggle = (n: number, on: boolean): void => onChange(on ? [...chosen, n] : chosen.filter((x) => x !== n))
+  return (
+    <Paper withBorder radius={12} p="sm">
+      <Text fw={600}>{he.import.exemptTitle}</Text>
+      <Text size="sm" c="dimmed">{he.import.exemptBody}</Text>
+      {hints.map((n) => (
+        <Toggle key={n} label={he.import.exemptToggle(n, monthLabel(`${year}-01-01`))} checked={chosen.includes(n)} onChange={(v) => toggle(n, v)} />
+      ))}
+    </Paper>
   )
 }

@@ -4,7 +4,7 @@ import { Fragment, useState } from 'react'
 import { todayISO } from '../../lib/dates'
 import { formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
-import { EmptyState, ListSkeleton, notifySuccess } from '../../ui'
+import { EmptyState, focusFirstError, ListSkeleton, notifySuccess } from '../../ui'
 import { useExpenseCategories, type ExpenseCategory } from '../maintenance/api'
 import { budgetRows } from '../export/buildWorkbook'
 import { FormModal } from '../tenants/dialogs'
@@ -82,7 +82,7 @@ function BudgetFormFields({ year, category, planned, onDone, categories }: Budge
   const submit = form.onSubmit((v) => {
     if (!(v.categoryId && typeof v.amount === 'number')) return
     save.mutate({ year, category_id: v.categoryId, amount: v.amount }, { onSuccess: () => { notifySuccess(he.finance.budgetSaved); onDone() } })
-  })
+  }, focusFirstError)
   return (
     <form onSubmit={submit} noValidate>
       <Stack>

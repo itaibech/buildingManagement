@@ -1,4 +1,5 @@
 import { NavLink, Stack, Text } from '@mantine/core'
+import { IconChevronLeft, IconFileSpreadsheet } from '@tabler/icons-react'
 import { useState } from 'react'
 import { useAuth } from '../../auth/AuthProvider'
 import { todayISO } from '../../lib/dates'
@@ -46,8 +47,10 @@ export function YearExport() {
   if (!isAdmin) return null
   return (
     <>
-      <NavLink label={he.export.fullYear} onClick={() => setOpen(true)} />
-      <FormModal opened={open} title={he.export.fullYear} onClose={() => setOpen(false)}>
+      <NavLink label={he.export.fullYear} onClick={() => setOpen(true)} fw={600} style={{ borderRadius: 10 }}
+        leftSection={<IconFileSpreadsheet size={22} stroke={1.75} aria-hidden="true" />}
+        rightSection={<IconChevronLeft size={18} stroke={1.75} aria-hidden="true" />} />
+      <FormModal compact opened={open} title={he.export.fullYear} onClose={() => setOpen(false)}>
         {open && <YearBody />}
       </FormModal>
     </>

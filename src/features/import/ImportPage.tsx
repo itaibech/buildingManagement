@@ -1,18 +1,16 @@
-import { Button, Group, Stepper } from '@mantine/core'
+import { Button, Group } from '@mantine/core'
 import { useEffect, useState, type ReactNode } from 'react'
 import { he } from '../../lib/he'
 import { ListSkeleton, notifyError, notifySuccess, PageHeader } from '../../ui'
-import { useDesktop } from '../finance/hooks'
 import { useImportYear, type ImportCounts } from './api'
 import { columnsReady, feesReady, summarize, yearValid } from './buildImport'
 import { CategoriesStep, ColumnsStep, FeesStep } from './MappingSteps'
 import { ImportError } from './parseWorkbook'
-import { DoneStep, EvNotice, LevyNotice, OverlapNotice, PreviewStep, ReplaceNotes, UploadStep } from './PreviewStep'
+import { DoneStep, EvNotice, ExemptNotice, LevyNotice, OverlapNotice, PaidNotice, PreviewStep, PriorNotice, ReplaceNotes, UploadStep } from './PreviewStep'
 import { readWorkbook, type ReadResult } from './readWorkbook'
+import { WizardSteps } from './WizardSteps'
 import { useDerived, useImportContext, useImportState, type Derived, type ImportContext, type ImportState } from './useImportFlow'
 
-// Mobile: the vertical stepper stays a compact 44px per step so the current step's content is in view.
-const COMPACT = { step: { minHeight: 44, alignItems: 'center' }, stepBody: { marginTop: 0 }, verticalSeparator: { top: 36, bottom: -10 } } as const
 const THIS_YEAR = new Date().getFullYear()
 const STEPS = ['upload', 'columns', 'fees', 'categories', 'preview', 'done'] as const
 
@@ -52,8 +50,11 @@ function PreviewBody({ st, d, ctx, save, back, confirm }: PreviewBodyProps) {
       <PreviewStep summary={summarize(d.payload, ctx.categories)} warnings={st.read.warnings} year={st.year} budgetYear={st.budgetYear}
         onYear={st.setYear} onBudgetYear={st.setBudgetYear} error={save.isError ? he.import.errors.failed : ''}>
         {d.levies.map((l) => <LevyNotice key={l.col} levy={l} apartments={d.payload?.apartments.length ?? 0} onAmount={(a) => setLevy(l.col, a)} />)}
-        <EvNotice ev={d.ev} include={st.includeEv} onInclude={st.setIncludeEv} />
+        <EvNotice ev={d.ev} include={d.includeEv} managed={ctx.hasChargers} skipped={d.evSkipped} onInclude={st.setIncludeEv} />
+        <PaidNotice overlaps={d.paid} include={st.importPaid} onInclude={st.setImportPaid} />
+        <PriorNotice prior={d.prior} keep={st.keepPrior} onKeep={st.setKeepPrior} />
         <OverlapNotice overlaps={d.overlaps} include={st.importOverlaps} onInclude={st.setImportOverlaps} />
+        <ExemptNotice hints={d.exemptHints} chosen={st.exempt} year={st.year} onChange={st.setExempt} />
         <ReplaceNotes fees={d.feesReplaced} budgets={d.budgetsUpdated} />
       </PreviewStep>
       <StepNav onBack={back} onNext={confirm} nextLabel={he.import.confirm} loading={save.isPending} disabled={!ready} />
@@ -83,12 +84,11 @@ function stepBodies({ st, d, ctx, go, upload, save, confirm, counts, again }: Bo
       <StepNav onBack={go(2)} onNext={go(4)} nextLabel={he.import.next} disabled={ctx.loading} />
     </>,
     preview: <PreviewBody st={st} d={d} ctx={ctx} save={save} back={go(3)} confirm={confirm} />,
-    done: <DoneStep counts={counts} year={st.year} onAgain={again} />,
+    done: <DoneStep counts={counts} year={st.year} evSkipped={(counts.ev_skipped ?? 0) + (d.includeEv ? 0 : d.evSkipped)} onAgain={again} />,
   }
 }
 
 export default function ImportPage() {
-  const desktop = useDesktop()
   const st = useImportState()
   const ctx = useImportContext(st.year || THIS_YEAR, st.budgetYear || THIS_YEAR)
   const d = useDerived(st, ctx)
@@ -110,11 +110,7 @@ export default function ImportPage() {
   return (
     <>
       <PageHeader title={he.nav.import} />
-      <Stepper active={active} onStepClick={(i) => i < active && active < 5 && setActive(i)} allowNextStepsSelect={false}
-        orientation={desktop ? 'horizontal' : 'vertical'} size="sm" iconSize={32} wrap={false}
-        styles={desktop ? undefined : COMPACT}>
-        {STEPS.map((s) => <Stepper.Step key={s} label={he.import.steps[s]}>{body[s]}</Stepper.Step>)}
-      </Stepper>
+      <WizardSteps steps={STEPS} labels={he.import.steps} bodies={body} active={active} onStep={setActive} />
     </>
   )
 }

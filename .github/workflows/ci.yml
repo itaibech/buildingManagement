@@ -2,12 +2,19 @@ name: CI
 on:
   pull_request:
   push:
+  # deploy.yml calls this workflow first, so prod migrations only run after lint, unit and pgTAP tests pass.
+  workflow_call:
+# Least privilege: CI only reads the repo. pull_request runs from forks get no secrets (none are used here).
+permissions:
+  contents: read
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
@@ -16,18 +23,24 @@ jobs:
       - run: npm run lint
       - run: npx tsc -b
       - run: npx vitest run
+      # The CSP plugin needs a Supabase URL at build time; CI only checks that the build succeeds.
       - run: npm run build
+        env:
+          VITE_SUPABASE_URL: http://127.0.0.1:54321
+          VITE_SUPABASE_ANON_KEY: ci-build-placeholder
   db-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: supabase/setup-cli@v1
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1
         with:
           version: 2.122.0
       - run: supabase db start
       - run: supabase test db
       - run: supabase gen types typescript --local > db.types.ts
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: db-types
           path: db.types.ts

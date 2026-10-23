@@ -83,14 +83,14 @@ isOneToOne: false
                   ]
                 },"apartment_fee_overrides": {
                   Row: {
-                    "amount": number,"apartment_id": string,"building_id": string,"created_at": string,"effective_from": string,"id": string
+                    "amount": number | null,"apartment_id": string,"building_id": string,"created_at": string,"effective_from": string,"id": string,"mode": string,"source": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount": number,"apartment_id": string,"building_id"?: string,"created_at"?: string,"effective_from": string,"id"?: string
+                    "amount"?: number | null,"apartment_id": string,"building_id"?: string,"created_at"?: string,"effective_from": string,"id"?: string,"mode"?: string,"source"?: string
                   }
                   Update: {
-                    "amount"?: number,"apartment_id"?: string,"building_id"?: string,"created_at"?: string,"effective_from"?: string,"id"?: string
+                    "amount"?: number | null,"apartment_id"?: string,"building_id"?: string,"created_at"?: string,"effective_from"?: string,"id"?: string,"mode"?: string,"source"?: string
                   }
                   Relationships: [
                     {
@@ -199,28 +199,28 @@ isOneToOne: false
                   ]
                 },"buildings": {
                   Row: {
-                    "address": string | null,"billing_start": string | null,"created_at": string,"id": string,"name": string,"opening_cash": number,"opening_cash_date": string | null
+                    "address": string | null,"billing_start": string | null,"committee_contact": string | null,"created_at": string,"id": string,"name": string,"opening_cash": number,"opening_cash_date": string | null,"payment_instructions": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "address"?: string | null,"billing_start"?: string | null,"created_at"?: string,"id"?: string,"name": string,"opening_cash"?: number,"opening_cash_date"?: string | null
+                    "address"?: string | null,"billing_start"?: string | null,"committee_contact"?: string | null,"created_at"?: string,"id"?: string,"name": string,"opening_cash"?: number,"opening_cash_date"?: string | null,"payment_instructions"?: string | null
                   }
                   Update: {
-                    "address"?: string | null,"billing_start"?: string | null,"created_at"?: string,"id"?: string,"name"?: string,"opening_cash"?: number,"opening_cash_date"?: string | null
+                    "address"?: string | null,"billing_start"?: string | null,"committee_contact"?: string | null,"created_at"?: string,"id"?: string,"name"?: string,"opening_cash"?: number,"opening_cash_date"?: string | null,"payment_instructions"?: string | null
                   }
                   Relationships: [
                     
                   ]
                 },"charges": {
                   Row: {
-                    "amount": number,"apartment_id": string,"building_id": string,"created_at": string,"id": string,"kind": string,"label": string,"month": string,"source": string
+                    "amount": number,"apartment_id": string,"building_id": string,"created_at": string,"ev_reading_id": string | null,"id": string,"kind": string,"label": string,"month": string,"source": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount": number,"apartment_id": string,"building_id"?: string,"created_at"?: string,"id"?: string,"kind": string,"label"?: string,"month": string,"source"?: string
+                    "amount": number,"apartment_id": string,"building_id"?: string,"created_at"?: string,"ev_reading_id"?: string | null,"id"?: string,"kind": string,"label"?: string,"month": string,"source"?: string
                   }
                   Update: {
-                    "amount"?: number,"apartment_id"?: string,"building_id"?: string,"created_at"?: string,"id"?: string,"kind"?: string,"label"?: string,"month"?: string,"source"?: string
+                    "amount"?: number,"apartment_id"?: string,"building_id"?: string,"created_at"?: string,"ev_reading_id"?: string | null,"id"?: string,"kind"?: string,"label"?: string,"month"?: string,"source"?: string
                   }
                   Relationships: [
                     {
@@ -252,6 +252,114 @@ isOneToOne: false
       columns: ["building_id"]
 isOneToOne: false
       referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "charges_ev_reading_id_fkey"
+      columns: ["ev_reading_id"]
+isOneToOne: false
+      referencedRelation: "ev_readings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"ev_chargers": {
+                  Row: {
+                    "active": boolean,"apartment_id": string,"building_id": string,"created_at": string,"id": string,"initial_reading": number,"label": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "active"?: boolean,"apartment_id": string,"building_id"?: string,"created_at"?: string,"id"?: string,"initial_reading"?: number,"label"?: string
+                  }
+                  Update: {
+                    "active"?: boolean,"apartment_id"?: string,"building_id"?: string,"created_at"?: string,"id"?: string,"initial_reading"?: number,"label"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "ev_chargers_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: true
+      referencedRelation: "apartment_balances"
+      referencedColumns: ["apartment_id"]
+    },{
+      foreignKeyName: "ev_chargers_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: true
+      referencedRelation: "apartments"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "ev_chargers_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: true
+      referencedRelation: "monthly_fees"
+      referencedColumns: ["apartment_id"]
+    },{
+      foreignKeyName: "ev_chargers_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "ev_chargers_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"ev_rates": {
+                  Row: {
+                    "building_id": string,"created_at": string,"effective_from": string,"id": string,"rate": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "building_id"?: string,"created_at"?: string,"effective_from": string,"id"?: string,"rate": number
+                  }
+                  Update: {
+                    "building_id"?: string,"created_at"?: string,"effective_from"?: string,"id"?: string,"rate"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "ev_rates_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "ev_rates_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"ev_readings": {
+                  Row: {
+                    "amount": number | null,"building_id": string,"charger_id": string,"created_at": string,"id": string,"kwh": number | null,"month": string,"note": string,"rate": number | null,"read_on": string | null,"reading": number,"source": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount"?: number | null,"building_id"?: string,"charger_id": string,"created_at"?: string,"id"?: string,"kwh"?: number | null,"month": string,"note"?: string,"rate"?: number | null,"read_on"?: string | null,"reading": number,"source"?: string
+                  }
+                  Update: {
+                    "amount"?: number | null,"building_id"?: string,"charger_id"?: string,"created_at"?: string,"id"?: string,"kwh"?: number | null,"month"?: string,"note"?: string,"rate"?: number | null,"read_on"?: string | null,"reading"?: number,"source"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "ev_readings_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "ev_readings_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "ev_readings_charger_id_fkey"
+      columns: ["charger_id"]
+isOneToOne: false
+      referencedRelation: "ev_chargers"
       referencedColumns: ["id"]
     }
                   ]
@@ -656,7 +764,7 @@ isOneToOne: false
           Views: {
             "apartment_balances": {
                   Row: {
-                    "apartment_id": string,"balance": number | null,"charged": number | null,"paid": number | null,"scheduled_charges": number | null
+                    "apartment_id": string,"balance": number | null,"charged": number | null,"current_fee": number | null,"current_fee_mode": string | null,"paid": number | null,"scheduled_charges": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -686,7 +794,7 @@ isOneToOne: false
                   ]
                 },"monthly_fees": {
                   Row: {
-                    "amount": number | null,"apartment_id": string,"month": string | null
+                    "amount": number | null,"apartment_id": string,"fee_mode": string | null,"month": string | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -695,7 +803,12 @@ isOneToOne: false
                 }
           }
           Functions: {
-            "building_cash_balance":
+            "apartment_fee_at":
+{ Args: { "p_apartment_id": string,"p_month": string }; Returns: {
+              "amount": number,"fee_mode": string
+            }[]
+                           },
+"building_cash_balance":
 { Args: { "p_building_id": string }; Returns: number
                            },
 "can_manage_ticket":
@@ -715,14 +828,70 @@ isOneToOne: false
 "default_building_id":
 { Args: Record<PropertyKey, never>; Returns: string
                            },
+"delete_ev_rate":
+{ Args: { "p_id": string }; Returns: number
+                           },
+"delete_ev_reading":
+{ Args: { "p_reading_id": string }; Returns: undefined
+                           },
+"ev_charge_reading":
+{ Args: { "p_reading_id": string }; Returns: Json
+                           },
+"ev_covered":
+{ Args: { "p": Json }; Returns: {
+              "month": string,"number": number
+            }[]
+                           },
+"ev_import_charger":
+{ Args: { "b": string,"c": Json }; Returns: Json
+                           },
+"ev_import_payments":
+{ Args: { "b": string,"p": Json }; Returns: number
+                           },
+"ev_import_rates":
+{ Args: { "b": string,"p": Json }; Returns: undefined
+                           },
+"ev_is_month":
+{ Args: { "j": Json }; Returns: boolean
+                           },
+"ev_is_number":
+{ Args: { "hi": number,"j": Json,"lo": number }; Returns: boolean
+                           },
+"ev_lock_all":
+{ Args: { "b": string }; Returns: undefined
+                           },
+"ev_recompute_from":
+{ Args: { "b": string,"p_from": string }; Returns: number
+                           },
+"ev_recompute_next":
+{ Args: { "p_charger_id": string,"p_month": string }; Returns: undefined
+                           },
+"ev_replace_main":
+{ Args: { "b": string,"p": Json }; Returns: Json
+                           },
+"ev_validate":
+{ Args: { "p": Json }; Returns: undefined
+                           },
 "import_check":
 { Args: { "ok": boolean,"what": string }; Returns: undefined
+                           },
+"import_ev":
+{ Args: { "payload": Json }; Returns: Json
+                           },
+"import_ev_paid":
+{ Args: { "p_apartment": string,"p_note": string,"p_paid_on": string }; Returns: boolean
+                           },
+"import_exempt":
+{ Args: { "b": string,"p": Json,"y0": string }; Returns: Json
                            },
 "import_fees":
 { Args: { "b": string,"p": Json,"y0": string,"y1": string }; Returns: Json
                            },
 "import_is_amount":
 { Args: { "j": Json }; Returns: boolean
+                           },
+"import_is_ev_charge":
+{ Args: { "p_apartment": string,"p_kind": string,"p_label": string }; Returns: boolean
                            },
 "import_is_int":
 { Args: { "hi": number,"j": Json,"lo": number }; Returns: boolean
@@ -739,8 +908,17 @@ isOneToOne: false
 "import_people":
 { Args: { "b": string,"p": Json }; Returns: Json
                            },
+"import_replaced_kinds":
+{ Args: { "p": Json }; Returns: (string)[]
+                           },
 "import_spending":
 { Args: { "b": string,"p": Json }; Returns: Json
+                           },
+"import_validate_exempt":
+{ Args: { "p": Json }; Returns: undefined
+                           },
+"import_validate_keep":
+{ Args: { "p": Json }; Returns: undefined
                            },
 "import_validate_refs":
 { Args: { "p": Json }; Returns: undefined
@@ -765,6 +943,15 @@ isOneToOne: false
                            },
 "my_apartment_id":
 { Args: Record<PropertyKey, never>; Returns: string
+                           },
+"record_ev_reading":
+{ Args: { "p_charger_id": string,"p_month": string,"p_note"?: string,"p_read_on"?: string,"p_reading": number }; Returns: Json
+                           },
+"save_ev_rate":
+{ Args: { "p_effective_from": string,"p_rate": number }; Returns: number
+                           },
+"set_apartment_fee":
+{ Args: { "p_amount"?: number,"p_apartment_id": string,"p_effective_from": string,"p_mode": string }; Returns: boolean
                            },
 "user_names":
 { Args: { "ids": (string)[] }; Returns: {

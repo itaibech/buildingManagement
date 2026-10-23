@@ -3,7 +3,7 @@ import { useForm } from '@mantine/form'
 import { todayISO } from '../../lib/dates'
 import { formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
-import { notifySuccess } from '../../ui'
+import { DateInput, focusFirstError, notifySuccess } from '../../ui'
 import { PAYMENT_METHODS, useBalances, useSavePayment, type PaymentMethod } from './api'
 import { MoneyInput } from './fields'
 import { useApartmentOptions } from './hooks'
@@ -20,13 +20,13 @@ const METHOD_DATA = PAYMENT_METHODS.map((m) => ({ value: m, label: he.finance.me
 const isMethod = (v: string | null): v is PaymentMethod => PAYMENT_METHODS.some((m) => m === v)
 
 /** "רישום תשלום": apartment, date (today), amount (defaults to what it owes), method and a note. */
-export function PaymentForm({ apartmentId, onDone }: { apartmentId?: string; onDone: () => void }) {
+export function PaymentForm({ apartmentId, note, onDone }: { apartmentId?: string; note?: string; onDone: () => void }) {
   const save = useSavePayment()
   const options = useApartmentOptions()
   const balances = useBalances()
   const owed = (id: string | null) => balances.data?.find((b) => b.apartmentId === id)?.balance ?? 0
   const form = useForm<PaymentValues>({
-    initialValues: { apartmentId: apartmentId ?? null, paidOn: todayISO(), amount: '', method: 'transfer', note: '' },
+    initialValues: { apartmentId: apartmentId ?? null, paidOn: todayISO(), amount: '', method: 'transfer', note: note ?? '' },
     validate: {
       apartmentId: (v) => (v ? null : he.finance.errors.required),
       paidOn: (v) => (v ? null : he.finance.errors.required),
@@ -39,7 +39,7 @@ export function PaymentForm({ apartmentId, onDone }: { apartmentId?: string; onD
     save.mutate({ apartment_id: v.apartmentId, paid_on: v.paidOn, amount: v.amount, method: v.method, note: v.note.trim() }, {
       onSuccess: () => { notifySuccess(he.finance.paymentRecorded); onDone() },
     })
-  })
+  }, focusFirstError)
   return (
     <form onSubmit={submit} noValidate>
       <Stack>
@@ -51,7 +51,7 @@ export function PaymentForm({ apartmentId, onDone }: { apartmentId?: string; onD
             {he.finance.payFull(formatILS(current))}
           </Button>
         )}
-        <TextInput label={he.finance.paidOn} withAsterisk type="date" dir="ltr" {...form.getInputProps('paidOn')} />
+        <DateInput label={he.finance.paidOn} withAsterisk {...form.getInputProps('paidOn')} />
         <Select label={he.finance.method} data={METHOD_DATA} allowDeselect={false} value={form.values.method}
           onChange={(v) => isMethod(v) && form.setFieldValue('method', v)} />
         <TextInput label={he.finance.note} {...form.getInputProps('note')} />

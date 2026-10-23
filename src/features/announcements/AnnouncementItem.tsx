@@ -1,6 +1,6 @@
 import { ActionIcon, Badge, Box, Card, Collapse, Group, Menu, Stack, Text, UnstyledButton } from '@mantine/core'
 import { IconChevronDown, IconDots, IconPencil, IconPin, IconTrash } from '@tabler/icons-react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { formatDate } from '../../lib/format'
 import { he } from '../../lib/he'
 import type { AnnouncementItem as Item } from './api'
@@ -48,37 +48,52 @@ export interface AnnouncementItemProps {
   actions?: AdminActions
 }
 
-/** One announcement: tap the header to read it. Opening an unread item marks it read. */
+function Header({ item, expired, opened, onToggle }: { item: Item; expired: boolean; opened: boolean; onToggle: () => void }) {
+  return (
+    <UnstyledButton onClick={onToggle} aria-expanded={opened} mih={44} p="md" pb={opened ? 'xs' : undefined} className="bm-row" style={{ flex: 1, minWidth: 0 }}>
+      <Group wrap="nowrap" gap="sm" align="center">
+        {!item.isRead && !expired ? <UnreadDot /> : <Box w={10} style={{ flexShrink: 0 }} />}
+        <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
+          <Text fw={item.isRead ? 400 : 600} truncate={opened ? undefined : 'end'}>{item.title}</Text>
+          <Group gap="xs" wrap="wrap">
+            {item.pinned && <Badge size="md" color="enamel" c="enamel.9" leftSection={<IconPin size={14} stroke={1.75} />}>{he.announcements.pinnedLabel}</Badge>}
+            <Meta a={item} expired={expired} />
+          </Group>
+        </Stack>
+        <IconChevronDown size={20} stroke={1.75} aria-hidden="true" style={{ transform: opened ? 'rotate(180deg)' : undefined }} />
+      </Group>
+    </UnstyledButton>
+  )
+}
+
+/**
+ * One announcement. Pinned and unread items open with their full body (an unread one is marked read once,
+ * as it is shown); read items show a 2-line preview and expand on tap.
+ */
 export function AnnouncementItem({ item, expired = false, onOpen, actions }: AnnouncementItemProps) {
-  const [opened, setOpened] = useState(false)
+  const [opened, setOpened] = useState(() => item.pinned || (!item.isRead && !expired))
   const reported = useRef(false)
-  const toggle = () => {
-    if (!opened && !item.isRead && !reported.current) {
+  const report = useRef(onOpen)
+  useEffect(() => {
+    report.current = onOpen
+  })
+  useEffect(() => {
+    if (opened && !item.isRead && !reported.current) {
       reported.current = true
-      onOpen?.(item)
+      report.current?.(item)
     }
-    setOpened(!opened)
-  }
+  }, [opened, item])
   return (
     <Card padding={0} data-testid={`announcement-${item.id}`} style={expired ? { opacity: 0.8 } : undefined}>
       <Group wrap="nowrap" gap={0} align="center">
-      <UnstyledButton onClick={toggle} aria-expanded={opened} mih={44} p="md" className="bm-row" style={{ flex: 1, minWidth: 0 }}>
-        <Group wrap="nowrap" gap="sm" align="center">
-          {!item.isRead && !expired ? <UnreadDot /> : <Box w={10} style={{ flexShrink: 0 }} />}
-          <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
-            <Text fw={item.isRead ? 400 : 600} truncate={opened ? undefined : 'end'}>{item.title}</Text>
-            <Group gap="xs" wrap="wrap">
-              {item.pinned && <Badge size="md" color="enamel" c="enamel.9" leftSection={<IconPin size={14} stroke={1.75} />}>{he.announcements.pinnedLabel}</Badge>}
-              <Meta a={item} expired={expired} />
-            </Group>
-          </Stack>
-          <IconChevronDown size={20} stroke={1.75} aria-hidden="true" style={{ transform: opened ? 'rotate(180deg)' : undefined }} />
-        </Group>
-      </UnstyledButton>
-      {actions && <ItemMenu item={item} actions={actions} />}
+        <Header item={item} expired={expired} opened={opened} onToggle={() => setOpened(!opened)} />
+        {actions && <ItemMenu item={item} actions={actions} />}
       </Group>
+      {!opened && (
+        <Text data-testid="announcement-preview" px="md" pb="md" mt={-8} ps={44} c="dimmed" size="sm" lineClamp={2}>{item.body}</Text>
+      )}
       <Collapse expanded={opened}>
-        <Text px="md" pb="md" style={{ whiteSpace: 'pre-wrap' }}>{item.body}</Text>
+        <Text px="md" pb="md" ps={44} style={{ whiteSpace: 'pre-wrap' }}>{item.body}</Text>
       </Collapse>
     </Card>
   )

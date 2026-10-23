@@ -72,16 +72,19 @@ export interface RowProps {
   onClick?: () => void
   label?: string
   trailing?: ReactNode
+  /** A status badge under the title (e.g. "פטור מדמי ועד"). */
+  badge?: ReactNode
 }
 
 /** A list row: plate on the start side, title and meta, amount at the end; tappable when `onClick` is set. */
-export function Row({ plate, title, meta, end, onClick, label, trailing }: RowProps) {
+export function Row({ plate, title, meta, end, onClick, label, trailing, badge }: RowProps) {
   const body = (
     <>
       {plate !== undefined && <AptPlate number={plate} size="sm" />}
       <div style={{ flex: 1, minWidth: 0 }}>
         <Text fw={600} truncate="end">{title}</Text>
         {meta && <Text size="sm" c="dimmed" className="bm-num" lineClamp={2}>{meta}</Text>}
+        {badge && <div style={{ marginTop: 2 }}>{badge}</div>}
       </div>
       <div style={{ flexShrink: 0 }}>{end}</div>
     </>

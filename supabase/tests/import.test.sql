@@ -2,7 +2,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(26);
+select plan(37);
 
 insert into auth.users (id, email, aud, role) values
   ('a9200000-0000-0000-0000-000000000001', 'imp-admin@test.local', 'authenticated', 'authenticated'),
@@ -109,6 +109,68 @@ select throws_ok($$ select public.import_year(jsonb_set((select j from p), '{pay
 select throws_ok($$ select public.import_year(jsonb_set((select j from p), '{expenses,0,category}', '"לא ברשימה"')) $$,
   '22023', 'Invalid import payload: unknown category', 'an expense category not in the payload is rejected');
 select is((select row(payments, charges, expenses)::text from import_counts), '(3,3,2)', 'failed imports change nothing');
+
+-- ---------------------------------------------------------------- confirmed exempt apartments (0010)
+select is(public.import_year(jsonb_set((select j from p), '{exempt}', '[902]')) ->> 'exempt', '1', 'exempt apartment reported');
+select is((select row(o.mode, o.effective_from)::text from public.apartment_fee_overrides o
+  join public.apartments a on a.id = o.apartment_id where a.number = 902), '(exempt,2030-01-01)', 'exempt from January of the import year');
+select throws_ok($$ select public.import_year(jsonb_set((select j from p), '{exempt}', '[999]')) $$,
+  '22023', 'Invalid import payload: exempt (unknown apartment)', 'an exempt apartment not in the payload is rejected');
+select is((select o.source from public.apartment_fee_overrides o
+  join public.apartments a on a.id = o.apartment_id where a.number = 902), 'import', 'import-created exempt rows are tagged');
+select public.set_apartment_fee((select id from public.apartments where number = 901), '2030-03-01', 'exempt', null);
+select is(public.import_year(jsonb_set((select j from p), '{exempt}', '[]')) ->> 'exempt', '0', 're-import without the choice');
+select is((select count(*) from public.apartment_fee_overrides o
+  join public.apartments a on a.id = o.apartment_id where a.number = 902), 0::bigint, 're-import removes the earlier import exempt row');
+select is((select row(o.mode, o.source)::text from public.apartment_fee_overrides o
+  join public.apartments a on a.id = o.apartment_id where a.number = 901), '(exempt,manual)', 'a manual timeline row survives re-import');
+
+-- ---------------------------------------------------------------- export, then re-import: balances unchanged (0012)
+-- A past year (balances are capped at the current month). 901 mixes sources in one month, has an EV-import
+-- payment, an imported levy and an imported EV charge; the exported workbook carries none of the charges.
+reset role;
+insert into public.payments (apartment_id, paid_on, amount, method, source)
+select a.id, v.paid_on::date, v.amount, 'other', v.source
+from public.apartments a, (values
+  (901, '2025-03-01', 300, 'import'), (901, '2025-03-10', 100, 'manual'), (901, '2025-04-01', 50, 'ev-import'),
+  (902, '2025-02-01', 200, 'import')) v(number, paid_on, amount, source)
+where a.number = v.number;
+insert into public.charges (apartment_id, month, amount, kind, label, source)
+select a.id, v.month::date, v.amount, v.kind, v.label, 'import'
+from public.apartments a, (values
+  (901, '2025-05-01', 500, 'levy', 'היטל מיוחד'), (901, '2025-04-01', 50, 'extra', 'טעינת רכב חשמלי'),
+  (902, '2025-05-01', 500, 'levy', 'היטל מיוחד')) v(number, month, amount, kind, label)
+where a.number = v.number;
+create temp table balances_before (apartment_id uuid, balance numeric);
+create temp table roundtrip (j jsonb);
+grant all on balances_before, roundtrip to authenticated;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"a9200000-0000-0000-0000-000000000001","role":"authenticated"}';
+insert into balances_before select apartment_id, balance from public.apartment_balances;
+-- What the year export + import preview produce: one payment per apartment-month (all sources summed, as the
+-- הכנסות sheet does), minus what is already recorded there by non-import payments (the preview's default),
+-- the year's fee schedule prefilled from the system, no charges, keep_prior_levies left to its default.
+insert into roundtrip select jsonb_build_object(
+  'year', 2025, 'budget_year', 2025,
+  'apartments', (select jsonb_agg(jsonb_build_object('number', number)) from public.apartments),
+  'residents', '[]'::jsonb, 'charges', '[]'::jsonb, 'categories', '[]'::jsonb, 'expenses', '[]'::jsonb, 'budgets', '[]'::jsonb,
+  'fees', coalesce((select jsonb_agg(jsonb_build_object('effective_from', effective_from, 'amount', amount))
+    from public.fee_schedule where effective_from between '2025-01-01' and '2025-12-31'), '[]'::jsonb),
+  'payments', coalesce((select jsonb_agg(jsonb_build_object('apartment', number, 'paid_on', month, 'amount', cell - coalesce(recorded, 0), 'note', 'יובא מאקסל'))
+    from (select a.number, date_trunc('month', x.paid_on)::date as month, sum(x.amount) as cell,
+        sum(x.amount) filter (where x.source <> 'import') as recorded
+      from public.payments x join public.apartments a on a.id = x.apartment_id
+      where x.paid_on between '2025-01-01' and '2025-12-31' group by 1, 2) c
+    where cell - coalesce(recorded, 0) > 0), '[]'::jsonb));
+select lives_ok($$ select public.import_year((select j from roundtrip)) $$, 're-importing the exported year succeeds');
+select is((select count(*) from public.apartment_balances b join balances_before o using (apartment_id)
+  where b.balance is distinct from o.balance), 0::bigint, 'export then re-import leaves every balance unchanged');
+select is((select count(*) from public.charges where source = 'import' and month between '2025-01-01' and '2025-12-31'),
+  3::bigint, 'prior imported levy and EV charges are kept when the file has none');
+select public.import_year(jsonb_set((select j from roundtrip), '{keep_prior_levies}', 'false'));
+select is((select count(*) from public.charges where source = 'import' and month between '2025-01-01' and '2025-12-31'),
+  0::bigint, 'keep_prior_levies = false replaces them');
 
 select * from finish();
 rollback;
