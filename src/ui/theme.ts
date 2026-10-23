@@ -1,4 +1,8 @@
-import { Badge, Button, Card, createTheme, type CSSVariablesResolver, NavLink, Paper, PasswordInput, TextInput, type MantineColorsTuple } from '@mantine/core'
+import {
+  Autocomplete, Badge, Button, Card, createTheme, type CSSVariablesResolver, Menu, Modal, MultiSelect, NavLink, NumberInput, Paper,
+  PasswordInput, SegmentedControl, Select, Textarea, TextInput, type MantineColorsTuple,
+} from '@mantine/core'
+import { he } from '../lib/he'
 
 // Doc tokens sit at index 6; lighter shades mix toward white, darker toward black.
 const enamel: MantineColorsTuple = ['#EDF1F7', '#D7DFED', '#B3C3DD', '#8FA7CE', '#6B8ABE', '#456CAD', '#1F4E9C', '#1B4386', '#173972', '#132F5E']
@@ -39,8 +43,20 @@ export const theme = createTheme({
     Paper: Paper.extend({ styles: { root: { borderColor: CARD_BORDER } } }),
     Button: Button.extend({ defaultProps: { radius: 'md', size: 'md' }, styles: { root: { ...touch, fontWeight: 600 } } }),
     TextInput: TextInput.extend({ defaultProps: { radius: 'md', size: 'md' }, styles: { input: touch } }),
-    PasswordInput: PasswordInput.extend({ defaultProps: { radius: 'md', size: 'md' }, styles: { input: touch } }),
+    PasswordInput: PasswordInput.extend({ defaultProps: { radius: 'md', size: 'md' }, styles: { input: touch, innerInput: touch } }),
+    Select: Select.extend({ defaultProps: { radius: 'md', size: 'md', clearButtonProps: { 'aria-label': he.clear } }, styles: { input: touch } }),
+    Autocomplete: Autocomplete.extend({ defaultProps: { radius: 'md', size: 'md' }, styles: { input: touch } }),
+    MultiSelect: MultiSelect.extend({ defaultProps: { radius: 'md', size: 'md', clearButtonProps: { 'aria-label': he.clear } }, styles: { input: touch } }),
+    NumberInput: NumberInput.extend({ defaultProps: { radius: 'md', size: 'md' }, styles: { input: touch } }),
+    Textarea: Textarea.extend({ defaultProps: { radius: 'md', size: 'md' } }),
+    SegmentedControl: SegmentedControl.extend({
+      defaultProps: { radius: 'md', size: 'md' },
+      styles: { label: { ...touch, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600 } },
+    }),
     NavLink: NavLink.extend({ styles: { root: touch } }),
+    // Every sheet's close "×": named for screen readers and a full 44px target.
+    Modal: Modal.extend({ defaultProps: { closeButtonProps: { 'aria-label': he.close, size: 44, iconSize: 22 } } }),
+    Menu: Menu.extend({ styles: { item: touch } }),
     Badge: Badge.extend({ defaultProps: { radius: 'sm', variant: 'light', size: 'lg' }, styles: { root: { textTransform: 'none', fontWeight: 600 } } }),
   },
 })

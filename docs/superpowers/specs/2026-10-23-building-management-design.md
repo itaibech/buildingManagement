@@ -72,9 +72,15 @@ Onboarding flow (agreed with user):
 1. The person signs up with Google or with email and password.
 2. They see a "waiting for approval" screen and no building data.
 3. An admin approves them, links them to an apartment and sets their role.
-4. Bootstrap: the email `itai.bechor@solaredge.com` becomes admin
-   automatically on first sign-in (seeded in a migration or config, not
-   hard-coded in the client).
+4. Bootstrap: the email `itai.bechor@gmail.com` (the `bootstrap_admin_email` app setting, set per
+   environment, never hard-coded in the client) becomes the **super admin** on its first sign-in,
+   while no admin exists yet. The grant is made **only for a Google sign-in** (Google has verified the
+   address); an email/password sign-up with that address gets a pending resident profile like
+   everyone else.
+5. The super admin can't be demoted, blocked or deleted, by anyone (enforced by database triggers,
+   not the UI).
+6. Any admin can promote a resident to admin, and demote or block another admin (except the super
+   admin and themselves).
 
 ## 5. Features
 
@@ -174,6 +180,24 @@ Import the committee's workbook (sample: `תשלומי וועד בית עד או
   → write. Re-importing the same year must not double the data: either
   replace that year's imported rows or refuse, and the builder picks one.
 - Admins only.
+
+### 5.7 טעינת רכב חשמלי — EV chargers (phase 1, task 14)
+- Admins register a charger per apartment (label, opening meter reading) and record a monthly meter
+  reading. Each reading creates that apartment's EV charge: (reading − previous) × the kWh rate in
+  force that month. Rates have a history (effective from a month).
+- Charges are written only by server functions (meter math under a per-charger lock); they can't be
+  edited directly, and re-recording a month recomputes the following month.
+- An EV workbook import (the "רכב חשמלי" sheet) creates chargers, readings, rates and "שולם" payments.
+  Once an apartment has a charger, the main workbook's EV block is no longer imported for it.
+- Residents see their own EV usage and charges. The page lives at `/ev` (admins), linked from the
+  כספים header.
+
+### 5.8 דמי ועד לדירה — Apartment fee timeline and exemption (phase 1, task 15)
+- The building fee schedule applies to every apartment by default. An apartment can have its own
+  timeline: from a month on, a custom amount, exempt, or back to the building fee.
+- Exempt apartments are left out of the collection rate; levies still apply to them.
+- Admins edit the timeline from כספים › דמי ועד; residents see their own monthly fee (or that they
+  are exempt). The Excel import can mark apartments with no payments all year as exempt (opt-in).
 
 ## 6. Data model (sketch — builder refines)
 

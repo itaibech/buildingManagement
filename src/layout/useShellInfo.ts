@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../auth/AuthProvider'
+import { useBuilding } from '../features/settings/api'
 import { supabase } from '../lib/supabase'
 
 export interface ShellInfo {
@@ -8,36 +9,32 @@ export interface ShellInfo {
   apartmentNumber: number | null
 }
 
-const EMPTY: ShellInfo = { buildingName: null, apartmentNumber: null }
-
-async function loadShellInfo(buildingId: string, residentId: string | null): Promise<ShellInfo> {
-  const building = supabase.from('buildings').select('name').eq('id', buildingId).maybeSingle()
-  const resident = residentId
-    ? supabase.from('residents').select('apartments(number)').eq('id', residentId).maybeSingle()
-    : Promise.resolve(null)
-  const [b, r] = await Promise.all([building, resident])
-  return { buildingName: b.data?.name ?? null, apartmentNumber: r?.data?.apartments?.number ?? null }
+async function loadApartmentNumber(residentId: string): Promise<number | null> {
+  const r = await supabase.from('residents').select('apartments(number)').eq('id', residentId).maybeSingle()
+  return r.data?.apartments?.number ?? null
 }
 
-/** Building name and the user's apartment number for the header plate. */
+/** Building name (shared query, so a rename in הגדרות בניין shows at once) and the user's apartment number. */
 export function useShellInfo(): ShellInfo {
   const { profile } = useAuth()
-  const buildingId = profile?.building_id
+  const building = useBuilding()
   const residentId = profile?.resident_id ?? null
-  const [info, setInfo] = useState<{ key: string; value: ShellInfo } | null>(null)
-  const key = `${buildingId ?? ''}:${residentId ?? ''}`
+  const [apartment, setApartment] = useState<{ key: string; value: number | null } | null>(null)
 
   useEffect(() => {
-    if (!buildingId) return
+    if (!residentId) return
     let cancelled = false
-    loadShellInfo(buildingId, residentId).then(
-      (value) => !cancelled && setInfo({ key, value }),
-      () => !cancelled && setInfo({ key, value: EMPTY }),
+    loadApartmentNumber(residentId).then(
+      (value) => !cancelled && setApartment({ key: residentId, value }),
+      () => !cancelled && setApartment({ key: residentId, value: null }),
     )
     return () => {
       cancelled = true
     }
-  }, [buildingId, residentId, key])
+  }, [residentId])
 
-  return info?.key === key ? info.value : EMPTY
+  return {
+    buildingName: building.data?.name ?? null,
+    apartmentNumber: residentId && apartment?.key === residentId ? apartment.value : null,
+  }
 }

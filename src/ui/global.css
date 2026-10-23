@@ -119,6 +119,33 @@ body {
   border-radius: 10px;
 }
 
+/* Unread count pill on the announcements nav item (tab bar and side nav). */
+.bm-unread {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border-radius: 9px;
+  background: var(--mantine-color-signal-6);
+  color: var(--mantine-color-text);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.bm-tab-icon {
+  position: relative;
+  display: inline-flex;
+}
+.bm-tab-icon .bm-unread {
+  position: absolute;
+  top: -6px;
+  inset-inline-start: 55%;
+}
+
 /* Floating action button above the tab bar (mobile). End side = left in RTL. */
 .bm-fab {
   position: fixed;
@@ -126,6 +153,83 @@ body {
   bottom: calc(var(--bm-tabbar-height) + var(--bm-safe-bottom) + 16px);
   z-index: 150;
   box-shadow: 0 4px 12px rgba(27, 35, 48, 0.22);
+}
+
+/* A page with a FAB reserves room for it at scroll end, so the last row is never under the button. */
+@media (max-width: 767px) {
+  .bm-main:has(.bm-fab) {
+    padding-bottom: calc(var(--app-shell-footer-offset, 0rem) + var(--app-shell-padding) + 88px);
+  }
+}
+
+/* DateInput: hide the OS-locale empty mask, show the Hebrew hint instead (see DateInput.tsx). */
+.bm-date {
+  position: relative;
+}
+.bm-date-hint {
+  display: none;
+  position: absolute;
+  inset-block: 0;
+  left: 14px;
+  align-items: center;
+  color: var(--mantine-color-dimmed);
+  pointer-events: none;
+}
+.bm-date[data-empty] .bm-date-hint {
+  display: flex;
+}
+.bm-date[data-empty] input:not(:focus) {
+  color: transparent;
+}
+.bm-date:focus-within .bm-date-hint {
+  display: none;
+}
+
+/* Sideways-scrolling tab list: fade the end edge (left in RTL) while more tabs are hidden there. */
+.bm-tabs-scroll[data-more] {
+  -webkit-mask-image: linear-gradient(to left, transparent 0, #000 40px);
+  mask-image: linear-gradient(to left, transparent 0, #000 40px);
+}
+
+/* Mobile toasts sit above the tab bar. */
+@media (max-width: 767px) {
+  .bm-toasts[data-position='bottom-center'] {
+    bottom: calc(var(--bm-tabbar-height) + var(--bm-safe-bottom) + 8px) !important;
+  }
+}
+
+/* Tappable list row (plate on the start side). */
+.bm-row {
+  color: inherit;
+  text-decoration: none;
+}
+@media (hover: hover) {
+  .bm-row:hover {
+    background-color: var(--mantine-color-stone-0);
+  }
+}
+.bm-row:focus-visible {
+  outline-offset: -2px;
+}
+
+/* Ticket comment composer: sticks above the tab bar on mobile. */
+.bm-composer {
+  background: var(--bm-plaster);
+}
+@media (max-width: 767px) {
+  .bm-composer {
+    position: sticky;
+    bottom: calc(var(--bm-tabbar-height) + var(--bm-safe-bottom));
+    z-index: 5;
+    margin-inline: calc(var(--mantine-spacing-md) * -1);
+    padding: var(--mantine-spacing-xs) var(--mantine-spacing-md);
+    border-top: 1px solid rgba(107, 116, 128, 0.15);
+  }
+}
+
+/* Hairline between stacked items (e.g. comments). */
+.bm-divided > * + * {
+  border-top: 1px solid rgba(107, 116, 128, 0.15);
 }
 
 @media (prefers-reduced-motion: reduce) {

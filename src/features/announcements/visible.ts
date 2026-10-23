@@ -1,0 +1,26 @@
+export interface AnnouncementLike {
+  pinned: boolean
+  expires_at: string | null
+  created_at: string
+}
+
+const isExpired = (a: AnnouncementLike, today: string): boolean => a.expires_at !== null && a.expires_at < today
+
+const newestFirst = (a: AnnouncementLike, b: AnnouncementLike): number => b.created_at.localeCompare(a.created_at)
+
+/** Non-expired items: pinned first, then newest first. An item is still visible on its expiry date. */
+export function visibleAnnouncements<T extends AnnouncementLike>(list: readonly T[], today: string): T[] {
+  return list
+    .filter((a) => !isExpired(a, today))
+    .sort((a, b) => Number(b.pinned) - Number(a.pinned) || newestFirst(a, b))
+}
+
+/** Expired items, newest first (shown to admins only). */
+export function expiredAnnouncements<T extends AnnouncementLike>(list: readonly T[], today: string): T[] {
+  return list.filter((a) => isExpired(a, today)).sort(newestFirst)
+}
+
+/** Read when the user has a receipt, or authored it themselves. */
+export function isReadBy(a: { id: string; author_id: string | null }, readIds: ReadonlySet<string>, userId: string | undefined): boolean {
+  return readIds.has(a.id) || (userId !== undefined && a.author_id === userId)
+}

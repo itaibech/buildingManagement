@@ -8,6 +8,8 @@ import Shell from './Shell'
 
 const auth = vi.hoisted(() => ({ release: (): void => undefined, loginShownAtCall: null as boolean | null }))
 const signOut = vi.hoisted(() => vi.fn())
+const unread = vi.hoisted(() => ({ count: 0 }))
+vi.mock('../features/announcements/api', () => ({ useUnreadCount: () => unread.count }))
 vi.mock('../auth/AuthProvider', () => ({
   useAuth: () => ({ signOut, profile: { resident_id: 'r1' }, isAdmin: false }),
 }))
@@ -60,6 +62,7 @@ async function exitWith(control: () => HTMLElement): Promise<void> {
 
 describe('Shell', () => {
   beforeEach(() => {
+    unread.count = 0
     signOut.mockReset()
     signOut.mockImplementation(
       () =>
@@ -85,5 +88,27 @@ describe('Shell', () => {
     renderShell()
     expect(desktopExit()).toBeDefined()
     await exitWith(desktopExit)
+  })
+
+  it('shows the unread count on the announcements item in both navs', () => {
+    unread.count = 3
+    renderShell()
+    expect(screen.getAllByLabelText('3 הודעות שלא נקראו')).toHaveLength(2)
+  })
+
+  it('shows no badge when everything is read', () => {
+    renderShell()
+    expect(screen.queryByRole('img', { name: /שלא נקראו|שלא נקראה/ })).not.toBeInTheDocument()
+  })
+})
+
+describe('activeTab', () => {
+  it('keeps "עוד" active on secondary and admin pages, and the tab itself on main pages', async () => {
+    const { activeTab } = await import('./nav')
+    expect(activeTab('/')).toBe('/')
+    expect(activeTab('/tickets/abc')).toBe('/tickets')
+    for (const p of ['/directory', '/maintenance', '/ev', '/ev/123', '/apartments/1', '/users', '/import', '/settings']) {
+      expect(activeTab(p)).toBe('/more')
+    }
   })
 })

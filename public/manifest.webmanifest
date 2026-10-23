@@ -1,0 +1,17 @@
+{
+  "name": "ניהול בניין",
+  "short_name": "ניהול בניין",
+  "description": "ועד הבית: הודעות, תקלות, תחזוקה וכספים",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F4F6F9",
+  "theme_color": "#1F4E9C",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

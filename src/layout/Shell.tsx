@@ -1,30 +1,29 @@
-import { ActionIcon, AppShell, Box, Group, NavLink, Stack, Text, Tooltip } from '@mantine/core'
-import { IconCoin, IconDots, IconHome2, IconLogout, IconSpeakerphone, IconTool, type Icon } from '@tabler/icons-react'
-import type { ReactNode } from 'react'
+import { ActionIcon, AppShell, Box, Divider, Group, NavLink, ScrollArea, Stack, Text, Tooltip } from '@mantine/core'
+import { IconLogout } from '@tabler/icons-react'
+import { Suspense, useEffect, type ReactNode } from 'react'
 import { Link, Outlet, useLocation } from 'react-router'
 import { useExit } from '../auth/useExit'
+import { useUnreadCount } from '../features/announcements/api'
 import { he } from '../lib/he'
-import { AptPlate } from '../ui'
+import { AptPlate, ListSkeleton } from '../ui'
+import { useAuth } from '../auth/AuthProvider'
+import { activeTab, ADMIN_NAV, GENERAL_NAV, MAIN_NAV, matches, type NavItem } from './nav'
 import { useShellInfo } from './useShellInfo'
 
-interface NavItem {
-  to: string
-  label: string
-  icon: Icon
-}
-
-const NAV: NavItem[] = [
-  { to: '/', label: he.nav.home, icon: IconHome2 },
-  { to: '/announcements', label: he.nav.announcements, icon: IconSpeakerphone },
-  { to: '/tickets', label: he.nav.tickets, icon: IconTool },
-  { to: '/finance', label: he.nav.finance, icon: IconCoin },
-  { to: '/more', label: he.nav.more, icon: IconDots },
-]
 const ICON = { size: 22, stroke: 1.75 } as const
+const ANNOUNCEMENTS = '/announcements'
 
-function isActive(pathname: string, to: string): boolean {
-  return to === '/' ? pathname === '/' : pathname === to || pathname.startsWith(`${to}/`)
+/** Small `signal` count pill for unread announcements. */
+function UnreadBadge({ count }: { count: number }) {
+  return (
+    <span className="bm-unread" role="img" aria-label={he.announcements.unreadCount(count)}>
+      {count > 9 ? '9+' : count}
+    </span>
+  )
 }
+
+const badgeFor = (to: string, unread: number) => (to === ANNOUNCEMENTS && unread > 0 ? <UnreadBadge count={unread} /> : undefined)
+
 
 /** Building name on the start side; the user's plate (and any trailing controls) on the end side. */
 function BuildingIdentity({ name, apartment, children }: { name: string; apartment: number | null; children?: ReactNode }) {
@@ -59,32 +58,51 @@ function MobileHeader({ name, apartment, onExit }: { name: string; apartment: nu
   )
 }
 
-function SideNav({ pathname, name, apartment, onExit }: { pathname: string; name: string; apartment: number | null; onExit: () => void }) {
+function NavGroup({ items, pathname, unread, label }: { items: NavItem[]; pathname: string; unread: number; label?: string }) {
+  return (
+    <>
+      {label && <Divider my="xs" color="stone.1" label={label} labelPosition="right" />}
+      {items.map(({ to, label: text, icon: I }) => {
+        const active = matches(pathname, to)
+        return (
+          <NavLink key={to} component={Link} to={to} label={text} leftSection={<I {...ICON} />} rightSection={badgeFor(to, unread)}
+            active={active} aria-current={active ? 'page' : undefined} />
+        )
+      })}
+    </>
+  )
+}
+
+function SideNav({ pathname, name, apartment, unread, onExit }: { pathname: string; name: string; apartment: number | null; unread: number; onExit: () => void }) {
+  const { isAdmin } = useAuth()
   return (
     <Stack h="100%" gap="xs" justify="space-between">
-      <Stack gap={4}>
-        <Box px="xs" pt="xs" pb="md">
-          <BuildingIdentity name={name} apartment={apartment} />
-        </Box>
+      <Box px="xs" pt="xs" pb="sm">
+        <BuildingIdentity name={name} apartment={apartment} />
+      </Box>
+      <ScrollArea style={{ flex: 1 }} type="auto">
         <nav aria-label={he.mainNav}>
-          {NAV.map(({ to, label, icon: I }) => (
-            <NavLink key={to} component={Link} to={to} label={label} leftSection={<I {...ICON} />} active={isActive(pathname, to)} aria-current={isActive(pathname, to) ? 'page' : undefined} />
-          ))}
+          <NavGroup items={MAIN_NAV} pathname={pathname} unread={unread} />
+          <NavGroup items={GENERAL_NAV} pathname={pathname} unread={unread} label={he.nav.general} />
+          {isAdmin && <NavGroup items={ADMIN_NAV} pathname={pathname} unread={unread} label={he.nav.admin} />}
         </nav>
-      </Stack>
+      </ScrollArea>
       <NavLink component="button" label={he.exit} leftSection={<ExitIcon />} onClick={onExit} c="stone.8" />
     </Stack>
   )
 }
 
-function TabBar({ pathname }: { pathname: string }) {
+function TabBar({ pathname, unread }: { pathname: string; unread: number }) {
   return (
     <nav className="bm-tabbar" aria-label={he.mainNav}>
-      {NAV.map(({ to, label, icon: I }) => {
-        const active = isActive(pathname, to)
+      {MAIN_NAV.map(({ to, label, icon: I }) => {
+        const active = activeTab(pathname) === to
         return (
           <Link key={to} to={to} className="bm-tab" data-active={active || undefined} aria-current={active ? 'page' : undefined}>
-            <I {...ICON} aria-hidden="true" />
+            <span className="bm-tab-icon">
+              <I {...ICON} aria-hidden="true" />
+              {badgeFor(to, unread)}
+            </span>
             <span>{label}</span>
           </Link>
         )
@@ -93,12 +111,27 @@ function TabBar({ pathname }: { pathname: string }) {
   )
 }
 
+/** Warm the tab pages' chunks once the shell is idle, so the first tap on a tab renders at once. */
+function usePrefetchTabs(): void {
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      void import('../features/announcements/AnnouncementsPage')
+      void import('../features/tickets/TicketsPage')
+      void import('../features/finance/FinancePage')
+      void import('../features/more/MorePage')
+    }, 1500)
+    return () => window.clearTimeout(id)
+  }, [])
+}
+
 export default function Shell() {
   const { pathname } = useLocation()
   const exit = useExit()
   const { buildingName, apartmentNumber } = useShellInfo()
+  const unread = useUnreadCount()
   const name = buildingName ?? he.appName
   const onExit = () => void exit()
+  usePrefetchTabs()
   return (
     <AppShell
       header={{ height: { base: 'calc(56px + env(safe-area-inset-top, 0px))', sm: 0 } }}
@@ -110,15 +143,18 @@ export default function Shell() {
         <MobileHeader name={name} apartment={apartmentNumber} onExit={onExit} />
       </AppShell.Header>
       <AppShell.Navbar p="sm" visibleFrom="sm">
-        <SideNav pathname={pathname} name={name} apartment={apartmentNumber} onExit={onExit} />
+        <SideNav pathname={pathname} name={name} apartment={apartmentNumber} unread={unread} onExit={onExit} />
       </AppShell.Navbar>
-      <AppShell.Main>
+      <AppShell.Main className="bm-main">
         <Box maw={1100} mx="auto">
-          <Outlet />
+          {/* A page's first load keeps the header and nav in place and shows skeleton rows. */}
+          <Suspense fallback={<ListSkeleton rows={4} />}>
+            <Outlet />
+          </Suspense>
         </Box>
       </AppShell.Main>
       <AppShell.Footer hiddenFrom="sm">
-        <TabBar pathname={pathname} />
+        <TabBar pathname={pathname} unread={unread} />
       </AppShell.Footer>
     </AppShell>
   )
