@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { buildImport, proposeFees, summarize } from './buildImport'
-import { budgetFixture, expensesFixture, incomeFixture } from './fixture'
+import { he } from '../../lib/he'
+import {
+  budgetUpdates, buildImport, feesToReplace, findOverlaps, initialFees, isExistingFee, overlapKey, proposeFees, summarize,
+} from './buildImport'
+import { budgetFixture, expensesFixture, INCOME_HEADER, incomeFixture } from './fixture'
 import { excelSerialToMonth, parseBudgetSheet, parseExpensesSheet, parseIncomeSheet, type ColumnMap } from './parseWorkbook'
 
 const income = parseIncomeSheet(incomeFixture)
@@ -63,6 +66,17 @@ describe('parseIncomeSheet', () => {
     expect(income.ev).toEqual([{ apartment: 3, byMonth: { '2026-01': 103.5, '2026-02': 293.4, '2026-04': 150 } }])
     const total = Object.values(income.ev[0].byMonth).reduce((s, v) => s + v, 0)
     expect(total).toBeCloseTo(546.9)
+  })
+
+  it('detects an EV block from its label even with fewer than 3 months, never left of the total', () => {
+    const header = [...INCOME_HEADER]
+    const apt = (ev: Record<number, number>) => { const r: unknown[] = [1, 'דייר', '', 390]; for (const [c, v] of Object.entries(ev)) r[Number(c)] = v; return r }
+    const labelled = parseIncomeSheet([[], (() => { const r: unknown[] = []; r[18] = 'טעינה'; r[19] = 'ינואר'; r[20] = 'פברואר'; return r })(), header, apt({ 19: 10, 20: 20 })])
+    expect(labelled.ev).toEqual([{ apartment: 1, byMonth: { '2026-01': 10, '2026-02': 20 } }])
+    const unlabelled = parseIncomeSheet([[], (() => { const r: unknown[] = []; r[18] = 'ינואר'; r[19] = 'פברואר'; return r })(), header, apt({ 18: 10, 19: 20 })])
+    expect(unlabelled.ev).toEqual([])
+    const leftOfTotal = parseIncomeSheet([[], ['טעינה', 'ינואר', 'פברואר', 'מרץ'], header, apt({})])
+    expect(leftOfTotal.ev).toEqual([])
   })
 
   it('throws a readable error when there is no header row', () => {
@@ -159,5 +173,55 @@ describe('buildImport', () => {
 
   it('summarizes counts for the preview', () => {
     expect(summarize(payload)).toMatchObject({ apartments: 3, residents: 4, levies: 3, ev: 3, expenses: 8, budgets: 2 })
+  })
+})
+
+describe('import guards', () => {
+  it('prefills fees from the year\'s existing schedule when there is one', () => {
+    const existing = [
+      { effective_from: '2025-01-01', amount: 350 },
+      { effective_from: '2026-03-01', amount: 400 },
+      { effective_from: '2026-01-01', amount: 380 },
+    ]
+    expect(initialFees(existing, income, income.columns, 2026)).toEqual({
+      fees: [{ amount: 380, effective_from: '2026-01-01' }, { amount: 400, effective_from: '2026-03-01' }], fromSystem: true,
+    })
+    expect(isExistingFee(existing, { amount: 380, effective_from: '2026-01-01' })).toBe(true)
+    expect(isExistingFee(existing, { amount: 390, effective_from: '2026-01-01' })).toBe(false)
+    expect(feesToReplace(existing, 2026)).toBe(2)
+  })
+
+  it('falls back to the sheet proposal when the year has no fees', () => {
+    const existing = [{ effective_from: '2025-01-01', amount: 350 }]
+    expect(initialFees(existing, income, income.columns, 2026)).toEqual({ fees: FEES, fromSystem: false })
+    expect(feesToReplace(existing, 2026)).toBe(0)
+  })
+
+  it('finds imported expense cells that already have a non-imported expense in the same category and month', () => {
+    const p = buildImport(parsed(), withLevyMonth(income.columns), FEES)
+    const existing = [
+      { category: 'חברת ניהול', spent_on: '2026-01-31', source: 'manual' },
+      { category: 'בנק', spent_on: '2026-04-15', source: 'maintenance' },
+      { category: 'בנק', spent_on: '2026-02-01', source: 'import' },
+      { category: 'חשמל', spent_on: '2026-01-10', source: 'manual' },
+    ]
+    expect(findOverlaps(p.expenses, existing)).toEqual([
+      { category: 'חברת ניהול', month: '2026-01', amount: 1800 },
+      { category: 'בנק', month: '2026-04', amount: 44 },
+    ])
+  })
+
+  it('skips overlapping cells and can leave out the EV block', () => {
+    const p = buildImport(parsed(), withLevyMonth(income.columns), FEES, {
+      skipExpenses: [overlapKey('חברת ניהול', '2026-01')], includeEv: false,
+    })
+    expect(p.expenses.filter((e) => e.category === 'חברת ניהול').map((e) => e.spent_on)).toEqual(['2026-02-01', '2026-03-01'])
+    expect(p.charges.some((c) => c.kind === 'extra')).toBe(false)
+    expect(p.payments.some((x) => x.note === he.import.evNote)).toBe(false)
+  })
+
+  it('counts budget lines the import will overwrite', () => {
+    const p = buildImport(parsed(), withLevyMonth(income.columns), FEES)
+    expect(budgetUpdates(p.budgets, ['נקיון', 'חשמל'])).toBe(1)
   })
 })

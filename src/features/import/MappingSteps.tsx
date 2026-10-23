@@ -1,8 +1,8 @@
-import { Alert, Button, Group, Paper, Select, SimpleGrid, Stack, Text } from '@mantine/core'
+import { Alert, Badge, Button, Group, Paper, Select, SimpleGrid, Stack, Text } from '@mantine/core'
 import { IconPlus } from '@tabler/icons-react'
 import { HEBREW_MONTHS, he } from '../../lib/he'
 import { DeleteButton, MoneyInput } from '../finance/fields'
-import { NEW_CATEGORY, type FeeEntry } from './buildImport'
+import { isExistingFee, NEW_CATEGORY, type ExistingFee, type FeeEntry } from './buildImport'
 import type { ColumnMap, IncomeSheet, Proposal } from './parseWorkbook'
 
 const pad = (n: number): string => String(n).padStart(2, '0')
@@ -72,17 +72,18 @@ export function ColumnsStep({ income, columns, year, onChange }: ColumnsStepProp
   )
 }
 
-interface FeesStepProps { fees: FeeEntry[]; year: number; onChange: (fees: FeeEntry[]) => void }
+interface FeesStepProps { fees: FeeEntry[]; year: number; existing: ExistingFee[]; fromSystem: boolean; onChange: (fees: FeeEntry[]) => void }
 
-export function FeesStep({ fees, year, onChange }: FeesStepProps) {
+export function FeesStep({ fees, year, existing, fromSystem, onChange }: FeesStepProps) {
   const set = (i: number, f: FeeEntry): void => onChange(fees.map((x, j) => (j === i ? f : x)))
   const used = new Set(fees.map((f) => f.effective_from.slice(5, 7)))
   const free = MONTH_DATA.find((m) => !used.has(m.value))?.value
   return (
     <Stack gap="sm">
-      <Text>{he.import.feesIntro}</Text>
+      <Text>{fromSystem ? he.import.feesFromSystem : he.import.feesIntro}</Text>
       {fees.map((f, i) => (
         <Paper key={f.effective_from} withBorder radius={12} p="sm">
+          {isExistingFee(existing, f) && <Badge color="enamel" mb="xs">{he.import.existingFee}</Badge>}
           <Group align="flex-end" wrap="nowrap" gap="xs">
             <MoneyInput label={he.import.feeAmount} value={f.amount} style={{ flex: 1 }} miw={0}
               onChange={(v) => set(i, { ...f, amount: amountOf(v) })} />

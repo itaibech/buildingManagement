@@ -1,10 +1,12 @@
-import { Alert, Button, FileButton, List, NumberInput, Paper, ScrollArea, SimpleGrid, Stack, Text, Title } from '@mantine/core'
+import { Alert, Button, Checkbox, FileButton, List, NumberInput, Paper, ScrollArea, SimpleGrid, Stack, Text, Title } from '@mantine/core'
 import { IconFileSpreadsheet } from '@tabler/icons-react'
 import { Link } from 'react-router'
-import { formatILS } from '../../lib/format'
+import type { ReactNode } from 'react'
+import { formatILS, monthLabel } from '../../lib/format'
 import { he } from '../../lib/he'
 import type { ImportCounts } from './api'
-import type { ImportSummary } from './buildImport'
+import { MoneyInput } from '../finance/fields'
+import type { ImportSummary, Overlap } from './buildImport'
 
 const XLSX_TYPES = '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
@@ -52,10 +54,10 @@ export function Warnings({ items }: { items: string[] }) {
 
 interface PreviewStepProps {
   summary: ImportSummary; warnings: string[]; year: number; budgetYear: number
-  onYear: (y: number) => void; onBudgetYear: (y: number) => void; error: string
+  onYear: (y: number) => void; onBudgetYear: (y: number) => void; error: string; children?: ReactNode
 }
 
-export function PreviewStep({ summary, warnings, year, budgetYear, onYear, onBudgetYear, error }: PreviewStepProps) {
+export function PreviewStep({ summary, warnings, year, budgetYear, onYear, onBudgetYear, error, children }: PreviewStepProps) {
   const toYear = (v: string | number): number => (typeof v === 'number' ? v : Number(v) || 0)
   return (
     <Stack gap="md">
@@ -71,6 +73,7 @@ export function PreviewStep({ summary, warnings, year, budgetYear, onYear, onBud
         {ORDER.map((k) => <Count key={k} label={he.import.counts[k]} value={summary[k]} />)}
       </SimpleGrid>
       <Text fw={600} className="bm-num">{he.import.paymentsTotal(formatILS(summary.paymentsTotal))}</Text>
+      {children}
       <Alert color="enamel">{he.import.replaceNote(year)}</Alert>
       <Warnings items={warnings} />
       {error && <Alert color="debt">{error}</Alert>}
@@ -91,5 +94,60 @@ export function DoneStep({ counts, year, onAgain }: { counts: ImportCounts; year
       <Button component={Link} to="/finance" fullWidth>{he.import.toFinance}</Button>
       <Button variant="default" fullWidth onClick={onAgain}>{he.import.again}</Button>
     </Stack>
+  )
+}
+
+export interface LevyLine { col: number; month: string; amount: number }
+export interface EvInfo { apartments: number[]; total: number }
+
+const Toggle = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) => (
+  <Checkbox size="md" mt="xs" mih={44} styles={{ body: { alignItems: 'center', minHeight: 44 } }}
+    label={label} checked={checked} onChange={(e) => onChange(e.currentTarget.checked)} />
+)
+
+export function LevyNotice({ levy, apartments, onAmount }: { levy: LevyLine; apartments: number; onAmount: (amount: number) => void }) {
+  const month = monthLabel(levy.month)
+  return (
+    <Paper withBorder radius={12} p="sm">
+      <Text fw={600}>{he.import.levyNotice(formatILS(levy.amount), apartments, month)}</Text>
+      <MoneyInput label={he.import.levyAmountFor(month)} value={levy.amount} mt="xs" maw={240}
+        onChange={(v) => onAmount(typeof v === 'number' ? v : Number(v) || 0)} />
+    </Paper>
+  )
+}
+
+export function EvNotice({ ev, include, onInclude }: { ev: EvInfo; include: boolean; onInclude: (v: boolean) => void }) {
+  if (ev.apartments.length === 0) return null
+  return (
+    <Paper withBorder radius={12} p="sm">
+      <Text fw={600}>{he.import.evTitle}</Text>
+      <Text size="sm" className="bm-num">{he.import.evNotice(ev.apartments.join(', '), formatILS(ev.total))}</Text>
+      <Toggle label={he.import.evInclude} checked={include} onChange={onInclude} />
+    </Paper>
+  )
+}
+
+export function OverlapNotice({ overlaps, include, onInclude }: { overlaps: Overlap[]; include: boolean; onInclude: (v: boolean) => void }) {
+  if (overlaps.length === 0) return null
+  return (
+    <Alert color="signal" title={he.import.overlapTitle(overlaps.length)}>
+      <Text size="sm">{he.import.overlapBody}</Text>
+      <ScrollArea.Autosize mah={160} mt="xs">
+        <List size="sm" spacing={2}>
+          {overlaps.map((o, i) => <List.Item key={i}>{he.import.overlapItem(o.category, monthLabel(o.month), formatILS(o.amount))}</List.Item>)}
+        </List>
+      </ScrollArea.Autosize>
+      <Toggle label={he.import.overlapInclude} checked={include} onChange={onInclude} />
+    </Alert>
+  )
+}
+
+export function ReplaceNotes({ fees, budgets }: { fees: number; budgets: number }) {
+  if (fees === 0 && budgets === 0) return null
+  return (
+    <Alert color="signal">
+      {fees > 0 && <Text size="sm">{he.import.replaceFees(fees)}</Text>}
+      {budgets > 0 && <Text size="sm">{he.import.updateBudgets(budgets)}</Text>}
+    </Alert>
   )
 }

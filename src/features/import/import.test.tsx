@@ -13,20 +13,19 @@ import ImportPage from './ImportPage'
 import { ImportError } from './parseWorkbook'
 import { readWorkbook, SHEETS } from './readWorkbook'
 
-const db = vi.hoisted(() => ({ rpcCalls: [] as { fn: string; args: unknown }[], categories: [] as unknown[] }))
+const db = vi.hoisted(() => ({ rpcCalls: [] as { fn: string; args: unknown }[], tables: {} as Record<string, unknown[]> }))
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 
 vi.mock('../../lib/supabase', () => {
-  const chain = (): Record<string, unknown> => {
+  const chain = (table: string): Record<string, unknown> => {
     const c: Record<string, unknown> = {}
-    c.select = () => c
-    c.order = () => c
-    c.then = (resolve: (v: unknown) => unknown) => Promise.resolve({ data: db.categories, error: null }).then(resolve)
+    for (const op of ['select', 'order', 'eq', 'gte', 'lt']) c[op] = () => c
+    c.then = (resolve: (v: unknown) => unknown) => Promise.resolve({ data: db.tables[table] ?? [], error: null }).then(resolve)
     return c
   }
   return {
     supabase: {
-      from: () => chain(),
+      from: (table: string) => chain(table),
       rpc: (fn: string, args: unknown) => {
         db.rpcCalls.push({ fn, args })
         return Promise.resolve({ data: { apartments: 3, residents: 4, payments: 30, expenses: 8 }, error: null })
@@ -48,7 +47,7 @@ beforeEach(() => {
   // jsdom has no scrollIntoView; Mantine's searchable Select calls it on the selected option.
   Element.prototype.scrollIntoView ??= () => undefined
   db.rpcCalls = []
-  db.categories = [{ id: 'c1', name: 'חברת ניהול' }, { id: 'c2', name: 'ניקיון' }, { id: 'c3', name: 'בנק' }]
+  db.tables = { expense_categories: [{ id: 'c1', name: 'חברת ניהול' }, { id: 'c2', name: 'ניקיון' }, { id: 'c3', name: 'בנק' }] }
   toast.success.mockClear()
   toast.error.mockClear()
 })
@@ -62,6 +61,20 @@ describe('readWorkbook', () => {
     expect(parsed.budget.year).toBe(2025)
     expect(warnings.length).toBeGreaterThan(0)
   })
+
+  it('stays bounded when a sheet claims a huge range', async () => {
+    const zip = XLSX.CFB.read(new Uint8Array(workbook(FULL)), { type: 'array' })
+    const entry = (zip.FileIndex as { name: string; content?: unknown }[]).find((f) => f.name === 'sheet1.xml')
+    if (!entry?.content) throw new Error('no sheet1.xml')
+    const xml = new TextDecoder().decode(entry.content as Uint8Array).replace(/<dimension ref="[^"]+"\/>/, '<dimension ref="A1:XFD1048576"/>')
+    expect(xml).toContain('XFD1048576')
+    entry.content = new TextEncoder().encode(xml)
+    const huge: ArrayBuffer = XLSX.CFB.write(zip, { fileType: 'zip', type: 'array' })
+    const started = Date.now()
+    const { parsed } = await readWorkbook(huge)
+    expect(Date.now() - started).toBeLessThan(3000)
+    expect(parsed.income.apartments.map((a) => a.number)).toEqual([1, 2, 3, 2])
+  }, 20000)
 
   it('refuses a workbook without the income sheet, and oversized files', async () => {
     await expect(readWorkbook(workbook({ אחר: [['x']] }))).rejects.toThrow(he.import.errors.noIncome)
@@ -81,42 +94,84 @@ const pick = async (label: string, option: string): Promise<void> => {
 }
 const next = (): boolean => fireEvent.click(screen.getByRole('button', { name: he.import.next }))
 
+const renderPage = (): HTMLElement => render(
+  <MantineProvider theme={theme}>
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter><ImportPage /></MemoryRouter>
+    </QueryClientProvider>
+  </MantineProvider>,
+).container
+
+async function upload(container: HTMLElement): Promise<void> {
+  const input = container.querySelector('input[type="file"]')
+  if (!input) throw new Error('no file input')
+  fireEvent.change(input, { target: { files: [new File([workbook(FULL)], 'book.xlsx')] } })
+  expect(await screen.findByText(he.import.columnsIntro)).toBeInTheDocument()
+}
+const feeValues = (): string[] => screen.getAllByRole('textbox', { name: he.import.feeAmount }).map((i) => (i as HTMLInputElement).value)
+const sentPayload = (): ImportPayload => (db.rpcCalls[0].args as { payload: ImportPayload }).payload
+
 describe('ImportPage', () => {
   it('walks upload → columns → fees → categories → preview → done and sends the confirmed payload', async () => {
-    const { container } = render(
-      <MantineProvider theme={theme}>
-        <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-          <MemoryRouter><ImportPage /></MemoryRouter>
-        </QueryClientProvider>
-      </MantineProvider>,
-    )
-    const input = container.querySelector('input[type="file"]')
-    if (!input) throw new Error('no file input')
-    fireEvent.change(input, { target: { files: [new File([workbook(FULL)], 'book.xlsx')] } })
-
-    expect(await screen.findByText(he.import.columnsIntro)).toBeInTheDocument()
+    await upload(renderPage())
     expect(screen.getByText(he.import.duplicate)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: he.import.next })).toBeDisabled()
     await pick(he.import.monthFor('אוקטובר'), 'אוקטובר')
     next()
 
     expect(await screen.findByText(he.import.feesIntro)).toBeInTheDocument()
-    expect(screen.getAllByRole('textbox', { name: he.import.feeAmount }).map((i) => (i as HTMLInputElement).value)).toEqual(['₪390', '₪330'])
+    expect(feeValues()).toEqual(['₪390', '₪330'])
+    expect(screen.queryByText(he.import.existingFee)).not.toBeInTheDocument()
     next()
 
     await pick(he.import.categoryFor('ניקיון חברה א'), 'ניקיון')
     next()
 
     expect(await screen.findByText(he.import.replaceNote(2026))).toBeInTheDocument()
+    expect(screen.getByText(he.import.levyNotice('‏500.00 ‏₪', 3, 'אוקטובר 2026'))).toBeInTheDocument()
+    expect(screen.getByText(he.import.evNotice('3', '‏546.90 ‏₪'))).toBeInTheDocument()
+    expect(screen.queryByText(he.import.replaceFees(2))).not.toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText(he.import.levyAmountFor('אוקטובר 2026')), { target: { value: '450' } })
+    expect(await screen.findByText(he.import.levyNotice('‏450.00 ‏₪', 3, 'אוקטובר 2026'))).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: he.import.confirm }))
 
     expect(await screen.findByText(he.import.doneTitle)).toBeInTheDocument()
     expect(toast.success).toHaveBeenCalledWith(he.toast.imported)
     expect(db.rpcCalls).toHaveLength(1)
-    const { payload } = db.rpcCalls[0].args as { payload: ImportPayload }
+    const payload = sentPayload()
     expect(payload.year).toBe(2026)
-    expect(payload.charges.filter((c) => c.kind === 'levy').map((c) => c.month)).toEqual(['2026-10-01', '2026-10-01', '2026-10-01'])
+    expect(payload.charges.filter((c) => c.kind === 'levy').map((c) => [c.month, c.amount])).toEqual([
+      ['2026-10-01', 450], ['2026-10-01', 450], ['2026-10-01', 450],
+    ])
     expect(payload.expenses.filter((e) => e.category === 'ניקיון')).toHaveLength(2)
     expect(payload.categories).not.toContain('ניקיון חברה א')
+  })
+
+  it('prefills the year\'s existing fees, warns about replacing fees and budgets, and skips overlapping expenses', async () => {
+    db.tables.fee_schedule = [
+      { id: 'f1', effective_from: '2026-01-01', amount: 400 }, { id: 'f2', effective_from: '2026-05-01', amount: 350 },
+      { id: 'f0', effective_from: '2025-01-01', amount: 300 },
+    ]
+    db.tables.budgets = [{ id: 'b1', year: 2025, category_id: 'cx', amount: 1, expense_categories: { name: 'דמי ניהול', sort_order: 1 } }]
+    db.tables.expenses = [{ id: 'e1', category_id: 'c1', spent_on: '2026-01-20', amount: 850, vendor: '', note: '', receipt_path: null,
+      source: 'manual', template_id: null, expense_categories: { name: 'חברת ניהול' } }]
+    await upload(renderPage())
+    await pick(he.import.monthFor('אוקטובר'), 'אוקטובר')
+    next()
+
+    expect(await screen.findByText(he.import.feesFromSystem)).toBeInTheDocument()
+    expect(feeValues()).toEqual(['₪400', '₪350'])
+    expect(screen.getAllByText(he.import.existingFee)).toHaveLength(2)
+    next()
+    next()
+
+    expect(await screen.findByText(he.import.replaceFees(2))).toBeInTheDocument()
+    expect(screen.getByText(he.import.updateBudgets(1))).toBeInTheDocument()
+    expect(screen.getByText(he.import.overlapTitle(1))).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: he.import.confirm }))
+    await screen.findByText(he.import.doneTitle)
+    const payload = sentPayload()
+    expect(payload.fees).toEqual([{ amount: 400, effective_from: '2026-01-01' }, { amount: 350, effective_from: '2026-05-01' }])
+    expect(payload.expenses.filter((e) => e.category === 'חברת ניהול').map((e) => e.spent_on)).toEqual(['2026-02-01', '2026-03-01'])
   })
 })

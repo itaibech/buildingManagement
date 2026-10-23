@@ -1,49 +1,20 @@
 import { Button, Group, Stepper } from '@mantine/core'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { he } from '../../lib/he'
-import { notifyError, notifySuccess, PageHeader } from '../../ui'
+import { ListSkeleton, notifyError, notifySuccess, PageHeader } from '../../ui'
 import { useDesktop } from '../finance/hooks'
-import { useExpenseCategories } from '../maintenance/api'
 import { useImportYear, type ImportCounts } from './api'
-import { buildImport, columnsReady, feesReady, NEW_CATEGORY, proposeFees, summarize, yearValid, type FeeEntry } from './buildImport'
+import { columnsReady, feesReady, summarize, yearValid } from './buildImport'
 import { CategoriesStep, ColumnsStep, FeesStep } from './MappingSteps'
-import { ImportError, type ColumnMap } from './parseWorkbook'
-import { DoneStep, PreviewStep, UploadStep } from './PreviewStep'
+import { ImportError } from './parseWorkbook'
+import { DoneStep, EvNotice, LevyNotice, OverlapNotice, PreviewStep, ReplaceNotes, UploadStep } from './PreviewStep'
 import { readWorkbook, type ReadResult } from './readWorkbook'
+import { useDerived, useImportContext, useImportState, type Derived, type ImportContext, type ImportState } from './useImportFlow'
 
 // Mobile: the vertical stepper stays a compact 44px per step so the current step's content is in view.
 const COMPACT = { step: { minHeight: 44, alignItems: 'center' }, stepBody: { marginTop: 0 }, verticalSeparator: { top: 36, bottom: -10 } } as const
+const THIS_YEAR = new Date().getFullYear()
 const STEPS = ['upload', 'columns', 'fees', 'categories', 'preview', 'done'] as const
-
-/** All the admin's choices live here, so going back a step never loses an edit. */
-function useImportFlow(existing: string[]) {
-  const [read, setRead] = useState<ReadResult | null>(null)
-  const [columns, setColumns] = useState<ColumnMap[]>([])
-  const [fees, setFees] = useState<FeeEntry[]>([])
-  const [choice, setChoice] = useState<Record<string, string>>({})
-  const [year, setYear] = useState(0)
-  const [budgetYear, setBudgetYear] = useState(0)
-  const load = (r: ReadResult): void => {
-    const { income, budget } = r.parsed
-    const proposed = proposeFees(income, income.columns)
-    setRead(r)
-    setColumns(income.columns)
-    setFees(proposed.length > 0 ? proposed : [{ amount: 0, effective_from: `${income.year}-01-01` }])
-    setChoice({})
-    setYear(income.year)
-    setBudgetYear(budget.year)
-  }
-  const names = useMemo(() => [...new Set([
-    ...(read?.parsed.expenses.map((e) => e.category) ?? []), ...(read?.parsed.budget.items.map((i) => i.category) ?? []),
-  ])], [read])
-  const resolved = useMemo(() => Object.fromEntries(names.map((n) => [n, choice[n] ?? (existing.includes(n) ? n : NEW_CATEGORY)])), [names, choice, existing])
-  const payload = useMemo(() => {
-    if (!read) return null
-    const categoryMap = Object.fromEntries(Object.entries(resolved).filter(([, v]) => v !== NEW_CATEGORY))
-    return buildImport(read.parsed, columns, fees, { year, budgetYear, categoryMap })
-  }, [read, columns, fees, year, budgetYear, resolved])
-  return { read, load, columns, setColumns, fees, setFees, names, resolved, setChoice, year, setYear, budgetYear, setBudgetYear, payload }
-}
 
 function StepNav({ onBack, onNext, nextLabel, disabled, loading }: { onBack?: () => void; onNext: () => void; nextLabel: string; disabled: boolean; loading?: boolean }) {
   return (
@@ -69,62 +40,73 @@ function useUpload(load: (r: ReadResult) => void, next: () => void) {
   return { ...state, onFile: (f: File) => void onFile(f) }
 }
 
-type Flow = ReturnType<typeof useImportFlow>
+interface PreviewBodyProps { st: ImportState; d: Derived; ctx: ImportContext; save: ReturnType<typeof useImportYear>; back: () => void; confirm: () => void }
+
+function PreviewBody({ st, d, ctx, save, back, confirm }: PreviewBodyProps) {
+  if (!st.read || !d.payload) return null
+  const ready = columnsReady(st.columns) && feesReady(d.fees) && yearValid(st.year) && yearValid(st.budgetYear) && !ctx.loading
+  const setLevy = (col: number, amount: number): void => st.setColumns(st.columns.map((c) =>
+    c.col === col && c.proposal.kind === 'levy' ? { ...c, proposal: { ...c.proposal, amount } } : c))
+  return (
+    <>
+      <PreviewStep summary={summarize(d.payload, ctx.categories)} warnings={st.read.warnings} year={st.year} budgetYear={st.budgetYear}
+        onYear={st.setYear} onBudgetYear={st.setBudgetYear} error={save.isError ? he.import.errors.failed : ''}>
+        {d.levies.map((l) => <LevyNotice key={l.col} levy={l} apartments={d.payload?.apartments.length ?? 0} onAmount={(a) => setLevy(l.col, a)} />)}
+        <EvNotice ev={d.ev} include={st.includeEv} onInclude={st.setIncludeEv} />
+        <OverlapNotice overlaps={d.overlaps} include={st.importOverlaps} onInclude={st.setImportOverlaps} />
+        <ReplaceNotes fees={d.feesReplaced} budgets={d.budgetsUpdated} />
+      </PreviewStep>
+      <StepNav onBack={back} onNext={confirm} nextLabel={he.import.confirm} loading={save.isPending} disabled={!ready} />
+    </>
+  )
+}
+
 interface BodiesProps {
-  flow: Flow; existing: string[]; categoriesLoading: boolean; go: (i: number) => () => void
+  st: ImportState; d: Derived; ctx: ImportContext; go: (i: number) => () => void
   upload: ReturnType<typeof useUpload>; save: ReturnType<typeof useImportYear>; confirm: () => void
   counts: ImportCounts; again: () => void
 }
 
-function stepBodies({ flow, existing, categoriesLoading, go, upload, save, confirm, counts, again }: BodiesProps): Record<(typeof STEPS)[number], ReactNode> {
-  const summary = flow.payload ? summarize(flow.payload, existing) : null
-  const ready = columnsReady(flow.columns) && feesReady(flow.fees) && yearValid(flow.year) && yearValid(flow.budgetYear)
+function stepBodies({ st, d, ctx, go, upload, save, confirm, counts, again }: BodiesProps): Record<(typeof STEPS)[number], ReactNode> {
   return {
     upload: <UploadStep {...upload} />,
-    columns: flow.read && <>
-      <ColumnsStep income={flow.read.parsed.income} columns={flow.columns} year={flow.year} onChange={flow.setColumns} />
-      <StepNav onBack={go(0)} onNext={go(2)} nextLabel={he.import.next} disabled={!columnsReady(flow.columns)} />
+    columns: st.read && <>
+      <ColumnsStep income={st.read.parsed.income} columns={st.columns} year={st.year} onChange={st.setColumns} />
+      <StepNav onBack={go(0)} onNext={go(2)} nextLabel={he.import.next} disabled={!columnsReady(st.columns)} />
     </>,
-    fees: <>
-      <FeesStep fees={flow.fees} year={flow.year} onChange={flow.setFees} />
-      <StepNav onBack={go(1)} onNext={go(3)} nextLabel={he.import.next} disabled={!feesReady(flow.fees)} />
+    fees: ctx.loading ? <ListSkeleton /> : <>
+      <FeesStep fees={d.fees} year={st.year} existing={ctx.fees} fromSystem={d.fromSystem} onChange={st.setFees} />
+      <StepNav onBack={go(1)} onNext={go(3)} nextLabel={he.import.next} disabled={!feesReady(d.fees)} />
     </>,
     categories: <>
-      <CategoriesStep names={flow.names} existing={existing} choice={flow.resolved} onChange={flow.setChoice} />
-      <StepNav onBack={go(2)} onNext={go(4)} nextLabel={he.import.next} disabled={categoriesLoading} />
+      <CategoriesStep names={d.names} existing={ctx.categories} choice={d.resolved} onChange={st.setChoice} />
+      <StepNav onBack={go(2)} onNext={go(4)} nextLabel={he.import.next} disabled={ctx.loading} />
     </>,
-    preview: summary && flow.read && <>
-      <PreviewStep summary={summary} warnings={flow.read.warnings} year={flow.year} budgetYear={flow.budgetYear}
-        onYear={flow.setYear} onBudgetYear={flow.setBudgetYear} error={save.isError ? he.import.errors.failed : ''} />
-      <StepNav onBack={go(3)} onNext={confirm} nextLabel={he.import.confirm} loading={save.isPending} disabled={!ready} />
-    </>,
-    done: <DoneStep counts={counts} year={flow.year} onAgain={again} />,
+    preview: <PreviewBody st={st} d={d} ctx={ctx} save={save} back={go(3)} confirm={confirm} />,
+    done: <DoneStep counts={counts} year={st.year} onAgain={again} />,
   }
 }
 
 export default function ImportPage() {
   const desktop = useDesktop()
-  const categories = useExpenseCategories()
-  const existing = useMemo(() => (categories.data ?? []).map((c) => c.name), [categories.data])
-  const flow = useImportFlow(existing)
+  const st = useImportState()
+  const ctx = useImportContext(st.year || THIS_YEAR, st.budgetYear || THIS_YEAR)
+  const d = useDerived(st, ctx)
   const [active, setActive] = useState(0)
   useEffect(() => {
     window.scrollTo({ top: 0 })
   }, [active])
   const [counts, setCounts] = useState<ImportCounts>({})
   const save = useImportYear()
-  const upload = useUpload(flow.load, () => setActive(1))
+  const upload = useUpload(st.load, () => setActive(1))
   const confirm = (): void => {
-    if (!flow.payload) return
-    save.mutate(flow.payload, {
+    if (!d.payload) return
+    save.mutate(d.payload, {
       onSuccess: (c) => { setCounts(c); notifySuccess(he.toast.imported); setActive(5) },
       onError: () => notifyError(he.import.errors.failed),
     })
   }
-  const body = stepBodies({
-    flow, existing, categoriesLoading: categories.isLoading, go: (i) => () => setActive(i), upload, save, confirm, counts,
-    again: () => { save.reset(); setActive(0) },
-  })
+  const body = stepBodies({ st, d, ctx, go: (i) => () => setActive(i), upload, save, confirm, counts, again: () => { save.reset(); setActive(0) } })
   return (
     <>
       <PageHeader title={he.nav.import} />

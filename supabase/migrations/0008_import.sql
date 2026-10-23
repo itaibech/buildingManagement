@@ -1,9 +1,13 @@
 -- 0008 Excel import: public.import_year(payload jsonb), admin only, in one transaction.
 -- The payload is built in the browser from an untrusted workbook, so every field is validated here
 -- (types, ranges, string lengths, array sizes, dates inside the import year) before anything is written.
--- Re-import: that year's source='import' payments, charges and expenses are deleted and re-inserted;
--- apartments are upserted by number, residents by (apartment, full_name), categories by name, budgets
--- by (year, category); the year's fee schedule is replaced. Manual rows are never touched.
+-- Re-import replaces that year's source='import' payments, charges and expenses; payments, charges and
+-- expenses entered by hand (or from templates / maintenance) are never touched.
+-- Apartments are upserted by number, residents inserted only when new for (apartment, full_name),
+-- categories by name. Two things the import overwrites, which the UI states in its preview:
+--   * fee_schedule has no source column: when the payload has fees, ALL of that year's fee_schedule rows
+--     (manual ones too) are replaced by the confirmed schedule. The UI prefills it from the existing rows.
+--   * budgets are upserted by (year, category): an existing amount for an imported category is updated.
 
 -- ---------------------------------------------------------------- validation helpers (internal)
 create function public.import_is_int(j jsonb, lo numeric, hi numeric) returns boolean

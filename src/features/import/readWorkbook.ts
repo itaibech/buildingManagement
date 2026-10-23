@@ -2,7 +2,7 @@
 // The file is untrusted: we only read cell values (no formulas, HTML, styles or macros are used).
 import { he } from '../../lib/he'
 import type { ParsedWorkbook } from './buildImport'
-import { ImportError, parseBudgetSheet, parseExpensesSheet, parseIncomeSheet } from './parseWorkbook'
+import { ImportError, MAX_COLS, MAX_ROWS, parseBudgetSheet, parseExpensesSheet, parseIncomeSheet } from './parseWorkbook'
 
 export const MAX_FILE_BYTES = 5 * 1024 * 1024
 export const SHEETS = { income: 'הכנסות', expenses: 'הוצאות', budget: 'עלויות שנתיות מתוכננות' } as const
@@ -15,13 +15,20 @@ export async function readWorkbook(data: ArrayBuffer): Promise<ReadResult> {
   const XLSX = await import('xlsx')
   let wb: ReturnType<typeof XLSX.read>
   try {
-    wb = XLSX.read(data, { type: 'array', cellFormula: false, cellHTML: false, cellStyles: false, bookVBA: false })
+    // sheetRows stops reading past MAX_ROWS; the column clip below stops a huge <dimension> from being materialised.
+    wb = XLSX.read(data, { type: 'array', sheetRows: MAX_ROWS, cellFormula: false, cellHTML: false, cellStyles: false, bookVBA: false })
   } catch {
     throw new ImportError(he.import.errors.unreadable)
   }
   const rows = (name: string): unknown[][] | null => {
     const ws = wb.Sheets[name]
-    return ws ? XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: true }) : null
+    if (!ws) return null
+    const ref = ws['!ref']
+    if (ref) {
+      const r = XLSX.utils.decode_range(ref)
+      ws['!ref'] = XLSX.utils.encode_range({ s: r.s, e: { r: Math.min(r.e.r, MAX_ROWS - 1), c: Math.min(r.e.c, MAX_COLS - 1) } })
+    }
+    return XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: true })
   }
   const incomeRows = rows(SHEETS.income)
   if (!incomeRows) throw new ImportError(he.import.errors.noIncome)

@@ -5,7 +5,15 @@ import { mode, type BudgetSheet, type ColumnMap, type ExpenseRow, type IncomeShe
 
 export interface ParsedWorkbook { income: IncomeSheet; expenses: ExpenseRow[]; budget: BudgetSheet }
 export type FeeEntry = { amount: number; effective_from: string }
-export interface ImportOptions { year?: number; budgetYear?: number; categoryMap?: Record<string, string> }
+export interface ImportOptions {
+  year?: number
+  budgetYear?: number
+  categoryMap?: Record<string, string>
+  /** overlapKey(category, month) of imported expense cells to leave out. */
+  skipExpenses?: string[]
+  /** Import the EV charging block (default true). */
+  includeEv?: boolean
+}
 export type PaymentRow = { apartment: number; paid_on: string; amount: number; note: string }
 export type ChargeRow = { apartment: number; month: string; amount: number; kind: 'levy' | 'extra'; label: string }
 export type ImportPayload = {
@@ -90,9 +98,11 @@ export function buildImport(parsed: ParsedWorkbook, columns: ColumnMap[], fees: 
   const year = opts.year ?? parsed.income.year
   const cat = (name: string): string => opts.categoryMap?.[name] ?? name
   const numbers = unique(parsed.income.apartments.map((a) => a.number))
-  const ev = evFrom(parsed.income, year)
+  const ev = opts.includeEv === false ? { charges: [], payments: [] } : evFrom(parsed.income, year)
+  const skip = new Set(opts.skipExpenses ?? [])
   const expenses = parsed.expenses.flatMap((r) =>
     Object.entries(r.byMonth).map(([m, amount]) => ({ category: cat(r.category), spent_on: rebase(m, year), amount, note: he.import.expenseNote })))
+    .filter((e) => !skip.has(overlapKey(e.category, e.spent_on)))
   const budgets = budgetsFrom(parsed.budget, cat)
   return {
     year,
@@ -148,3 +158,40 @@ export const columnsReady = (cols: ColumnMap[]): boolean =>
   cols.every((c) => c.proposal.kind !== 'levy' || c.proposal.month !== null)
 export const feesReady = (fees: FeeEntry[]): boolean => fees.length > 0
 export const yearValid = (y: number): boolean => Number.isInteger(y) && y >= 2000 && y <= 2100
+
+// ---------------------------------------------------------------- guards against overwriting or double counting
+
+export type ExistingFee = { effective_from: string; amount: number }
+export type ExistingExpense = { category: string; spent_on: string; source: string }
+export interface Overlap { category: string; month: string; amount: number }
+
+const inYear = (existing: ExistingFee[], year: number): FeeEntry[] => existing
+  .filter((f) => f.effective_from.startsWith(`${year}-`))
+  .map((f) => ({ amount: f.amount, effective_from: f.effective_from.slice(0, 10) }))
+  .sort((a, b) => a.effective_from.localeCompare(b.effective_from))
+
+/** Fees step prefill: the year's schedule already in the system when it has rows, else the sheet's proposal. */
+export function initialFees(existing: ExistingFee[], income: IncomeSheet, columns: ColumnMap[], year: number): { fees: FeeEntry[]; fromSystem: boolean } {
+  const current = inYear(existing, year)
+  if (current.length > 0) return { fees: current, fromSystem: true }
+  const proposed = proposeFees(income, columns)
+  return { fees: proposed.length > 0 ? proposed : [{ amount: 0, effective_from: `${year}-01-01` }], fromSystem: false }
+}
+
+export const isExistingFee = (existing: ExistingFee[], f: FeeEntry): boolean =>
+  existing.some((e) => e.effective_from.slice(0, 10) === f.effective_from && e.amount === f.amount)
+/** How many fee_schedule rows of that year the import replaces. */
+export const feesToReplace = (existing: ExistingFee[], year: number): number => inYear(existing, year).length
+/** How many budget lines (by category) the import overwrites. */
+export const budgetUpdates = (budgets: ImportPayload['budgets'], existing: string[]): number =>
+  budgets.filter((b) => existing.includes(b.category)).length
+
+export const overlapKey = (category: string, monthOrDate: string): string => `${category}|${monthOrDate.slice(0, 7)}`
+
+/** Imported expense cells whose category and month already have a non-imported expense (manual, template, maintenance). */
+export function findOverlaps(expenses: ImportPayload['expenses'], existing: ExistingExpense[]): Overlap[] {
+  const taken = new Set(existing.filter((e) => e.source !== 'import').map((e) => overlapKey(e.category, e.spent_on)))
+  return expenses
+    .filter((e) => taken.has(overlapKey(e.category, e.spent_on)))
+    .map((e) => ({ category: e.category, month: e.spent_on.slice(0, 7), amount: e.amount }))
+}

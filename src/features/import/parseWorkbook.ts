@@ -20,8 +20,8 @@ export interface BudgetSheet { year: number; items: { category: string; amount: 
 
 export class ImportError extends Error {}
 
-const MAX_ROWS = 2000
-const MAX_COLS = 60
+export const MAX_ROWS = 2000
+export const MAX_COLS = 60
 const pad = (n: number): string => String(n).padStart(2, '0')
 const text = (v: unknown): string => (typeof v === 'string' || typeof v === 'number' ? String(v).trim() : '')
 const isTotal = (v: unknown): boolean => text(v).replace('״', '"').startsWith('סה"כ')
@@ -126,14 +126,19 @@ function mapColumns(header: unknown[], year: number, levyValues: (col: number) =
   })
 }
 
-/** The EV block: a row above the header whose Hebrew month names sit to the right of the total column. */
+const isEvLabel = (v: unknown): boolean => /טעינה|הטענה/.test(text(v))
+
+/**
+ * The EV block sits to the right of the total column, above the header: a row of Hebrew month names.
+ * It counts when it has at least 3 months, or when a 'טעינה' / 'הטענה' label marks it.
+ */
 function evColumns(rows: unknown[][], headerRow: number, total: number, year: number): Map<number, string> {
+  const right = (r: unknown[]): [number, unknown][] => r.flatMap((c, col): [number, unknown][] => (col > total ? [[col, c]] : []))
+  const labelled = rows.slice(0, headerRow).some((r) => right(r).some(([, c]) => isEvLabel(c)))
   for (let i = 0; i < headerRow; i++) {
     const cols = new Map<number, string>()
-    rows[i].forEach((c, col) => {
-      if (col > total && monthIndex(c) >= 0) cols.set(col, ym(year, monthIndex(c)))
-    })
-    if (cols.size >= 3) return cols
+    for (const [col, c] of right(rows[i])) if (monthIndex(c) >= 0) cols.set(col, ym(year, monthIndex(c)))
+    if (cols.size >= 3 || (cols.size > 0 && labelled)) return cols
   }
   return new Map()
 }
