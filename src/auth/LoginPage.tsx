@@ -1,10 +1,11 @@
-import { Alert, Button, Center, Divider, Paper, Stack, Title } from '@mantine/core'
+import { Alert, Button, Center, Divider, Paper, Stack } from '@mantine/core'
 import { useState } from 'react'
 import { Navigate } from 'react-router'
 import { he } from '../lib/he'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthProvider'
 import CredentialsForm from './CredentialsForm'
+import { AuthIdentity } from './PendingPage'
 import { useGoogleEnabled } from './useGoogleEnabled'
 
 export default function LoginPage() {
@@ -23,20 +24,22 @@ export default function LoginPage() {
   }
 
   return (
-    <Center mih="100vh" p="md">
-      <Paper withBorder p="lg" radius="md" w="100%" maw={400}>
-        <Stack>
-          <Title order={2} ta="center">{he.appName}</Title>
-          {googleEnabled && (
-            <>
-              <Button variant="default" onClick={() => void onGoogle()}>{he.signInWithGoogle}</Button>
-              <Divider label={he.or} />
-            </>
-          )}
-          {error && <Alert color="red">{error}</Alert>}
-          <CredentialsForm />
-        </Stack>
-      </Paper>
+    <Center mih="100dvh" px="md" py="xl">
+      <Stack w="100%" maw={420} gap="xl">
+        <AuthIdentity />
+        <Paper withBorder radius="lg" p={{ base: 'lg', sm: 'xl' }}>
+          <Stack gap="md">
+            {googleEnabled && (
+              <>
+                <Button variant="default" fullWidth size="lg" onClick={() => void onGoogle()}>{he.signInWithGoogle}</Button>
+                <Divider label={he.or} />
+              </>
+            )}
+            {error && <Alert color="debt" role="alert">{error}</Alert>}
+            <CredentialsForm />
+          </Stack>
+        </Paper>
+      </Stack>
     </Center>
   )
 }

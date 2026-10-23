@@ -370,3 +370,24 @@ Each `api.ts` exports react-query hooks for its feature (`useX()` / `useSaveX()`
 - [ ] Step 3: README: setup steps (Supabase project, bootstrap admin SQL, Google OAuth, GitHub secrets and variables, enabling Pages), local dev, and how to run DB tests.
 - [ ] Step 4: Run the `security-review` skill on the branch and fix the findings.
 - [ ] Step 5: Commit (`chore: keepalive, CSP, setup docs`) and deploy. Confirm the live URL loads and Google login round-trips.
+
+### Task 13: Excel export (admins) — user-requested
+
+**Files:** Create `src/features/export/{buildWorkbook.ts,exportXlsx.ts,ExportButton.tsx}`, `src/features/export/buildWorkbook.test.ts`. Modify the admin list pages (apartments/residents, tickets, maintenance, finance tabs) to add an `ExportButton`, and the "עוד" page to add "ייצוא שנה מלאה".
+
+**Interfaces:**
+- Consumes: the Task 4–11 hooks and views. SheetJS is lazy-loaded, as in Task 11.
+- Produces:
+  - `toSheetRows<T>(rows: T[], columns: { header: string; value: (r: T) => string | number | null }[]): (string|number|null)[][]`
+  - `buildYearWorkbook(data: { year; apartments; residents; ledger; expenses; categories; budgets }): WorkbookSpec`. It yields three sheets with the same names and layout the importer reads: `הכנסות` (apartment, name, phone, one column per month of payments, total), `הוצאות` (category rows × months, total) and `עלויות שנתיות מתוכננות`. This means an exported year re-imports cleanly.
+  - `ExportButton({ fileName, getRows })` is visible to admins only. The file name is `<name>-YYYY-MM-DD.xlsx`.
+- Sheets are RTL (`!views: [{ RTL: true }]`), amounts are numbers (not strings), and dates are DD/MM/YYYY strings.
+
+- [ ] Step 1: Write the failing tests:
+  - `toSheetRows` maps the headers plus rows in order.
+  - `buildYearWorkbook` puts the month payment sums in the correct columns of `הכנסות` and gives a total equal to the row sum.
+  - **Round trip:** `parseIncomeSheet(buildYearWorkbook(...).sheets['הכנסות'])` reproduces the same per-month amounts (this uses the Task 11 parser).
+- [ ] Step 2: Run `npx vitest run src/features/export`. Expected: FAIL.
+- [ ] Step 3: Implement it, and add buttons to the pages, admin-gated with `useAuth().isAdmin`.
+- [ ] Step 4: Run the tests. Expected: PASS. Manually download from the running app and open the file to check RTL and number cells.
+- [ ] Step 5: Commit `feat: excel export for admins`.
