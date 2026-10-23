@@ -2,7 +2,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(26);
+select plan(29);
 
 insert into auth.users (id, email, aud, role) values
   ('a9200000-0000-0000-0000-000000000001', 'imp-admin@test.local', 'authenticated', 'authenticated'),
@@ -109,6 +109,13 @@ select throws_ok($$ select public.import_year(jsonb_set((select j from p), '{pay
 select throws_ok($$ select public.import_year(jsonb_set((select j from p), '{expenses,0,category}', '"לא ברשימה"')) $$,
   '22023', 'Invalid import payload: unknown category', 'an expense category not in the payload is rejected');
 select is((select row(payments, charges, expenses)::text from import_counts), '(3,3,2)', 'failed imports change nothing');
+
+-- ---------------------------------------------------------------- confirmed exempt apartments (0010)
+select is(public.import_year(jsonb_set((select j from p), '{exempt}', '[902]')) ->> 'exempt', '1', 'exempt apartment reported');
+select is((select row(o.mode, o.effective_from)::text from public.apartment_fee_overrides o
+  join public.apartments a on a.id = o.apartment_id where a.number = 902), '(exempt,2030-01-01)', 'exempt from January of the import year');
+select throws_ok($$ select public.import_year(jsonb_set((select j from p), '{exempt}', '[999]')) $$,
+  '22023', 'Invalid import payload: exempt (unknown apartment)', 'an exempt apartment not in the payload is rejected');
 
 select * from finish();
 rollback;
