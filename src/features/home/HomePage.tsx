@@ -1,4 +1,5 @@
-import { Anchor, Box, Button, Card, Group, Progress, Stack, Text, Title } from '@mantine/core'
+import { Anchor, Box, Button, Card, Group, Progress, SimpleGrid, Stack, Text, Title } from '@mantine/core'
+import { IconTool } from '@tabler/icons-react'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
@@ -8,7 +9,7 @@ import { he } from '../../lib/he'
 import { AptPlate, EmptyState, ListSkeleton, Money, PageHeader, StatusBadge } from '../../ui'
 import { useAnnouncements } from '../announcements/api'
 import { useBalances, useCollectionSummary, useFeeSchedule } from '../finance/api'
-import { MyBalanceHero } from '../finance/cards'
+import { HowToPay, MyBalanceHero } from '../finance/cards'
 import { monthOf } from '../finance/ledger'
 import { useTasks } from '../maintenance/api'
 import { dueBucket } from '../maintenance/nextDue'
@@ -53,10 +54,10 @@ function CollectionHero() {
   const rate = noFees ? undefined : q.data
   return (
     <Card>
-      <Text fw={600} c="dimmed" size="sm">{he.home.collectionThisMonth}</Text>
+      <Title order={2} size="h4">{he.home.collectionThisMonth}</Title>
       {(fees.isLoading || (q.isLoading && !noFees)) && <ListSkeleton rows={1} />}
       {(fees.isError || q.isError) && <LoadError onRetry={() => { void fees.refetch(); void q.refetch() }} />}
-      {noFees && <EmptyState title={he.home.setFeesFirst} action={{ label: he.home.setFeesAction, onClick: () => navigate('/finance?tab=charges') }} />}
+      {noFees && <EmptyState title={he.home.setFeesFirst} action={{ label: he.home.setFeesAction, onClick: () => navigate('/finance?tab=fees') }} />}
       {rate?.total === 0 && <EmptyState title={he.home.collectionSoon} />}
       {rate && rate.total > 0 && (
         <Stack gap="xs" mt="xs">
@@ -82,7 +83,7 @@ function Debtors() {
       {debtors.map((b) => (
         <Group key={b.apartmentId} gap="sm" wrap="nowrap" mih={44}>
           <AptPlate number={b.number} size="sm" />
-          <Text fw={600} truncate="end" style={{ flex: 1, minWidth: 0 }}>{b.names.join(', ') || he.apartment(b.number)}</Text>
+          <Text fw={600} truncate="end" c={b.names.length ? undefined : 'dimmed'} style={{ flex: 1, minWidth: 0 }}>{b.names.join(', ') || he.finance.noResidents}</Text>
           <Money amount={b.balance} />
         </Group>
       ))}
@@ -158,12 +159,13 @@ function MaintenanceDue() {
 }
 
 /** Resident: the calls this user opened that are still active. */
-function MyTickets() {
+function MyTickets({ onReport }: { onReport: () => void }) {
   const userId = useAuth().session?.user.id
   const { data, isLoading, isError, refetch } = useTickets(['open', 'in_progress'])
   const mine = data?.filter((t) => t.opened_by === userId)
   return (
     <Section title={he.home.myTickets} to="/tickets" linkLabel={he.home.allTickets}>
+      <Button color="signal" fullWidth leftSection={<IconTool size={20} stroke={1.75} aria-hidden="true" />} onClick={onReport}>{he.home.reportTicket}</Button>
       {isLoading && <ListSkeleton rows={2} />}
       {isError && <LoadError onRetry={() => void refetch()} />}
       {mine?.length === 0 && <EmptyState title={he.home.noMyTickets} />}
@@ -172,24 +174,26 @@ function MyTickets() {
   )
 }
 
-function ResidentHome() {
+function ResidentHome({ onReport }: { onReport: () => void }) {
   return (
     <Stack gap="lg">
       <MyBalanceHero />
+      <HowToPay whenOwed />
       <LatestAnnouncement showUnread />
-      <MyTickets />
+      <MyTickets onReport={onReport} />
     </Stack>
   )
 }
 
+/** The collection hero full width; then money and calls beside maintenance and the latest announcement. */
 function AdminHome() {
   return (
     <Stack gap="lg">
       <CollectionHero />
-      <Debtors />
-      <OpenTickets />
-      <MaintenanceDue />
-      <LatestAnnouncement showUnread={false} />
+      <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg" verticalSpacing="lg">
+        <Stack gap="lg"><Debtors /><OpenTickets /></Stack>
+        <Stack gap="lg"><MaintenanceDue /><LatestAnnouncement showUnread={false} /></Stack>
+      </SimpleGrid>
     </Stack>
   )
 }
@@ -197,11 +201,10 @@ function AdminHome() {
 export default function HomePage() {
   const { profile, isAdmin } = useAuth()
   const [reporting, setReporting] = useState(false)
-  const action = isAdmin ? undefined : { label: he.home.reportTicket, onClick: () => setReporting(true) }
   return (
     <>
-      <PageHeader title={profile?.full_name ? he.welcomeUser(profile.full_name) : he.welcome} action={action} />
-      {isAdmin ? <AdminHome /> : <ResidentHome />}
+      <PageHeader title={profile?.full_name ? he.welcomeUser(profile.full_name) : he.welcome} />
+      {isAdmin ? <AdminHome /> : <ResidentHome onReport={() => setReporting(true)} />}
       <FormModal opened={reporting} title={he.tickets.add} onClose={() => setReporting(false)}>
         {reporting && <TicketForm onDone={() => setReporting(false)} />}
       </FormModal>

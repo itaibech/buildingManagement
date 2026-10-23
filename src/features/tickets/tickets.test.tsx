@@ -90,9 +90,11 @@ describe('TicketsPage', () => {
     expect(within(row).getByLabelText(he.tickets.photoCount(2))).toBeInTheDocument()
   })
 
-  it('"הכל" shows every status', () => {
+  it('one filter: active (default), closed, or everything', () => {
     wrap(<TicketsPage />)
-    fireEvent.click(screen.getByRole('checkbox', { name: he.tickets.filters.all }))
+    fireEvent.click(screen.getByRole('radio', { name: he.tickets.filters.closed }))
+    expect(m.useTickets).toHaveBeenLastCalledWith(['closed'])
+    fireEvent.click(screen.getByRole('radio', { name: he.tickets.filters.all }))
     expect(m.useTickets).toHaveBeenLastCalledWith(undefined)
   })
 

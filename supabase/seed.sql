@@ -64,6 +64,11 @@ select gen_random_uuid(), u.id, u.id::text, 'email',
 from auth.users u
 where u.email in ('admin@example.test', 'resident@example.test', 'pending@example.test');
 
+-- The bootstrap grant needs a Google sign-up (0012), so the local email admin is made the super admin
+-- directly, as postgres.
+update public.profiles set role = 'admin', status = 'approved', is_super_admin = true
+where email = 'admin@example.test';
+
 -- Approve the resident and link them to apartment 1.
 update public.profiles
 set status = 'approved', resident_id = '20000000-0000-0000-0000-000000000001'

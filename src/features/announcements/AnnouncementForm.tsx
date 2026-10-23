@@ -1,7 +1,7 @@
 import { Alert, Button, Stack, Switch, Textarea, TextInput } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { he } from '../../lib/he'
-import { notifySuccess } from '../../ui'
+import { DateInput, focusFirstError, notifySuccess } from '../../ui'
 import { useSaveAnnouncement, type Announcement } from './api'
 import { todayISO } from '../../lib/dates'
 
@@ -35,14 +35,14 @@ export function AnnouncementForm({ announcement, onDone }: { announcement?: Anno
         onDone()
       },
     })
-  })
+  }, focusFirstError)
   return (
     <form onSubmit={submit} noValidate>
       <Stack>
         <TextInput label={he.announcements.title} withAsterisk data-autofocus {...form.getInputProps('title')} />
         <Textarea label={he.announcements.body} autosize minRows={4} maxRows={12} {...form.getInputProps('body')} />
         <Switch label={he.announcements.pinned} size="md" {...form.getInputProps('pinned', { type: 'checkbox' })} />
-        <TextInput label={he.announcements.expiresAt} description={he.announcements.expiresHint} type="date" dir="ltr" {...form.getInputProps('expires_at')} />
+        <DateInput label={he.announcements.expiresAt} description={he.announcements.expiresHint} {...form.getInputProps('expires_at')} />
         {save.isError && <Alert color="debt">{he.announcements.errors.save}</Alert>}
         <Button type="submit" fullWidth loading={save.isPending}>{announcement ? he.announcements.save : he.announcements.publish}</Button>
       </Stack>

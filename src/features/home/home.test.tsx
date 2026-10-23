@@ -18,6 +18,7 @@ const m = vi.hoisted(() => ({
   balance: 0,
   balances: [] as unknown[],
   fees: [{ id: 'f1', effective_from: '2026-01-01', amount: 390 }] as unknown[],
+  building: { id: 'b1', name: 'בניין', address: null, payment_instructions: 'העברה לחשבון 12-345-678' as string | null, committee_contact: '050-0000009' as string | null },
 }))
 
 vi.mock('../../lib/supabase', () => ({ supabase: {} }))
@@ -37,6 +38,10 @@ vi.mock('../finance/api', () => ({
   useCollectionSummary: () => ({ data: { total: 6, paidUp: 4, due: 1200 }, isLoading: false, isError: false, refetch: vi.fn() }),
   useFeeSchedule: () => ({ data: m.fees, isLoading: false, isError: false, isSuccess: true, refetch: vi.fn() }),
   useBalances: () => ({ data: m.balances, isLoading: false, isError: false, refetch: vi.fn() }),
+}))
+vi.mock('../settings/api', async (orig) => ({
+  ...(await orig<typeof import('../settings/api')>()),
+  useBuilding: () => ({ data: m.building, isLoading: false, isError: false }),
 }))
 vi.mock('../maintenance/api', () => ({ useTasks: () => ({ data: m.tasks, isLoading: false, isError: false, refetch: vi.fn() }) }))
 
@@ -129,7 +134,22 @@ describe('HomePage', () => {
   it('resident hero states the balance in words', () => {
     m.balance = 660
     renderHome()
-    expect(screen.getByText(norm(he.home.balanceDue(formatILS(660))))).toBeTruthy()
+    expect(screen.getByText(he.home.owed)).toBeTruthy()
+    expect(screen.getByText(norm(formatILS(660)))).toBeTruthy()
+  })
+
+  it('resident with a balance to pay sees how to pay: instructions, copy and tap-to-call', () => {
+    m.balance = 660
+    renderHome()
+    expect(screen.getByRole('heading', { name: he.pay.title })).toBeTruthy()
+    expect(screen.getByText('העברה לחשבון 12-345-678')).toBeTruthy()
+    expect(screen.getByRole('button', { name: he.pay.copy })).toBeTruthy()
+    expect(screen.getByRole('link', { name: he.pay.call('050-0000009') }).getAttribute('href')).toBe('tel:0500000009')
+  })
+
+  it('hides how to pay on home when nothing is owed', () => {
+    renderHome()
+    expect(screen.queryByRole('heading', { name: he.pay.title })).toBeNull()
   })
 
   it('resident hero says everything is paid at zero, and credit below zero', () => {
@@ -138,7 +158,8 @@ describe('HomePage', () => {
     cleanup()
     m.balance = -330
     renderHome()
-    expect(screen.getByText(norm(he.finance.creditOf(formatILS(330))))).toBeTruthy()
+    expect(screen.getByText(norm(`${formatILS(330)} ${he.credit}`))).toBeTruthy()
+    expect(screen.getByText(he.home.allPaid)).toBeTruthy()
   })
 
   it('admin hero asks to set fees first when the fee schedule is empty', () => {

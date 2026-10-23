@@ -23,7 +23,7 @@ export function AdminControls({ ticket }: { ticket: Ticket }) {
       <Stack gap="md">
         <Title order={2} size="h4">{he.tickets.adminControls}</Title>
         <Input.Wrapper label={he.tickets.status}>
-          <SegmentedControl fullWidth mt={4} size="md" data={STATUS_OPTIONS} value={ticket.status} onChange={setStatus} />
+          <SegmentedControl fullWidth maw={480} mt={4} size="md" data={STATUS_OPTIONS} value={ticket.status} onChange={setStatus} />
         </Input.Wrapper>
         <Group gap="xs" align="flex-end" wrap="nowrap">
           <TextInput style={{ flex: 1 }} label={he.tickets.vendor} placeholder={he.tickets.vendorPlaceholder}

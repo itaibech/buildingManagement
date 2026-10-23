@@ -48,7 +48,7 @@ function Groups({ tasks, onOpen, actions }: { tasks: Task[]; onOpen: (t: Task) =
       {groups.map(({ bucket, items }) => (
         <Stack key={bucket} gap="sm" component="section" aria-label={he.dueStatus[bucket]}>
           <Title order={2} size="h4">{he.dueStatus[bucket]}</Title>
-          {items.map((t) => <TaskRow key={t.id} task={t} bucket={bucket} onOpen={onOpen} actions={actions} />)}
+          {items.map((t) => <TaskRow key={t.id} task={t} bucket={bucket} onOpen={onOpen} actions={actions} showStatus={false} />)}
         </Stack>
       ))}
     </>
