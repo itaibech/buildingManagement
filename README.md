@@ -78,8 +78,10 @@ values ('bootstrap_admin_email', 'itai.bechor@gmail.com')
 on conflict (key) do update set value = excluded.value;
 ```
 
-The first sign-up with that email (while no admin exists yet) becomes the approved **super admin**,
-whom nobody can demote, block or delete. Every other new user waits for an admin's approval.
+The first **Google** sign-in with that email (while no admin exists yet) becomes the approved **super
+admin**, whom nobody can demote, block or delete. An email/password sign-up with the same address does
+not: email addresses aren't verified when "Confirm email" is off (below), so the grant needs Google, which
+has verified the address. Every other new user waits for an admin's approval.
 
 If that account had already signed in before the setting existed (so it's a pending resident), promote
 it once from the SQL Editor (it runs as `postgres`, which the profile guards allow):
@@ -95,9 +97,17 @@ Supabase → Authentication:
 
 - **URL Configuration:** Site URL `https://itaibech.github.io/buildingManagement/`. Redirect URLs:
   just that URL. Don't add `localhost` URLs to the hosted project; local development uses the local stack.
-- **Providers → Email:** keep **Confirm email** on. The bootstrap profile is created at sign-up, so the
-  bootstrap email must be one the admin controls and confirms (Google sign-in is verified already).
-  A minimum password length of 8 or more is recommended.
+- **Providers → Email:** you can turn **Confirm email** off. Every new account starts as a pending
+  resident and sees nothing until an admin approves it, and the super-admin grant only fires for Google
+  sign-ins, so an unconfirmed address can't gain anything. Turning it off also avoids the built-in mailer:
+  Supabase's default SMTP is for testing only (heavily rate-limited, and new projects only deliver to the
+  organisation's team members), so with confirmation on, residents who sign up by email may never get the
+  link. A minimum password length of 8 or more is recommended.
+- **Password reset** ("שכחת סיסמה?" on the login page) sends a mail too. It works with the built-in mailer
+  only within those limits; for reliable delivery configure a free custom SMTP provider under
+  Authentication → SMTP (optional). The login page tells users to sign in with Google or contact the
+  committee if no mail arrives. The reset link lands on the Site URL above, so no extra redirect URL is
+  needed.
 
 ### 6. Google sign-in
 
@@ -164,11 +174,22 @@ Before pushing: `npm test && npm run lint && npm run typecheck && npm run build 
 
 1. Each feature is a branch stacked on the previous one, with a PR into its parent. CI (`ci.yml`: audit,
    lint, types, tests, build, pgTAP) must pass.
-2. Merge the stack down into `main`. A push to `main` runs `deploy.yml`: it builds with the repo
-   variables, applies new migrations in `supabase/migrations` to the hosted project (`supabase db push`),
-   then publishes GitHub Pages.
+2. Merge the stack down into `main`. A push to `main` runs `deploy.yml`: it first runs the whole CI
+   (`ci.yml` as a reusable workflow, pgTAP included); only when that passes does it build with the repo
+   variables, apply new migrations in `supabase/migrations` to the hosted project (`supabase db push`),
+   and publish GitHub Pages.
 3. Migrations are forward-only: fix a bad one with a new migration, never by editing an applied one.
    Protect `main` (Settings → Branches) so it only takes PRs with a green CI.
+
+#### First-deploy checklist
+
+- `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD` and `SUPABASE_PROJECT_REF` are set as repo secrets
+  (without the token, `migrate` fails and nothing is deployed).
+- `supabase migration list` against the hosted project shows no history under old migration names;
+  a mismatch makes `db push` refuse.
+- If the direct DB host is unreachable from the runner (IPv6), switch `db push` to the session pooler with
+  `--db-url`. A failure here is safe: deploy needs migrate.
+- After migrate and before the first sign-in, run the bootstrap SQL from step 4, then sign in with Google.
 
 ## License
 

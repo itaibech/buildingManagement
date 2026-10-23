@@ -192,4 +192,21 @@ describe('ImportPage', () => {
     expect(sentPayload().payments.some((p) => p.note === he.import.evNote)).toBe(true)
     expect(screen.getByText(/חיובי טעינה דולגו/)).toBeInTheDocument()
   })
+
+  it('skips payments already recorded in the same apartment-month by default, and can import them anyway', async () => {
+    db.tables.payments = [{ paid_on: '2026-01-15', amount: 100, source: 'manual', apartments: { number: 1 } }]
+    await upload(renderPage())
+    await pick(he.import.monthFor('אוקטובר'), 'אוקטובר')
+    next()
+    await screen.findByText(he.import.feesIntro)
+    next()
+    next()
+    expect(await screen.findByText(he.import.paidTitle(1))).toBeInTheDocument()
+    expect(screen.getByText(he.import.paidItem(1, 'ינואר 2026', '‏390.00 ‏₪', '‏100.00 ‏₪'))).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: he.import.confirm }))
+    await screen.findByText(he.import.doneTitle)
+    const jan = (p: ImportPayload): number[] => p.payments.filter((x) => x.apartment === 1 && x.paid_on === '2026-01-01').map((x) => x.amount)
+    expect(jan(sentPayload())).toEqual([290])
+    expect(sentPayload().keep_prior_levies).toBe(true)
+  })
 })

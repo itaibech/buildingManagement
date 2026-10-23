@@ -6,7 +6,7 @@ import { formatILS, monthLabel } from '../../lib/format'
 import { he } from '../../lib/he'
 import type { ImportCounts } from './api'
 import { MoneyInput } from '../finance/fields'
-import type { ImportSummary, Overlap } from './buildImport'
+import type { ImportSummary, Overlap, PaymentOverlap } from './buildImport'
 
 const XLSX_TYPES = '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
@@ -142,6 +142,33 @@ export function OverlapNotice({ overlaps, include, onInclude }: { overlaps: Over
         </List>
       </ScrollArea.Autosize>
       <Toggle label={he.import.overlapInclude} checked={include} onChange={onInclude} />
+    </Alert>
+  )
+}
+
+export function PaidNotice({ overlaps, include, onInclude }: { overlaps: PaymentOverlap[]; include: boolean; onInclude: (v: boolean) => void }) {
+  if (overlaps.length === 0) return null
+  return (
+    <Alert color="signal" title={he.import.paidTitle(overlaps.length)}>
+      <Text size="sm">{he.import.paidBody}</Text>
+      <ScrollArea.Autosize mah={160} mt="xs">
+        <List size="sm" spacing={2} className="bm-num">
+          {overlaps.map((o) => (
+            <List.Item key={`${o.apartment}|${o.month}`}>{he.import.paidItem(o.apartment, monthLabel(o.month), formatILS(o.amount), formatILS(o.recorded))}</List.Item>
+          ))}
+        </List>
+      </ScrollArea.Autosize>
+      <Toggle label={he.import.paidInclude} checked={include} onChange={onInclude} />
+    </Alert>
+  )
+}
+
+export function PriorNotice({ prior, keep, onKeep }: { prior: { levy: number; ev: number }; keep: boolean; onKeep: (v: boolean) => void }) {
+  if (prior.levy === 0 && prior.ev === 0) return null
+  return (
+    <Alert color="signal" title={[prior.levy > 0 && he.import.priorLevies(prior.levy), prior.ev > 0 && he.import.priorEv(prior.ev)].filter(Boolean).join(' · ')}>
+      <Text size="sm">{he.import.priorBody}</Text>
+      <Toggle label={he.import.priorKeep} checked={keep} onChange={onKeep} />
     </Alert>
   )
 }

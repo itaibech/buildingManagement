@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { he } from '../../lib/he'
 import {
-  budgetUpdates, buildImport, feesToReplace, findOverlaps, initialFees, isExistingFee, likelyExempt, overlapKey, proposeFees, summarize,
+  budgetUpdates, buildImport, feesToReplace, findOverlaps, findPaymentOverlaps, initialFees, isExistingFee, likelyExempt, overlapKey,
+  priorCharges, proposeFees, skipRecorded, summarize, type PaymentRow,
 } from './buildImport'
 import { budgetFixture, expensesFixture, INCOME_HEADER, incomeFixture } from './fixture'
 import { excelSerialToMonth, parseBudgetSheet, parseExpensesSheet, parseIncomeSheet, type ColumnMap } from './parseWorkbook'
@@ -223,6 +224,46 @@ describe('import guards', () => {
   it('counts budget lines the import will overwrite', () => {
     const p = buildImport(parsed(), withLevyMonth(income.columns), FEES)
     expect(budgetUpdates(p.budgets, ['נקיון', 'חשמל'])).toBe(1)
+  })
+})
+
+describe('payments overlap guard (re-importing an exported year)', () => {
+  const pay = (apartment: number, paid_on: string, amount: number): PaymentRow => ({ apartment, paid_on, amount, note: 'x' })
+  const payments = [pay(1, '2026-03-01', 400), pay(1, '2026-04-01', 390), pay(2, '2026-03-01', 390), pay(2, '2026-03-01', 50)]
+  const existing = [
+    { apartment: 1, paid_on: '2026-03-10', amount: 100, source: 'manual' },
+    { apartment: 1, paid_on: '2026-04-01', amount: 390, source: 'import' },
+    { apartment: 2, paid_on: '2026-03-01', amount: 50, source: 'ev-import' },
+    { apartment: 2, paid_on: '2026-03-20', amount: 390, source: 'manual' },
+  ]
+
+  it('lists apartment-months whose file amount is already recorded by non-import payments', () => {
+    expect(findPaymentOverlaps(payments, existing)).toEqual([
+      { apartment: 1, month: '2026-03', amount: 400, recorded: 100 },
+      { apartment: 2, month: '2026-03', amount: 440, recorded: 440 },
+    ])
+  })
+
+  it('by default skips what is already recorded, importing only the rest of the cell', () => {
+    const out = skipRecorded(payments, findPaymentOverlaps(payments, existing))
+    expect(out).toEqual([pay(1, '2026-03-01', 300), pay(1, '2026-04-01', 390)])
+  })
+
+  it('counts the previous import\'s levy and EV charges a file without them would remove', () => {
+    const charges = [
+      { apartment: 1, month: '2026-05-01', kind: 'levy', source: 'import' },
+      { apartment: 2, month: '2026-05-01', kind: 'levy', source: 'import' },
+      { apartment: 2, month: '2026-05-01', kind: 'levy', source: 'manual' },
+      { apartment: 1, month: '2026-02-01', kind: 'extra', source: 'import' },
+      { apartment: 3, month: '2026-02-01', kind: 'extra', source: 'import' },
+    ]
+    expect(priorCharges(charges, [], [3])).toEqual({ levy: 2, ev: 1 })
+    expect(priorCharges(charges, ['levy'], [3])).toEqual({ levy: 0, ev: 1 })
+  })
+
+  it('keeps prior levies by default in the payload', () => {
+    expect(buildImport(parsed(), withLevyMonth(income.columns), FEES).keep_prior_levies).toBe(true)
+    expect(buildImport(parsed(), withLevyMonth(income.columns), FEES, { keepPrior: false }).keep_prior_levies).toBe(false)
   })
 })
 
