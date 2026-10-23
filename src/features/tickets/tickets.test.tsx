@@ -26,6 +26,8 @@ const m = vi.hoisted(() => ({
 
 const mutation = (fn: (v: unknown, o?: { onSuccess?: (d: unknown) => void }) => void) => ({ mutate: fn, isPending: false, isError: false })
 
+// The real client needs env vars CI doesn't have; every hook that would use it is mocked below.
+vi.mock('../../lib/supabase', () => ({ supabase: {} }))
 vi.mock('./api', async (orig) => ({
   ...(await orig<typeof import('./api')>()),
   useTickets: (s?: unknown) => {
