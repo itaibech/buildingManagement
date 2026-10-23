@@ -17,6 +17,7 @@ const m = vi.hoisted(() => ({
   refetch: vi.fn(),
   balance: 0,
   balances: [] as unknown[],
+  fees: [{ id: 'f1', effective_from: '2026-01-01', amount: 390 }] as unknown[],
 }))
 
 vi.mock('../../lib/supabase', () => ({ supabase: {} }))
@@ -34,6 +35,7 @@ vi.mock('../tickets/api', () => ({
 vi.mock('../finance/api', () => ({
   useMyBalance: () => ({ data: { apartmentId: 'a1', balance: m.balance, scheduled: 0 }, isLoading: false, isError: false, refetch: vi.fn() }),
   useCollectionSummary: () => ({ data: { total: 6, paidUp: 4, due: 1200 }, isLoading: false, isError: false, refetch: vi.fn() }),
+  useFeeSchedule: () => ({ data: m.fees, isLoading: false, isError: false, isSuccess: true, refetch: vi.fn() }),
   useBalances: () => ({ data: m.balances, isLoading: false, isError: false, refetch: vi.fn() }),
 }))
 vi.mock('../maintenance/api', () => ({ useTasks: () => ({ data: m.tasks, isLoading: false, isError: false, refetch: vi.fn() }) }))
@@ -58,6 +60,7 @@ beforeEach(() => {
   m.failed = false
   m.refetch.mockClear()
   m.balance = 0
+  m.fees = [{ id: 'f1', effective_from: '2026-01-01', amount: 390 }]
   m.balances = [
     { apartmentId: 'a3', number: 3, names: ['חייב גדול'], balance: 900, scheduled: 0 },
     { apartmentId: 'a5', number: 5, names: ['חייב קטן'], balance: 100, scheduled: 0 },
@@ -136,5 +139,14 @@ describe('HomePage', () => {
     m.balance = -330
     renderHome()
     expect(screen.getByText(norm(he.finance.creditOf(formatILS(330))))).toBeTruthy()
+  })
+
+  it('admin hero asks to set fees first when the fee schedule is empty', () => {
+    m.isAdmin = true
+    m.fees = []
+    renderHome()
+    expect(screen.getByText(he.home.setFeesFirst)).toBeTruthy()
+    expect(screen.getByRole('button', { name: he.home.setFeesAction })).toBeTruthy()
+    expect(screen.queryByText(he.home.collected(4, 6))).toBeNull()
   })
 })

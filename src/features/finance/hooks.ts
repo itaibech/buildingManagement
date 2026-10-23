@@ -41,3 +41,9 @@ export function useBudgetRows(year: number) {
   const refetch = () => { void budgets.refetch(); void expenses.refetch() }
   return { rows, isLoading: budgets.isLoading || expenses.isLoading, isError: budgets.isError || expenses.isError, refetch }
 }
+
+/** Ids of the templates already posted as expenses on the first of `month`. */
+export function useAppliedTemplates(month: string): ReadonlySet<string> {
+  const expenses = useExpenses(Number(month.slice(0, 4)))
+  return useMemo(() => new Set((expenses.data ?? []).flatMap((e) => (e.template_id && e.spent_on === month ? [e.template_id] : []))), [expenses.data, month])
+}

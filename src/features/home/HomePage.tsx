@@ -1,13 +1,13 @@
 import { Anchor, Box, Button, Card, Group, Progress, Stack, Text, Title } from '@mantine/core'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { useAuth } from '../../auth/AuthProvider'
 import { formatDate, formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
 import { AptPlate, EmptyState, ListSkeleton, Money, PageHeader, StatusBadge } from '../../ui'
 import { useAnnouncements } from '../announcements/api'
-import { useBalances, useCollectionSummary } from '../finance/api'
+import { useBalances, useCollectionSummary, useFeeSchedule } from '../finance/api'
 import { MyBalanceHero } from '../finance/cards'
 import { monthOf } from '../finance/ledger'
 import { useTasks } from '../maintenance/api'
@@ -46,13 +46,17 @@ function Section({ title, to, linkLabel, children }: { title: string; to: string
 
 /** Admin hero: how many apartments are paid up for the current month (Israel time). */
 function CollectionHero() {
-  const q = useCollectionSummary(monthOf(todayISO()))
-  const rate = q.data
+  const navigate = useNavigate()
+  const fees = useFeeSchedule()
+  const noFees = fees.data?.length === 0
+  const q = useCollectionSummary(monthOf(todayISO()), fees.isSuccess && !noFees)
+  const rate = noFees ? undefined : q.data
   return (
     <Card>
       <Text fw={600} c="dimmed" size="sm">{he.home.collectionThisMonth}</Text>
-      {q.isLoading && <ListSkeleton rows={1} />}
-      {q.isError && <LoadError onRetry={() => void q.refetch()} />}
+      {(fees.isLoading || (q.isLoading && !noFees)) && <ListSkeleton rows={1} />}
+      {(fees.isError || q.isError) && <LoadError onRetry={() => { void fees.refetch(); void q.refetch() }} />}
+      {noFees && <EmptyState title={he.home.setFeesFirst} action={{ label: he.home.setFeesAction, onClick: () => navigate('/finance?tab=charges') }} />}
       {rate?.total === 0 && <EmptyState title={he.home.collectionSoon} />}
       {rate && rate.total > 0 && (
         <Stack gap="xs" mt="xs">

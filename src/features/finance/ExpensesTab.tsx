@@ -10,6 +10,7 @@ import { receiptUrl, useDeleteExpense, useDeleteTemplate, useExpenses, useTempla
 import { LoadFailed } from './cards'
 import { ApplyTemplates, ExpenseForm, TemplateForm } from './ExpenseForms'
 import { DeleteButton, MonthStepper, Row } from './fields'
+import { useAppliedTemplates } from './hooks'
 import { monthOf } from './ledger'
 
 type Sheet = { kind: 'apply' } | { kind: 'template'; template?: Template } | null
@@ -120,6 +121,7 @@ export function ExpensesTab({ adding, onAddingClose }: { adding: boolean; onAddi
   const [sheet, setSheet] = useState<Sheet>(null)
   const [removing, setRemoving] = useState<Removing>(null)
   const templates = useTemplates()
+  const appliedIds = useAppliedTemplates(month)
   const close = () => setSheet(null)
   return (
     <Stack gap="md">
@@ -129,7 +131,7 @@ export function ExpensesTab({ adding, onAddingClose }: { adding: boolean; onAddi
       <Templates onSheet={setSheet} onDelete={(row) => setRemoving({ kind: 'template', row })} />
       <FormModal opened={adding} title={he.finance.addExpense} onClose={onAddingClose}>{adding && <ExpenseForm onDone={onAddingClose} />}</FormModal>
       <FormModal opened={!!sheet} title={sheet?.kind === 'apply' ? he.finance.applyTitle(monthLabel(month)) : sheet?.template ? he.finance.editTemplate : he.finance.addTemplate} onClose={close}>
-        {sheet?.kind === 'apply' && <ApplyTemplates month={month} templates={templates.data ?? []} onDone={close} />}
+        {sheet?.kind === 'apply' && <ApplyTemplates month={month} templates={templates.data ?? []} applied={appliedIds} onDone={close} />}
         {sheet?.kind === 'template' && <TemplateForm key={sheet.template?.id ?? 'new'} template={sheet.template} onDone={close} />}
       </FormModal>
       <RemoveDialog removing={removing} onClose={() => setRemoving(null)} />

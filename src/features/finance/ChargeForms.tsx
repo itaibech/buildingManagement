@@ -85,7 +85,7 @@ export function LevyForm({ onDone }: { onDone: () => void }) {
         {form.values.target === 'some' && (
           <MultiSelect label={he.finance.apartments} searchable data={options} {...form.getInputProps('apartmentIds')} />
         )}
-        <Button type="submit" fullWidth loading={save.isPending}>{he.finance.addCharge}</Button>
+        <Button type="submit" fullWidth loading={save.isPending} disabled={options.length === 0}>{he.finance.addCharge}</Button>
       </Stack>
     </form>
   )

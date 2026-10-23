@@ -1,4 +1,4 @@
-import { Alert, Button, CloseButton, Divider, FileButton, Group, Select, Stack, Text, TextInput } from '@mantine/core'
+import { Alert, Badge, Button, CloseButton, Divider, FileButton, Group, Select, Stack, Text, TextInput } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { IconPaperclip } from '@tabler/icons-react'
 import { Fragment, useState } from 'react'
@@ -105,12 +105,36 @@ export function TemplateForm({ template, onDone }: { template?: Template; onDone
   )
 }
 
-/** Confirm sheet: lists the templates and their total, then posts them as expenses for `month`. */
-export function ApplyTemplates({ month, templates, onDone }: { month: string; templates: Template[]; onDone: () => void }) {
+function TemplateLine({ t, applied }: { t: Template; applied: boolean }) {
+  return (
+    <Group justify="space-between" wrap="nowrap" mih={48} data-applied={applied || undefined}>
+      <Stack gap={0} style={{ minWidth: 0 }}>
+        <Group gap="xs" wrap="nowrap">
+          <Text fw={600} truncate="end" c={applied ? 'dimmed' : undefined}>{t.label}</Text>
+          {applied && <Badge color="paid" c="paid.9">{he.finance.alreadyApplied}</Badge>}
+        </Group>
+        <Text size="sm" c="dimmed" truncate="end">{[t.category, t.vendor].filter(Boolean).join(' · ')}</Text>
+      </Stack>
+      <Text className="bm-num" fw={600} c={applied ? 'dimmed' : undefined}>{formatILS(t.amount)}</Text>
+    </Group>
+  )
+}
+
+export interface ApplyTemplatesProps {
+  month: string
+  templates: Template[]
+  /** Template ids already posted for this month; shown as done and skipped by the DB. */
+  applied: ReadonlySet<string>
+  onDone: () => void
+}
+
+/** Confirm sheet: lists the templates (marking ones already posted this month), then posts the rest for `month`. */
+export function ApplyTemplates({ month, templates, applied, onDone }: ApplyTemplatesProps) {
   const apply = useApplyTemplates(month)
-  const total = templates.reduce((t, x) => t + x.amount, 0)
   if (templates.length === 0) return <Alert color="stone">{he.finance.noTemplates}</Alert>
-  const go = () => apply.mutate(templates, { onSuccess: (n) => { notifySuccess(he.finance.templatesApplied(n)); onDone() } })
+  const pending = templates.filter((t) => !applied.has(t.id))
+  const total = pending.reduce((t, x) => t + x.amount, 0)
+  const go = () => apply.mutate(templates, { onSuccess: (r) => { notifySuccess(he.finance.templatesApplied(r.added, r.existing)); onDone() } })
   return (
     <Stack>
       <Text>{he.finance.applyIntro(monthLabel(month))}</Text>
@@ -118,19 +142,14 @@ export function ApplyTemplates({ month, templates, onDone }: { month: string; te
         {templates.map((t, i) => (
           <Fragment key={t.id}>
             {i > 0 && <Divider color="stone.1" />}
-            <Group justify="space-between" wrap="nowrap" mih={48}>
-              <Stack gap={0} style={{ minWidth: 0 }}>
-                <Text fw={600} truncate="end">{t.label}</Text>
-                <Text size="sm" c="dimmed" truncate="end">{[t.category, t.vendor].filter(Boolean).join(' · ')}</Text>
-              </Stack>
-              <Text className="bm-num" fw={600}>{formatILS(t.amount)}</Text>
-            </Group>
+            <TemplateLine t={t} applied={applied.has(t.id)} />
           </Fragment>
         ))}
       </Stack>
       <Divider />
       <Group justify="space-between"><Text fw={600}>{he.finance.total}</Text><Text fw={600} className="bm-num">{formatILS(total)}</Text></Group>
-      <Button fullWidth loading={apply.isPending} onClick={go}>{he.finance.applyConfirm(templates.length)}</Button>
+      {pending.length === 0 && <Text size="sm" c="dimmed">{he.finance.allApplied}</Text>}
+      <Button fullWidth loading={apply.isPending} disabled={pending.length === 0} onClick={go}>{he.finance.applyConfirm(pending.length)}</Button>
     </Stack>
   )
 }

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { MantineProvider } from '@mantine/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -12,18 +12,25 @@ import { LevyForm } from './ChargeForms'
 import { ApplyTemplates } from './ExpenseForms'
 import FinancePage from './FinancePage'
 import { PaymentForm } from './PaymentForm'
-import type { Template } from './api'
+import { useDeleteExpense, useSaveExpense, type Template } from './api'
 
 interface Call { table: string; op: string; args: unknown[] }
-const db = vi.hoisted(() => ({ admin: false, calls: [] as Call[], tables: {} as Record<string, unknown[]>, rpc: {} as Record<string, unknown> }))
+const db = vi.hoisted(() => ({
+  admin: false, calls: [] as Call[], tables: {} as Record<string, unknown[]>, rpc: {} as Record<string, unknown>,
+  /** `table.op` keys whose statement resolves with an error. */
+  fail: new Set<string>(), removed: [] as string[][], removeError: null as { message: string } | null,
+}))
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 
 /** Chainable PostgREST stand-in: records every call, resolves to the table's rows. */
 function builder(table: string) {
-  const result = () => ({ data: db.tables[table] ?? [], error: null })
+  const ops: string[] = []
+  const result = () => (ops.some((op) => db.fail.has(`${table}.${op}`))
+    ? { data: null, error: { message: 'boom' } }
+    : { data: db.tables[table] ?? [], error: null })
   const chain: Record<string, unknown> = {}
   for (const op of ['select', 'eq', 'lt', 'gte', 'order', 'in', 'insert', 'upsert', 'update', 'delete']) {
-    chain[op] = (...args: unknown[]) => { db.calls.push({ table, op, args }); return chain }
+    chain[op] = (...args: unknown[]) => { db.calls.push({ table, op, args }); ops.push(op); return chain }
   }
   chain.single = () => Promise.resolve({ data: { id: 'new' }, error: null })
   chain.then = (resolve: (v: unknown) => unknown) => Promise.resolve(result()).then(resolve)
@@ -34,7 +41,12 @@ vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: (table: string) => builder(table),
     rpc: (fn: string) => Promise.resolve({ data: db.rpc[fn] ?? null, error: null }),
-    storage: { from: () => ({ upload: () => Promise.resolve({ error: null }), remove: () => Promise.resolve({ error: null }) }) },
+    storage: {
+      from: () => ({
+        upload: () => Promise.resolve({ error: null }),
+        remove: (paths: string[]) => { db.removed.push(paths); return Promise.resolve({ error: db.removeError }) },
+      }),
+    },
   },
 }))
 vi.mock('../../auth/AuthProvider', () => ({ useAuth: () => ({ isAdmin: db.admin, session: { user: { id: 'me' } } }) }))
@@ -60,6 +72,9 @@ beforeEach(() => {
   db.calls = []
   db.rpc = { my_apartment_id: 'a1', collection_summary: [] }
   db.tables = { apartments: APARTMENTS, residents: RESIDENTS }
+  db.fail = new Set()
+  db.removed = []
+  db.removeError = null
   toast.success.mockClear()
   toast.error.mockClear()
 })
@@ -79,6 +94,9 @@ describe('resident finance page', () => {
     expect(screen.queryByText('יוסי')).toBeNull()
     const ledgerFilter = db.calls.find((c) => c.table === 'apartment_ledger' && c.op === 'eq')
     expect(ledgerFilter?.args).toEqual(['apartment_id', 'a1'])
+    // Only its own apartment row is fetched (id + number), never the whole list.
+    const aptCalls = db.calls.filter((c) => c.table === 'apartments')
+    expect(aptCalls.map((c) => [c.op, ...c.args])).toEqual([['select', 'id, number'], ['eq', 'id', 'a1']])
   })
 
   it('shows the balance sentence and upcoming charges', async () => {
@@ -128,11 +146,59 @@ describe('forms', () => {
     expect(rows.every((r) => r.kind === 'levy' && r.amount === 500 && r.month.endsWith('-01'))).toBe(true)
   })
 
-  it('applies the templates as expenses dated the first of the month', async () => {
-    const templates: Template[] = [{ id: 't1', category_id: 'c1', category: 'ניקיון', amount: 600, vendor: 'ספק', label: 'ניקיון חודשי' }]
-    wrap(<ApplyTemplates month="2026-10-01" templates={templates} onDone={vi.fn()} />)
+  it('applies the templates idempotently and reports added vs existing', async () => {
+    const templates: Template[] = [
+      { id: 't1', category_id: 'c1', category: 'ניקיון', amount: 600, vendor: 'ספק', label: 'ניקיון חודשי' },
+      { id: 't2', category_id: 'c2', category: 'בזק', amount: 120, vendor: '', label: 'אינטרנט' },
+    ]
+    db.tables.expenses = [{ id: 'new-1' }] // the DB inserted one row and skipped the duplicate
+    wrap(<ApplyTemplates month="2026-10-01" templates={templates} applied={new Set(['t2'])} onDone={vi.fn()} />)
+    expect(screen.getByText(he.finance.alreadyApplied)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: he.finance.applyConfirm(1) }))
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith(he.finance.templatesApplied(1)))
-    expect(inserts('expenses')).toEqual([[{ category_id: 'c1', amount: 600, vendor: 'ספק', note: 'ניקיון חודשי', spent_on: '2026-10-01' }]])
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith(he.finance.templatesApplied(1, 1)))
+    const upsert = db.calls.find((c) => c.table === 'expenses' && c.op === 'upsert')
+    expect(upsert?.args[1]).toEqual({ onConflict: 'template_id,spent_on', ignoreDuplicates: true })
+    expect(upsert?.args[0]).toEqual([
+      { category_id: 'c1', amount: 600, vendor: 'ספק', note: 'ניקיון חודשי', spent_on: '2026-10-01', template_id: 't1' },
+      { category_id: 'c2', amount: 120, vendor: '', note: 'אינטרנט', spent_on: '2026-10-01', template_id: 't2' },
+    ])
+  })
+
+  it('disables applying when every template is already posted this month', () => {
+    const templates: Template[] = [{ id: 't1', category_id: 'c1', category: 'ניקיון', amount: 600, vendor: '', label: 'ניקיון' }]
+    wrap(<ApplyTemplates month="2026-10-01" templates={templates} applied={new Set(['t1'])} onDone={vi.fn()} />)
+    expect(screen.getByRole('button', { name: he.finance.applyConfirm(0) })).toBeDisabled()
+    expect(screen.getByText(he.finance.allApplied)).toBeInTheDocument()
+  })
+
+  it('keeps the levy submit disabled until the apartments are loaded', () => {
+    db.tables.apartments = []
+    wrap(<LevyForm onDone={vi.fn()} />)
+    expect(screen.getByRole('button', { name: he.finance.addCharge })).toBeDisabled()
+  })
+})
+
+describe('receipt cleanup', () => {
+  const hookWrap = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>
+  )
+
+  it('tells the admin when the receipt file could not be removed (the row is already gone)', async () => {
+    db.removeError = { message: 'storage down' }
+    const { result } = renderHook(() => useDeleteExpense(), { wrapper: hookWrap })
+    await act(() => result.current.mutateAsync({ id: 'e1', receipt_path: 'e1/r.pdf' }))
+    expect(db.calls.some((c) => c.table === 'expenses' && c.op === 'delete')).toBe(true)
+    expect(toast.error).toHaveBeenCalledWith(he.finance.receiptRemoveFailed)
+  })
+
+  it('removes the uploaded receipt when linking it to the expense fails', async () => {
+    db.fail.add('expenses.update')
+    const file = new File(['%PDF'], 'r.pdf', { type: 'application/pdf' })
+    const { result } = renderHook(() => useSaveExpense(), { wrapper: hookWrap })
+    const values = { category_id: 'c1', spent_on: '2026-10-01', amount: 5, vendor: '', note: '' }
+    const out = await act(() => result.current.mutateAsync({ values, file }))
+    expect(out.receiptFailed).toBe(true)
+    expect(db.removed).toHaveLength(1)
+    expect(db.removed[0]?.[0]).toMatch(/^new\/[0-9a-f-]+\.pdf$/)
   })
 })

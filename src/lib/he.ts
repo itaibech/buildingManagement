@@ -47,6 +47,8 @@ export const he = {
     noMaintenanceDue: 'אין משימות תחזוקה קרובות',
     loadFailed: 'לא הצלחנו לטעון. נסו לרענן.',
     retry: 'ניסיון חוזר',
+    setFeesFirst: 'הגדירו דמי ועד כדי לראות נתוני גבייה',
+    setFeesAction: 'הגדרת דמי ועד',
     collectionSoon: 'נתוני הגבייה יופיעו כאן לאחר הגדרת דמי הוועד',
     openTicketsCount: (n: number) => (n === 1 ? 'תקלה פעילה אחת' : `${n} תקלות פעילות`),
     allTickets: 'לכל התקלות',
@@ -386,8 +388,15 @@ export const he = {
     applyTemplates: 'החלת הוצאות קבועות לחודש',
     applyTitle: (month: string) => `הוצאות קבועות ל${month}`,
     applyIntro: (month: string) => `ההוצאות הבאות יירשמו בתאריך 1 ב${month}:`,
-    applyConfirm: (n: number) => (n === 1 ? 'רישום הוצאה אחת' : `רישום ${n} הוצאות`),
-    templatesApplied: (n: number) => (n === 1 ? 'הוצאה קבועה אחת נרשמה' : `${n} הוצאות קבועות נרשמו`),
+    applyConfirm: (n: number) => (n === 0 ? 'הכול כבר נרשם' : n === 1 ? 'רישום הוצאה אחת' : `רישום ${n} הוצאות`),
+    templatesApplied: (added: number, existing: number) => {
+      const a = added === 1 ? 'נוספה הוצאה אחת' : `נוספו ${added} הוצאות`
+      if (existing === 0) return a
+      return `${a}, ${existing === 1 ? 'אחת כבר הייתה קיימת' : `${existing} כבר היו קיימות`}`
+    },
+    alreadyApplied: 'כבר נרשמה',
+    allApplied: 'כל ההוצאות הקבועות כבר נרשמו לחודש הזה.',
+    receiptRemoveFailed: 'ההוצאה נמחקה, אבל קובץ הקבלה לא נמחק.',
     templates: 'הוצאות קבועות',
     addTemplate: 'הוצאה קבועה חדשה',
     editTemplate: 'עריכת הוצאה קבועה',

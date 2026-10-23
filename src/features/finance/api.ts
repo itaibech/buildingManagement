@@ -25,7 +25,7 @@ export interface Fee { id: string; effective_from: string; amount: number }
 export interface FeeOverride { id: string; apartment_id: string; effective_from: string; amount: number }
 export interface Expense {
   id: string; category_id: string; category: string; spent_on: string; amount: number
-  vendor: string; note: string; receipt_path: string | null; source: string
+  vendor: string; note: string; receipt_path: string | null; source: string; template_id: string | null
 }
 export interface ExpenseInput { category_id: string; spent_on: string; amount: number; vendor: string; note: string }
 export interface Template { id: string; category_id: string; category: string; amount: number; vendor: string; label: string }
@@ -90,6 +90,18 @@ export function useMyApartmentId() {
       return data ?? null
     },
   })
+}
+
+/** The resident's own apartment (id and number only); null when not linked. */
+export function useMyApartment() {
+  const mine = useMyApartmentId()
+  const id = mine.data ?? null
+  const q = useQuery({
+    queryKey: [...KEY, 'my-apartment-row', id],
+    enabled: mine.isSuccess,
+    queryFn: async () => (id ? must(await supabase.from('apartments').select('id, number').eq('id', id))[0] ?? null : null),
+  })
+  return { ...q, isLoading: mine.isLoading || q.isLoading, isError: mine.isError || q.isError, refetch: () => { void mine.refetch(); void q.refetch() } }
 }
 
 /** The resident's own balance and scheduled charges; null when they aren't linked to an apartment. */
@@ -231,7 +243,7 @@ export function useExpenses(year: number) {
     queryKey: [...KEY, 'expenses', year],
     queryFn: async (): Promise<Expense[]> =>
       must(await supabase.from('expenses')
-        .select('id, category_id, spent_on, amount, vendor, note, receipt_path, source, expense_categories(name)')
+        .select('id, category_id, spent_on, amount, vendor, note, receipt_path, source, template_id, expense_categories(name)')
         .gte('spent_on', `${year}-01-01`).lt('spent_on', `${year + 1}-01-01`)
         .order('spent_on', { ascending: false }).order('created_at', { ascending: false }))
         .map(({ expense_categories, ...e }) => ({ ...e, amount: num(e.amount), category: catName(expense_categories) })),
@@ -245,6 +257,8 @@ async function attachReceipt(expenseId: string, file: File): Promise<boolean> {
   const up = await supabase.storage.from(RECEIPT_BUCKET).upload(path, file, { contentType: file.type })
   if (up.error) return false
   const { error } = await supabase.from('expenses').update({ receipt_path: path }).eq('id', expenseId)
+  // Don't leave an orphaned object behind when the link couldn't be saved.
+  if (error) await supabase.storage.from(RECEIPT_BUCKET).remove([path])
   return !error
 }
 
@@ -260,7 +274,10 @@ export function useSaveExpense() {
 export function useDeleteExpense() {
   return useFinanceMutation(async (expense: Pick<Expense, 'id' | 'receipt_path'>) => {
     fail((await supabase.from('expenses').delete().eq('id', expense.id)).error)
-    if (expense.receipt_path) await supabase.storage.from(RECEIPT_BUCKET).remove([expense.receipt_path])
+    if (!expense.receipt_path) return
+    // The expense is gone either way; only tell the admin that its receipt file stayed behind.
+    const { error } = await supabase.storage.from(RECEIPT_BUCKET).remove([expense.receipt_path])
+    if (error) notifyError(he.finance.receiptRemoveFailed)
   })
 }
 
@@ -293,11 +310,18 @@ export function useDeleteTemplate() {
 }
 
 /** Posts one expense per template, dated the first of `month`. */
+export interface ApplyResult { added: number; existing: number }
+
+/**
+ * Posts one expense per template, dated the first of `month`. Idempotent in the DB: a template
+ * already posted for that date is skipped (unique template_id + spent_on), and counted as existing.
+ */
 export function useApplyTemplates(month: string) {
-  return useFinanceMutation(async (templates: readonly Template[]) => {
-    const rows = templates.map((t) => ({ category_id: t.category_id, amount: t.amount, vendor: t.vendor, note: t.label, spent_on: month }))
-    fail((await supabase.from('expenses').insert(rows)).error)
-    return rows.length
+  return useFinanceMutation(async (templates: readonly Template[]): Promise<ApplyResult> => {
+    const rows = templates.map((t) => ({ category_id: t.category_id, amount: t.amount, vendor: t.vendor, note: t.label, spent_on: month, template_id: t.id }))
+    const added = must(await supabase.from('expenses')
+      .upsert(rows, { onConflict: 'template_id,spent_on', ignoreDuplicates: true }).select('id')).length
+    return { added, existing: rows.length - added }
   })
 }
 
