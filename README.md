@@ -80,15 +80,19 @@ on conflict (key) do update set value = excluded.value;
 
 The first **Google** sign-in with that email (while no admin exists yet) becomes the approved **super
 admin**, whom nobody can demote, block or delete. An email/password sign-up with the same address does
-not: email addresses aren't verified when "Confirm email" is off (below), so the grant needs Google, which
-has verified the address. Every other new user waits for an admin's approval.
+not; the grant needs Google, which has verified the address. Every other new user waits for an admin's
+approval. Sign in with Google right after running the SQL, before sharing the site URL.
 
 If that account had already signed in before the setting existed (so it's a pending resident), promote
-it once from the SQL Editor (it runs as `postgres`, which the profile guards allow):
+it once from the SQL Editor (it runs as `postgres`, which the profile guards allow). First check
+Authentication → Users: if that user has an **email** identity you didn't create, delete that identity
+(or the whole user, and sign in with Google again). The SQL only promotes a user who has a Google
+identity:
 
 ```sql
-update public.profiles set role = 'admin', status = 'approved', is_super_admin = true
-where lower(email) = 'itai.bechor@gmail.com';
+update public.profiles p set role = 'admin', status = 'approved', is_super_admin = true
+where lower(p.email) = 'itai.bechor@gmail.com'
+  and exists (select 1 from auth.identities i where i.user_id = p.user_id and i.provider = 'google');
 ```
 
 ### 5. Auth settings
@@ -97,17 +101,18 @@ Supabase → Authentication:
 
 - **URL Configuration:** Site URL `https://itaibech.github.io/buildingManagement/`. Redirect URLs:
   just that URL. Don't add `localhost` URLs to the hosted project; local development uses the local stack.
-- **Providers → Email:** you can turn **Confirm email** off. Every new account starts as a pending
-  resident and sees nothing until an admin approves it, and the super-admin grant only fires for Google
-  sign-ins, so an unconfirmed address can't gain anything. Turning it off also avoids the built-in mailer:
-  Supabase's default SMTP is for testing only (heavily rate-limited, and new projects only deliver to the
-  organisation's team members), so with confirmation on, residents who sign up by email may never get the
-  link. A minimum password length of 8 or more is recommended.
-- **Password reset** ("שכחת סיסמה?" on the login page) sends a mail too. It works with the built-in mailer
-  only within those limits; for reliable delivery configure a free custom SMTP provider under
-  Authentication → SMTP (optional). The login page tells users to sign in with Google or contact the
-  committee if no mail arrives. The reset link lands on the Site URL above, so no extra redirect URL is
-  needed.
+- **Providers → Email:** keep **Confirm email** ON (the Supabase default). With it off, anyone could
+  sign up with the owner's address (auto-confirmed) before the owner does; the owner's later Google
+  sign-in would then be linked into that attacker-created account (pre-account takeover). With it on,
+  GoTrue drops unverified email identities when a verified Google identity signs in with the same
+  address. A minimum password length of 8 or more is recommended.
+- **Mail delivery:** Supabase's built-in mailer is for testing only: heavily rate-limited, and it only
+  delivers to the project's team-member addresses. Until custom SMTP is set up, residents should sign in
+  with **Google** (the login page recommends it). Email/password sign-up, confirmation and password
+  reset ("שכחת סיסמה?") work for everyone once custom SMTP is configured: create a free account at
+  Resend or Brevo, verify a sender, then Supabase → Authentication → SMTP Settings → enable custom SMTP
+  and enter the host, port, user, password and sender. The reset link lands on the Site URL above, so no
+  extra redirect URL is needed.
 
 ### 6. Google sign-in
 
@@ -183,13 +188,18 @@ Before pushing: `npm test && npm run lint && npm run typecheck && npm run build 
 
 #### First-deploy checklist
 
+Before merging:
 - `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD` and `SUPABASE_PROJECT_REF` are set as repo secrets
   (without the token, `migrate` fails and nothing is deployed).
 - `supabase migration list` against the hosted project shows no history under old migration names;
   a mismatch makes `db push` refuse.
 - If the direct DB host is unreachable from the runner (IPv6), switch `db push` to the session pooler with
   `--db-url`. A failure here is safe: deploy needs migrate.
-- After migrate and before the first sign-in, run the bootstrap SQL from step 4, then sign in with Google.
+
+Then, in this order:
+1. Merge to `main`: CI, then migrations, then Pages.
+2. Run the bootstrap SQL from step 4.
+3. The super admin signs in with **Google** immediately, before the URL is shared with anyone.
 
 ## License
 

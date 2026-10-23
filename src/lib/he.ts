@@ -67,6 +67,7 @@ export const he = {
   signUp: 'הרשמה',
   signInWithGoogle: 'כניסה עם Google',
   or: 'או',
+  preferGoogle: 'מומלץ להתחבר עם Google',
   email: 'אימייל',
   password: 'סיסמה',
   fullName: 'שם מלא',
