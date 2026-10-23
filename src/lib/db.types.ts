@@ -83,14 +83,14 @@ isOneToOne: false
                   ]
                 },"apartment_fee_overrides": {
                   Row: {
-                    "amount": number | null,"apartment_id": string,"building_id": string,"created_at": string,"effective_from": string,"id": string,"mode": string
+                    "amount": number | null,"apartment_id": string,"building_id": string,"created_at": string,"effective_from": string,"id": string,"mode": string,"source": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount"?: number | null,"apartment_id": string,"building_id"?: string,"created_at"?: string,"effective_from": string,"id"?: string,"mode"?: string
+                    "amount"?: number | null,"apartment_id": string,"building_id"?: string,"created_at"?: string,"effective_from": string,"id"?: string,"mode"?: string,"source"?: string
                   }
                   Update: {
-                    "amount"?: number | null,"apartment_id"?: string,"building_id"?: string,"created_at"?: string,"effective_from"?: string,"id"?: string,"mode"?: string
+                    "amount"?: number | null,"apartment_id"?: string,"building_id"?: string,"created_at"?: string,"effective_from"?: string,"id"?: string,"mode"?: string,"source"?: string
                   }
                   Relationships: [
                     {

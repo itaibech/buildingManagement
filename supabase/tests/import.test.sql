@@ -2,7 +2,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(29);
+select plan(33);
 
 insert into auth.users (id, email, aud, role) values
   ('a9200000-0000-0000-0000-000000000001', 'imp-admin@test.local', 'authenticated', 'authenticated'),
@@ -116,6 +116,14 @@ select is((select row(o.mode, o.effective_from)::text from public.apartment_fee_
   join public.apartments a on a.id = o.apartment_id where a.number = 902), '(exempt,2030-01-01)', 'exempt from January of the import year');
 select throws_ok($$ select public.import_year(jsonb_set((select j from p), '{exempt}', '[999]')) $$,
   '22023', 'Invalid import payload: exempt (unknown apartment)', 'an exempt apartment not in the payload is rejected');
+select is((select o.source from public.apartment_fee_overrides o
+  join public.apartments a on a.id = o.apartment_id where a.number = 902), 'import', 'import-created exempt rows are tagged');
+select public.set_apartment_fee((select id from public.apartments where number = 901), '2030-03-01', 'exempt', null);
+select is(public.import_year(jsonb_set((select j from p), '{exempt}', '[]')) ->> 'exempt', '0', 're-import without the choice');
+select is((select count(*) from public.apartment_fee_overrides o
+  join public.apartments a on a.id = o.apartment_id where a.number = 902), 0::bigint, 're-import removes the earlier import exempt row');
+select is((select row(o.mode, o.source)::text from public.apartment_fee_overrides o
+  join public.apartments a on a.id = o.apartment_id where a.number = 901), '(exempt,manual)', 'a manual timeline row survives re-import');
 
 select * from finish();
 rollback;

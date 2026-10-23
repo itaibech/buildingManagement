@@ -3,7 +3,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(37);
+select plan(38);
 
 insert into auth.users (id, email, aud, role) values
   ('a9500000-0000-0000-0000-000000000001', 'fee-admin@test.local', 'authenticated', 'authenticated'),
@@ -40,6 +40,8 @@ select throws_ok($$insert into public.apartment_fee_overrides (apartment_id, mod
   values ('b9500000-0000-0000-0000-00000000000c', 'exempt', 5, '2020-01-01')$$, '23514', null, 'exempt has no amount');
 select throws_ok($$insert into public.apartment_fee_overrides (apartment_id, mode, amount, effective_from)
   values ('b9500000-0000-0000-0000-00000000000c', 'free', null, '2020-01-01')$$, '23514', null, 'unknown mode rejected');
+select throws_ok($$insert into public.apartment_fee_overrides (apartment_id, mode, amount, effective_from)
+  values ('b9500000-0000-0000-0000-00000000000c', 'exempt', null, '2020-01-15')$$, '23514', null, 'effective_from must be the first of a month');
 
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"a9500000-0000-0000-0000-000000000001","role":"authenticated"}';

@@ -34,3 +34,22 @@ export const affectsPast = (month: string, currentMonth: string): boolean => mon
 
 /** The current billing month (first of the month). */
 export const currentMonth = (): string => monthOf(todayISO())
+
+export type FeeEffect = Pick<TimelineRow, 'mode' | 'amount'>
+const BUILDING: FeeEffect = { mode: 'building', amount: null }
+
+/**
+ * What "ביטול פטור" restores: the mode/amount in force just before the exemption that applies at `asOf`
+ * began (a custom amount survives), else the building fee.
+ */
+export function restoreAfterExempt(rows: readonly TimelineRow[], asOf: string): FeeEffect {
+  const sorted = sortTimeline(rows)
+  const i = sorted.findIndex((r) => r.effective_from <= asOf)
+  if (i < 0 || sorted[i].mode !== 'exempt') return BUILDING
+  const before = sorted.slice(i + 1).find((r) => r.mode !== 'exempt')
+  return before ? { mode: before.mode, amount: before.amount } : BUILDING
+}
+
+/** "תעריף הבניין" or "סכום מיוחד ₪450", for the un-exempt hint. */
+export const restoreLabel = (e: FeeEffect): string =>
+  e.mode === 'custom' && e.amount !== null ? he.fees.restoreCustom(formatILS(e.amount)) : he.fees.restoreBuilding

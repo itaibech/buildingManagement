@@ -11,12 +11,12 @@ import { theme } from '../../ui/theme'
 import type { ApartmentBalance } from './api'
 import { ApartmentFeesSection } from './ApartmentFees'
 import { BalanceRow } from './BalancesTab'
-import { FeeChangeForm, PastWarning } from './FeeForms'
+import { ExemptToggleForm, FeeChangeForm, PastWarning } from './FeeForms'
 import { currentMonth } from './feeTimeline'
 import { shiftMonth } from './ledger'
 
-const db = vi.hoisted(() => ({ tables: {} as Record<string, unknown[]>, rpcCalls: [] as { fn: string; args: unknown }[] }))
-const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
+const db = vi.hoisted(() => ({ tables: {} as Record<string, unknown[]>, rpcCalls: [] as { fn: string; args: unknown }[], rpcResult: true }))
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }))
 
 function builder(table: string) {
   const chain: Record<string, unknown> = {}
@@ -28,11 +28,11 @@ function builder(table: string) {
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: (table: string) => builder(table),
-    rpc: (fn: string, args: unknown) => { db.rpcCalls.push({ fn, args }); return Promise.resolve({ data: true, error: null }) },
+    rpc: (fn: string, args: unknown) => { db.rpcCalls.push({ fn, args }); return Promise.resolve({ data: db.rpcResult, error: null }) },
   },
 }))
-vi.mock('../../ui/notify', () => ({ notifySuccess: toast.success, notifyError: toast.error }))
-vi.mock('../../ui', async (orig) => ({ ...(await orig<typeof import('../../ui')>()), notifySuccess: toast.success, notifyError: toast.error }))
+vi.mock('../../ui/notify', () => ({ notifySuccess: toast.success, notifyError: toast.error, notifyInfo: toast.info }))
+vi.mock('../../ui', async (orig) => ({ ...(await orig<typeof import('../../ui')>()), notifySuccess: toast.success, notifyError: toast.error, notifyInfo: toast.info }))
 
 const wrap = (node: ReactNode) =>
   render(
@@ -49,7 +49,9 @@ const balance = (feeMode: ApartmentBalance['feeMode']): ApartmentBalance =>
 beforeEach(() => {
   db.tables = {}
   db.rpcCalls = []
+  db.rpcResult = true
   toast.success.mockClear()
+  toast.info.mockClear()
 })
 
 describe('FeeChangeForm', () => {
@@ -68,6 +70,19 @@ describe('FeeChangeForm', () => {
     expect(db.rpcCalls).toEqual([{ fn: 'set_apartment_fee', args: {
       p_apartment_id: 'a1', p_effective_from: shiftMonth(currentMonth(), 1), p_mode: 'exempt',
     } }])
+  })
+
+  it('cancel returns without saving; a no-op save shows the neutral toast', async () => {
+    const onCancel = vi.fn()
+    wrap(<FeeChangeForm apartmentId="a1" onDone={() => undefined} onCancel={onCancel} />)
+    fireEvent.click(screen.getByRole('button', { name: he.tenants.cancel }))
+    expect(onCancel).toHaveBeenCalled()
+    expect(db.rpcCalls).toEqual([])
+    db.rpcResult = false
+    fireEvent.click(screen.getByText(he.fees.modeOptions.building))
+    fireEvent.click(screen.getByRole('button', { name: he.fees.save }))
+    await waitFor(() => expect(toast.info).toHaveBeenCalledWith(he.fees.noChange))
+    expect(toast.success).not.toHaveBeenCalled()
   })
 
   it('warns when the month is before the current one', () => {
@@ -99,5 +114,21 @@ describe('ApartmentFeesSection', () => {
     expect(await screen.findByText(he.fees.modes.custom)).toBeTruthy()
     expect(screen.getByText(he.fees.modes.exempt)).toBeTruthy()
     expect(document.body.textContent).toContain(he.fees.nextChange(`${next.slice(5, 7)}/${next.slice(0, 4)}`, formatILS(350)))
+  })
+})
+
+describe('ExemptToggleForm', () => {
+  it('ending an exemption restores the custom amount that applied before it', async () => {
+    const timeline = [
+      { id: 't1', apartment_id: 'a1', effective_from: '2025-01-01', mode: 'custom' as const, amount: 450 },
+      { id: 't2', apartment_id: 'a1', effective_from: '2025-06-01', mode: 'exempt' as const, amount: null },
+    ]
+    wrap(<ExemptToggleForm apartmentId="a1" exempt timeline={timeline} onDone={() => undefined} />)
+    expect(document.body.textContent).toContain(he.fees.unmarkHint(he.fees.restoreCustom(formatILS(450))))
+    fireEvent.click(screen.getByRole('button', { name: he.fees.unmarkExempt }))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith(he.fees.saved))
+    expect(db.rpcCalls).toEqual([{ fn: 'set_apartment_fee', args: {
+      p_apartment_id: 'a1', p_effective_from: currentMonth(), p_mode: 'custom', p_amount: 450,
+    } }])
   })
 })

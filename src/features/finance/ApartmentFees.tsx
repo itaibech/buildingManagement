@@ -52,13 +52,14 @@ function FeeTable({ rows, onSheet }: { rows: ApartmentFeeRow[]; onSheet: (s: She
       <Table.Thead><Table.Tr><Table.Th>{H.apartment}</Table.Th><Table.Th>{H.residents}</Table.Th><Table.Th ta="end">{H.fee}</Table.Th><Table.Th>{H.source}</Table.Th><Table.Th>{H.next}</Table.Th><Table.Th /></Table.Tr></Table.Thead>
       <Table.Tbody>
         {rows.map((r) => (
-          <Table.Tr key={r.apartmentId}>
-            <Table.Td><UnstyledButton mih={44} onClick={() => onSheet({ kind: 'timeline', id: r.apartmentId })} aria-label={he.fees.open(r.number)}><AptPlate number={r.number} size="sm" /></UnstyledButton></Table.Td>
+          <Table.Tr key={r.apartmentId} style={{ cursor: 'pointer' }} onClick={() => onSheet({ kind: 'timeline', id: r.apartmentId })}>
+            <Table.Td><UnstyledButton mih={44} onClick={(e) => { e.stopPropagation(); onSheet({ kind: 'timeline', id: r.apartmentId }) }} aria-label={he.fees.open(r.number)}><AptPlate number={r.number} size="sm" /></UnstyledButton></Table.Td>
             <Table.Td>{names(r)}</Table.Td>
             <Table.Td ta="end"><FeeAmount r={r} /></Table.Td>
             <Table.Td><StatusBadge kind="fee" value={r.feeMode} /></Table.Td>
             <Table.Td>{r.next ? nextChangeLabel(r.next) : ''}</Table.Td>
-            <Table.Td w={56}><RowMenu r={r} onSheet={onSheet} /></Table.Td>
+            {/* The menu (and its portalled dropdown) must not also open the row's sheet. */}
+            <Table.Td w={56} onClick={(e) => e.stopPropagation()}><RowMenu r={r} onSheet={onSheet} /></Table.Td>
           </Table.Tr>
         ))}
       </Table.Tbody>
@@ -89,7 +90,7 @@ function DeleteRowDialog({ row, onClose }: { row: TimelineRow | null; onClose: (
 export function FeeTimelineSheet({ r }: { r: ApartmentFeeRow }) {
   const [editing, setEditing] = useState(false)
   const [removing, setRemoving] = useState<TimelineRow | null>(null)
-  if (editing) return <FeeChangeForm apartmentId={r.apartmentId} onDone={() => setEditing(false)} />
+  if (editing) return <FeeChangeForm apartmentId={r.apartmentId} onDone={() => setEditing(false)} onCancel={() => setEditing(false)} />
   return (
     <Stack gap="md">
       <Group gap="md" wrap="nowrap">
@@ -134,7 +135,7 @@ export function ApartmentFeesSection() {
       {q.data && q.data.length > 0 && (desktop ? <FeeTable rows={q.data} onSheet={setSheet} /> : <FeeListRows rows={q.data} onSheet={setSheet} />)}
       <FormModal opened={!!open} title={sheetTitle(sheet, open)} onClose={close}>
         {open && sheet?.kind === 'timeline' && <FeeTimelineSheet key={open.apartmentId} r={open} />}
-        {open && sheet?.kind === 'exempt' && <ExemptToggleForm apartmentId={open.apartmentId} exempt={open.feeMode === 'exempt'} onDone={close} />}
+        {open && sheet?.kind === 'exempt' && <ExemptToggleForm apartmentId={open.apartmentId} exempt={open.feeMode === 'exempt'} timeline={open.timeline} onDone={close} />}
       </FormModal>
     </Card>
   )

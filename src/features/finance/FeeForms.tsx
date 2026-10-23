@@ -1,9 +1,9 @@
-import { Alert, Button, Input, SegmentedControl, Stack, Text } from '@mantine/core'
+import { Alert, Button, Group, Input, SegmentedControl, Stack, Text } from '@mantine/core'
 import { useState, type FormEvent } from 'react'
 import { he } from '../../lib/he'
-import { FEE_MODES, isFeeMode, notifySuccess, type FeeMode } from '../../ui'
+import { FEE_MODES, isFeeMode, notifyInfo, notifySuccess, type FeeMode } from '../../ui'
 import { useSetApartmentFee } from './api'
-import { affectsPast, currentMonth } from './feeTimeline'
+import { affectsPast, currentMonth, restoreAfterExempt, restoreLabel, type TimelineRow } from './feeTimeline'
 import { MonthField, MoneyInput } from './fields'
 import { shiftMonth } from './ledger'
 
@@ -13,10 +13,10 @@ export function PastWarning({ month }: { month: string }) {
   return <Alert color="signal">{he.fees.pastWarning}</Alert>
 }
 
-const saved = (changed: boolean): void => notifySuccess(changed ? he.fees.saved : he.fees.noChange)
+const saved = (changed: boolean): void => (changed ? notifySuccess(he.fees.saved) : notifyInfo(he.fees.noChange))
 
 /** A new timeline row for one apartment: from month (next month by default), mode, and the amount for custom. */
-export function FeeChangeForm({ apartmentId, onDone }: { apartmentId: string; onDone: () => void }) {
+export function FeeChangeForm({ apartmentId, onDone, onCancel }: { apartmentId: string; onDone: () => void; onCancel?: () => void }) {
   const save = useSetApartmentFee()
   const [month, setMonth] = useState(() => shiftMonth(currentMonth(), 1))
   const [mode, setMode] = useState<FeeMode>('custom')
@@ -41,25 +41,31 @@ export function FeeChangeForm({ apartmentId, onDone }: { apartmentId: string; on
             onChange={(v) => { setAmount(v); setError(null) }} />
         )}
         <PastWarning month={month} />
-        <Button type="submit" fullWidth loading={save.isPending}>{he.fees.save}</Button>
+        <Group grow>
+          {onCancel && <Button variant="default" onClick={onCancel}>{he.tenants.cancel}</Button>}
+          <Button type="submit" loading={save.isPending}>{he.fees.save}</Button>
+        </Group>
       </Stack>
     </form>
   )
 }
 
-/** Quick toggle: exempt from a month on (default this month), or back to the building fee. */
-export function ExemptToggleForm({ apartmentId, exempt, onDone }: { apartmentId: string; exempt: boolean; onDone: () => void }) {
+interface ExemptToggleProps { apartmentId: string; exempt: boolean; timeline: readonly TimelineRow[]; onDone: () => void }
+
+/** Quick toggle: exempt from a month on (default this month), or end it, restoring what applied before it. */
+export function ExemptToggleForm({ apartmentId, exempt, timeline, onDone }: ExemptToggleProps) {
   const save = useSetApartmentFee()
   const [month, setMonth] = useState(currentMonth)
+  const restore = restoreAfterExempt(timeline, currentMonth())
   const submit = (e: FormEvent): void => {
     e.preventDefault()
-    save.mutate({ apartment_id: apartmentId, effective_from: month, mode: exempt ? 'building' : 'exempt', amount: null },
-      { onSuccess: (changed) => { saved(changed); onDone() } })
+    const next = exempt ? restore : { mode: 'exempt' as const, amount: null }
+    save.mutate({ apartment_id: apartmentId, effective_from: month, ...next }, { onSuccess: (changed) => { saved(changed); onDone() } })
   }
   return (
     <form onSubmit={submit} noValidate>
       <Stack>
-        <Text>{exempt ? he.fees.unmarkHint : he.fees.markHint}</Text>
+        <Text>{exempt ? he.fees.unmarkHint(restoreLabel(restore)) : he.fees.markHint}</Text>
         <MonthField label={he.fees.fromMonth} value={month} onChange={setMonth} />
         <PastWarning month={month} />
         <Button type="submit" fullWidth loading={save.isPending}>{exempt ? he.fees.unmarkExempt : he.fees.markExempt}</Button>
