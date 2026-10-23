@@ -3,7 +3,7 @@ import type { Database } from '../../lib/db.types'
 import { he } from '../../lib/he'
 import { supabase } from '../../lib/supabase'
 import { notifyError } from '../../ui/notify'
-import { nextDue, type Frequency } from './nextDue'
+import type { Frequency } from './nextDue'
 
 export type Task = Omit<Database['public']['Tables']['maintenance_tasks']['Row'], 'frequency'> & { frequency: Frequency }
 export type LogEntry = Database['public']['Tables']['maintenance_log']['Row']
@@ -19,8 +19,6 @@ export interface MarkDoneInput {
   task: Task
   doneOn: string
   note: string
-  /** Not offered in the UI until the finance feature exists. */
-  cost?: number
 }
 
 const KEY = ['maintenance'] as const
@@ -53,17 +51,15 @@ export function useTaskLog(taskId: string | undefined) {
   })
 }
 
-/** Logs a completion and moves `next_due` forward (null for one-off tasks). */
+/** Logs a completion atomically (RPC); the server moves `next_due` from the latest done date. */
 export function useMarkDone() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: async ({ task, doneOn, note, cost }: MarkDoneInput) => {
-      const log = await supabase.from('maintenance_log').insert({ task_id: task.id, done_on: doneOn, note, cost: cost ?? null })
-      if (log.error) throw new Error(log.error.message)
-      const upd = await supabase.from('maintenance_tasks').update({ next_due: nextDue(doneOn, task.frequency) }).eq('id', task.id)
-      if (upd.error) throw new Error(upd.error.message)
+    mutationFn: async ({ task, doneOn, note }: MarkDoneInput) => {
+      const { error } = await supabase.rpc('mark_task_done', { p_task_id: task.id, p_done_on: doneOn, p_note: note })
+      if (error) throw new Error(error.message)
     },
-    onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
+    onSettled: () => client.invalidateQueries({ queryKey: KEY }),
     onError: () => notifyError(he.toast.failed),
   })
 }

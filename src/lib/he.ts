@@ -185,6 +185,7 @@ export const he = {
     due: (date: string) => `עד ${date}`,
     markDone: 'בוצע',
     markDoneTitle: (title: string) => `סימון כבוצעה: ${title}`,
+    nextDuePreview: (date: string) => `המועד הבא: ${date}`,
     markedDone: 'המשימה סומנה כבוצעה',
     doneOn: 'תאריך ביצוע',
     note: 'הערה (אופציונלי)',

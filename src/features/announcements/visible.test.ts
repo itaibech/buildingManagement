@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { expiredAnnouncements, isReadBy, todayISO, visibleAnnouncements, type AnnouncementLike } from './visible'
+import { expiredAnnouncements, isReadBy, visibleAnnouncements, type AnnouncementLike } from './visible'
+import { todayISO } from '../../lib/dates'
 
 const a = (id: string, o: Partial<AnnouncementLike> = {}): AnnouncementLike & { id: string } => ({
   id,

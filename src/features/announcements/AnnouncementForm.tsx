@@ -3,7 +3,7 @@ import { useForm } from '@mantine/form'
 import { he } from '../../lib/he'
 import { notifySuccess } from '../../ui'
 import { useSaveAnnouncement, type Announcement } from './api'
-import { todayISO } from './visible'
+import { todayISO } from '../../lib/dates'
 
 interface Values {
   title: string

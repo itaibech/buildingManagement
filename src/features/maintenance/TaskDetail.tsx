@@ -2,11 +2,13 @@ import { Card, Stack, Text } from '@mantine/core'
 import { formatDate } from '../../lib/format'
 import { he } from '../../lib/he'
 import { ListSkeleton } from '../../ui'
-import { useTaskLog, type Task } from './api'
+import { useTaskLog, useTasks } from './api'
 
 /** Task summary and its done log, newest first. */
-export function TaskDetail({ task }: { task: Task }) {
-  const log = useTaskLog(task.id)
+export function TaskDetail({ taskId }: { taskId: string }) {
+  const task = useTasks().data?.find((t) => t.id === taskId)
+  const log = useTaskLog(taskId)
+  if (!task) return null
   return (
     <Stack gap="sm">
       <Text c="dimmed" className="bm-num">

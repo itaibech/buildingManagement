@@ -4,7 +4,7 @@ import { useAuth } from '../../auth/AuthProvider'
 import { he } from '../../lib/he'
 import { EmptyState, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
 import { ConfirmDialog, FormModal } from '../tenants/dialogs'
-import { todayISO } from '../announcements/visible'
+import { todayISO } from '../../lib/dates'
 import { useDeleteTask, useTasks, type Task } from './api'
 import { DoneForm } from './DoneForm'
 import { dueBucket, type DueBucket } from './nextDue'
@@ -28,7 +28,7 @@ function Dialogs({ dialog, close }: { dialog: Dialog; close: () => void }) {
         {kind === 'add' && <TaskForm onDone={close} />}
         {dialog?.kind === 'edit' && <TaskForm key={dialog.task.id} task={dialog.task} onDone={close} />}
         {dialog?.kind === 'done' && <DoneForm key={dialog.task.id} task={dialog.task} onDone={close} />}
-        {dialog?.kind === 'detail' && <TaskDetail task={dialog.task} />}
+        {dialog?.kind === 'detail' && <TaskDetail taskId={dialog.task.id} />}
       </FormModal>
       <ConfirmDialog opened={kind === 'delete'} title={he.maintenance.deleteConfirm(task?.title ?? '')} body={he.maintenance.deleteBody}
         confirmLabel={he.maintenance.delete} loading={del.isPending} failed={del.isError} onClose={close} onConfirm={onDelete} />

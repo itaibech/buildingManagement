@@ -5,7 +5,8 @@ import type { Database } from '../../lib/db.types'
 import { he } from '../../lib/he'
 import { supabase } from '../../lib/supabase'
 import { notifyError } from '../../ui/notify'
-import { expiredAnnouncements, isReadBy, todayISO, visibleAnnouncements } from './visible'
+import { expiredAnnouncements, isReadBy, visibleAnnouncements } from './visible'
+import { todayISO } from '../../lib/dates'
 
 export type Announcement = Database['public']['Tables']['announcements']['Row']
 export type AnnouncementItem = Announcement & { isRead: boolean }

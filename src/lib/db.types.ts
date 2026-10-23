@@ -305,6 +305,9 @@ isOneToOne: false
 "is_approved":
 { Args: Record<PropertyKey, never>; Returns: boolean
                            },
+"mark_task_done":
+{ Args: { "p_done_on": string,"p_note": string,"p_task_id": string }; Returns: string
+                           },
 "my_apartment_id":
 { Args: Record<PropertyKey, never>; Returns: string
                            },
