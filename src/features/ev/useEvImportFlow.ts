@@ -80,9 +80,11 @@ export function useEvDerived(st: EvImportState, ctx: EvImportContext) {
     const readings = deriveReadings(st.sheet, now)
     const rates = st.ratesEdit ?? deriveRates(st.sheet, readings.chargers, now)
     const payments = derivePayments(st.sheet)
-    const covered = coveredKeys(readings.chargers, payments)
-    const mainCharges = ctx.mainCharges.filter((k) => covered.has(k)).length
-    const replaceMain = st.replaceMain && (mainCharges > 0 || [...ctx.mainPayments].some((k) => covered.has(k)))
+    // Same rule as the server: main EV charges by apartment-year of the readings, main EV payments by the months paid.
+    const years = new Set(readings.chargers.flatMap((c) => c.readings.map((r) => `${c.apartment}|${r.month.slice(0, 4)}`)))
+    const mainCharges = ctx.mainCharges.filter((k) => years.has(k.slice(0, k.indexOf('|') + 5))).length
+    const paidKeys = coveredKeys([], payments)
+    const replaceMain = st.replaceMain && (mainCharges > 0 || [...ctx.mainPayments].some((k) => paidKeys.has(k)))
     // Main-import EV payments are deleted when replacing, so those months are no longer overlaps.
     const taken = (k: string) => ctx.existing.has(k) || (!replaceMain && ctx.mainPayments.has(k))
     const overlaps: EvPaymentRow[] = payments.filter((p) => taken(paymentKey(p.apartment, p.paid_on)))

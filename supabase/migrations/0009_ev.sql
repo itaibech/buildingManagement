@@ -389,7 +389,12 @@ as $$
 $$;
 
 -- replace_main_ev: the main workbook's EV block (import_year: source 'import' extras labelled EV, and payments
--- noted EV) is removed for the covered apartment-months, so the meter import is the one source of EV charges.
+-- noted EV) gives way to the meter import:
+--   * its EV charges go for every apartment-YEAR the payload has readings in. By year, not month: the committee's
+--     main workbook books EV a month after the reading (observed), so a month match would leave one month doubled.
+--   * its EV payments go only for the apartment-months the payload has a payment in (payments are real money;
+--     a month the EV file has no "שולם" for keeps the main workbook's payment).
+-- The meter import is then the one source of EV charges for those apartments and years.
 create function public.ev_replace_main(p jsonb, b uuid) returns jsonb
 language plpgsql set search_path = ''
 as $$
@@ -400,11 +405,14 @@ begin
   if coalesce((p ->> 'replace_main_ev')::boolean, false) then
     delete from public.charges x using public.apartments a
     where a.id = x.apartment_id and a.building_id = b and x.source = 'import' and x.kind = 'extra'
-      and x.label = 'טעינת רכב חשמלי' and (a.number, x.month) in (select * from public.ev_covered(p));
+      and x.label = 'טעינת רכב חשמלי' and (a.number, extract(year from x.month)::int) in (
+        select (c ->> 'apartment')::int, left(r ->> 'month', 4)::int
+        from jsonb_array_elements(p -> 'chargers') c, jsonb_array_elements(c -> 'readings') r);
     get diagnostics n_chg = row_count;
     delete from public.payments x using public.apartments a
     where a.id = x.apartment_id and a.building_id = b and x.source = 'import' and x.note like 'טעינת רכב חשמלי%'
-      and (a.number, date_trunc('month', x.paid_on::timestamp)::date) in (select * from public.ev_covered(p));
+      and (a.number, date_trunc('month', x.paid_on::timestamp)::date) in (
+        select (e ->> 'apartment')::int, (e ->> 'paid_on')::date from jsonb_array_elements(p -> 'payments') e);
     get diagnostics n_pay = row_count;
   end if;
   return jsonb_build_object('main_charges', n_chg, 'main_payments', n_pay);

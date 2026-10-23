@@ -169,8 +169,10 @@ select throws_ok($$ insert into public.ev_rates (rate, effective_from) values (1
 -- ---------------------------------------------------------------- main workbook EV block vs the meter import
 create temp table main as select $json$
 {"year": 2020, "budget_year": 2020, "apartments": [{"number": 946}], "residents": [], "fees": [],
- "payments": [{"apartment": 946, "paid_on": "2020-01-01", "amount": 100, "note": "טעינת רכב חשמלי · יובא מאקסל"}],
- "charges": [{"apartment": 946, "month": "2020-01-01", "amount": 100, "kind": "extra", "label": "טעינת רכב חשמלי"}],
+ "payments": [{"apartment": 946, "paid_on": "2020-01-01", "amount": 100, "note": "טעינת רכב חשמלי · יובא מאקסל"},
+   {"apartment": 946, "paid_on": "2020-02-01", "amount": 100, "note": "טעינת רכב חשמלי · יובא מאקסל"}],
+ "charges": [{"apartment": 946, "month": "2020-01-01", "amount": 100, "kind": "extra", "label": "טעינת רכב חשמלי"},
+   {"apartment": 946, "month": "2020-02-01", "amount": 100, "kind": "extra", "label": "טעינת רכב חשמלי"}],
  "categories": [], "expenses": [], "budgets": []}
 $json$::jsonb as j;
 create temp view apt946 as
@@ -178,14 +180,15 @@ select (select coalesce(sum(c.amount), 0) from public.charges c join public.apar
   (select coalesce(sum(x.amount), 0) from public.payments x join public.apartments a on a.id = x.apartment_id where a.number = 946) as paid;
 grant select on main, apt946 to authenticated;
 select public.import_year((select j from main));
-select is((select row(charged, paid)::text from apt946), '(100.00,100.00)', 'the main import wrote its EV charge and payment');
+select is((select row(charged, paid)::text from apt946), '(200.00,200.00)', 'the main import wrote its EV charges and payments');
 select is(public.import_ev($json$
 {"chargers": [{"apartment": 946, "initial_reading": 0, "readings": [{"month": "2020-01-01", "reading": 50}]}],
  "rates": [], "payments": [{"apartment": 946, "paid_on": "2020-01-01", "amount": 25}], "replace_main_ev": true}
-$json$) ->> 'main_charges', '1', 'replace_main_ev removes the main import''s EV charge for the covered month');
-select is((select row(charged, paid)::text from apt946), '(25.00,25.00)', 'no double charge: only the meter charge and the EV payment remain');
+$json$) ->> 'main_charges', '2', 'replace_main_ev removes the main import''s EV charges for the covered apartment-year');
+select is((select row(charged, paid)::text from apt946), '(25.00,125.00)',
+  'no double charge: only the meter charge; the main EV payment is replaced only in the month the EV file has one');
 select lives_ok($$ select public.import_year((select j from main)) $$, 'the main import runs again');
-select is((select row(charged, paid)::text from apt946), '(25.00,25.00)',
+select is((select row(charged, paid)::text from apt946), '(25.00,125.00)',
   're-running the main import neither re-adds its EV block nor removes the EV payments');
 
 select * from finish();
