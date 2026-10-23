@@ -119,6 +119,33 @@ body {
   border-radius: 10px;
 }
 
+/* Unread count pill on the announcements nav item (tab bar and side nav). */
+.bm-unread {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border-radius: 9px;
+  background: var(--mantine-color-signal-6);
+  color: var(--mantine-color-text);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.bm-tab-icon {
+  position: relative;
+  display: inline-flex;
+}
+.bm-tab-icon .bm-unread {
+  position: absolute;
+  top: -6px;
+  inset-inline-start: 55%;
+}
+
 /* Floating action button above the tab bar (mobile). End side = left in RTL. */
 .bm-fab {
   position: fixed;

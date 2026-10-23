@@ -22,6 +22,7 @@
     "@mantine/core": "^9.7.3",
     "@mantine/form": "^9.7.3",
     "@mantine/hooks": "^9.7.3",
+    "@mantine/notifications": "^9.7.3",
     "@supabase/supabase-js": "^2.118.0",
     "@tabler/icons-react": "^3.49.0",
     "@tanstack/react-query": "^5.104.5",

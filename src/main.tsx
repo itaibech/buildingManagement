@@ -1,7 +1,9 @@
 import '@mantine/core/styles.css'
+import '@mantine/notifications/styles.css'
 import './ui/fonts'
 import './ui/global.css'
 import { DirectionProvider, MantineProvider } from '@mantine/core'
+import { Notifications } from '@mantine/notifications'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -18,6 +20,7 @@ createRoot(root).render(
   <StrictMode>
     <DirectionProvider initialDirection="rtl">
       <MantineProvider theme={theme} cssVariablesResolver={cssVariablesResolver}>
+        <Notifications position="top-center" />
         <QueryClientProvider client={queryClient}>
           <HashRouter>
             <App />

@@ -21,4 +21,10 @@ if (typeof window !== 'undefined') {
     unobserve(): void {}
     disconnect(): void {}
   }
+  // Mantine's autosize Textarea listens to document.fonts, which jsdom lacks.
+  if (!('fonts' in document)) {
+    Object.defineProperty(document, 'fonts', {
+      value: { addEventListener: () => undefined, removeEventListener: () => undefined },
+    })
+  }
 }
