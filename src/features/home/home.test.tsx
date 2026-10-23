@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { MantineProvider } from '@mantine/core'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
 import { theme } from '../../ui/theme'
 import HomePage from './HomePage'
@@ -14,6 +15,8 @@ const m = vi.hoisted(() => ({
   loading: false,
   failed: false,
   refetch: vi.fn(),
+  balance: 0,
+  balances: [] as unknown[],
 }))
 
 vi.mock('../../lib/supabase', () => ({ supabase: {} }))
@@ -28,7 +31,15 @@ vi.mock('../tickets/api', () => ({
   useCreateTicket: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
   useUpdateTicket: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
 }))
+vi.mock('../finance/api', () => ({
+  useMyBalance: () => ({ data: { apartmentId: 'a1', balance: m.balance, scheduled: 0 }, isLoading: false, isError: false, refetch: vi.fn() }),
+  useCollectionSummary: () => ({ data: { total: 6, paidUp: 4, due: 1200 }, isLoading: false, isError: false, refetch: vi.fn() }),
+  useBalances: () => ({ data: m.balances, isLoading: false, isError: false, refetch: vi.fn() }),
+}))
 vi.mock('../maintenance/api', () => ({ useTasks: () => ({ data: m.tasks, isLoading: false, isError: false, refetch: vi.fn() }) }))
+
+/** Testing Library collapses whitespace (Intl puts a no-break space before ₪). */
+const norm = (text: string): string => text.replace(/\s+/g, ' ')
 
 const ticket = (id: string, title: string, opened_by: string) => ({
   id, title, opened_by, status: 'open', location: '', description: '', created_at: '2026-10-01T00:00:00Z', photoCount: 0,
@@ -46,6 +57,12 @@ beforeEach(() => {
   m.loading = false
   m.failed = false
   m.refetch.mockClear()
+  m.balance = 0
+  m.balances = [
+    { apartmentId: 'a3', number: 3, names: ['חייב גדול'], balance: 900, scheduled: 0 },
+    { apartmentId: 'a5', number: 5, names: ['חייב קטן'], balance: 100, scheduled: 0 },
+    { apartmentId: 'a1', number: 1, names: ['משלם'], balance: 0, scheduled: 0 },
+  ]
   m.tickets = [ticket('t1', 'נזילה בחדר מדרגות', 'me'), ticket('t2', 'תקלה של שכן', 'other')]
   m.tasks = [{ id: 'k1', title: 'בדיקת מעלית', vendor: '', frequency: 'yearly', next_due: '2020-01-01' }]
 })
@@ -94,5 +111,30 @@ describe('HomePage', () => {
     renderHome()
     expect(screen.queryByText(he.home.noMyTickets)).toBeNull()
     expect(screen.queryByText('נזילה בחדר מדרגות')).toBeNull()
+  })
+
+  it('admin hero shows the collection count and the debtors, largest first', () => {
+    m.isAdmin = true
+    renderHome()
+    expect(screen.getAllByText(he.home.collected(4, 6)).length).toBeGreaterThan(0)
+    const section = screen.getByRole('heading', { name: he.home.debtors }).closest('.mantine-Card-root') as HTMLElement
+    const names = within(section).getAllByText(/חייב/).map((el) => el.textContent)
+    expect(names).toEqual(['חייב גדול', 'חייב קטן'])
+    expect(within(section).queryByText('משלם')).toBeNull()
+  })
+
+  it('resident hero states the balance in words', () => {
+    m.balance = 660
+    renderHome()
+    expect(screen.getByText(norm(he.home.balanceDue(formatILS(660))))).toBeTruthy()
+  })
+
+  it('resident hero says everything is paid at zero, and credit below zero', () => {
+    renderHome()
+    expect(screen.getByText(he.home.allPaid)).toBeTruthy()
+    cleanup()
+    m.balance = -330
+    renderHome()
+    expect(screen.getByText(norm(he.finance.creditOf(formatILS(330))))).toBeTruthy()
   })
 })
