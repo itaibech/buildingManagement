@@ -1,9 +1,9 @@
-import { ActionIcon, Divider, Group, Stack, Table, Text } from '@mantine/core'
+import { ActionIcon, Divider, Group, Stack, Table, Text, UnstyledButton } from '@mantine/core'
 import { IconPencil } from '@tabler/icons-react'
 import { Fragment } from 'react'
 import { formatILS, formatKwh, formatRate, HEBREW_MONTHS } from '../../lib/format'
 import { he } from '../../lib/he'
-import { DeleteButton, Row } from '../finance/fields'
+import { DeleteButton } from '../finance/fields'
 import { useDesktop } from '../finance/hooks'
 import type { HistoryRow } from './evMath'
 
@@ -22,17 +22,34 @@ function EditButton({ label, onClick }: { label: string; onClick: () => void }) 
   )
 }
 
+/** Mobile row: month and amount on top, then the sheet's numbers on two full-width lines; tap to edit. */
+function MobileRow({ r, onEdit, onDelete }: { r: HistoryRow; onEdit: () => void; onDelete: () => void }) {
+  return (
+    <Group gap={0} wrap="nowrap" mih={56} px="md" py={6}>
+      <UnstyledButton onClick={onEdit} aria-label={he.ev.editReading(monthName(r.month))} mih={44} className="bm-row" style={{ flex: 1, minWidth: 0 }}>
+        <Group justify="space-between" wrap="nowrap" gap="xs">
+          <Text fw={600}>{monthName(r.month)}</Text>
+          <Text fw={600} className="bm-num">{dash(r.amount, formatILS)}</Text>
+        </Group>
+        <Text size="sm" c="dimmed" className="bm-num">
+          {`${he.ev.reading} ${formatKwh(r.reading)} · ${he.ev.kwhValue(dash(r.kwh, formatKwh))} · ${dash(r.rate, formatRate)}`}
+        </Text>
+        <Text size="sm" c="dimmed" className="bm-num">
+          {`${he.ev.paid} ${formatILS(r.paid)} · `}<Text span inherit c={diffColor(r.diff)}>{`${he.ev.diff} ${signed(r.diff)}`}</Text>
+        </Text>
+      </UnstyledButton>
+      <DeleteButton label={he.ev.deleteReading(monthName(r.month))} onClick={onDelete} />
+    </Group>
+  )
+}
+
 function MobileList({ rows, onEdit, onDelete }: HistoryProps) {
   return (
     <Stack gap={0}>
       {rows.map((r, i) => (
         <Fragment key={r.id}>
           {i > 0 && <Divider color="stone.1" />}
-          <Row title={monthName(r.month)} onClick={() => onEdit(r.id)} label={he.ev.editReading(monthName(r.month))}
-            meta={<>{`${he.ev.reading} ${formatKwh(r.reading)} · ${he.ev.kwhValue(dash(r.kwh, formatKwh))} · ${dash(r.rate, formatRate)}`}<br />
-              {`${he.ev.paid} ${formatILS(r.paid)} · `}<Text span c={diffColor(r.diff)} inherit>{`${he.ev.diff} ${signed(r.diff)}`}</Text></>}
-            end={<Text fw={600} className="bm-num">{dash(r.amount, formatILS)}</Text>}
-            trailing={<DeleteButton label={he.ev.deleteReading(monthName(r.month))} onClick={() => onDelete(r.id)} />} />
+          <MobileRow r={r} onEdit={() => onEdit(r.id)} onDelete={() => onDelete(r.id)} />
         </Fragment>
       ))}
     </Stack>

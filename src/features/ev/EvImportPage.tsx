@@ -46,7 +46,7 @@ interface BodiesProps {
 function stepBodies({ st, d, ctx, go, upload, save, confirm, counts, again }: BodiesProps): Record<(typeof STEPS)[number], ReactNode> {
   const ratesOk = !!d && ratesValid(d.rates) && !d.missing
   return {
-    upload: <UploadStep {...upload} intro={T.intro} />,
+    upload: <UploadStep {...upload} intro={T.intro} hint={T.fileHint} />,
     chargers: d && (ctx.loading ? <ListSkeleton /> : <>
       <ChargersStep d={d} ctx={ctx} />
       <StepNav onBack={go(0)} onNext={go(2)} nextLabel={he.import.next} disabled={d.chargers.length === 0} />

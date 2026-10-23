@@ -835,6 +835,9 @@ isOneToOne: false
 "ev_import_payments":
 { Args: { "b": string,"p": Json }; Returns: number
                            },
+"ev_import_rates":
+{ Args: { "b": string,"p": Json }; Returns: undefined
+                           },
 "ev_is_month":
 { Args: { "j": Json }; Returns: boolean
                            },

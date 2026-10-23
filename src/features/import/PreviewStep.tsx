@@ -10,9 +10,9 @@ import type { ImportSummary, Overlap } from './buildImport'
 
 const XLSX_TYPES = '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
-interface UploadStepProps { fileName: string; busy: boolean; error: string; onFile: (f: File) => void; intro?: string }
+interface UploadStepProps { fileName: string; busy: boolean; error: string; onFile: (f: File) => void; intro?: string; hint?: string }
 
-export function UploadStep({ fileName, busy, error, onFile, intro = he.import.intro }: UploadStepProps) {
+export function UploadStep({ fileName, busy, error, onFile, intro = he.import.intro, hint = he.import.fileHint }: UploadStepProps) {
   return (
     <Stack gap="sm">
       <Text>{intro}</Text>
@@ -24,7 +24,7 @@ export function UploadStep({ fileName, busy, error, onFile, intro = he.import.in
           </Button>
         )}
       </FileButton>
-      <Text size="sm" c="dimmed">{busy ? he.import.reading : fileName ? he.import.fileChosen(fileName) : he.import.fileHint}</Text>
+      <Text size="sm" c="dimmed">{busy ? he.import.reading : fileName ? he.import.fileChosen(fileName) : hint}</Text>
       {error && <Alert color="debt">{error}</Alert>}
     </Stack>
   )
