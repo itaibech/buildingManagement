@@ -5,6 +5,7 @@
 -- Readings and charges are only written through the definer RPCs below (admins), so a reading and its charge
 -- always agree. Editing or deleting a reading recomputes the following month too.
 -- Imported rows (import_ev) carry source 'ev-import' and are replaced by a re-import; manual readings win.
+-- Changing a rate by hand does not recompute existing charges; an import does, from its first rate on.
 
 -- ---------------------------------------------------------------- tables
 create table public.ev_chargers (
@@ -282,6 +283,23 @@ begin
 end;
 $$;
 
+-- The confirmed rates replace every rate dated inside the imported span (first rate .. last reading month);
+-- rates outside it are kept.
+create function public.ev_import_rates(p jsonb, b uuid) returns void
+language plpgsql set search_path = ''
+as $$
+declare
+  lo date := (select min((e ->> 'effective_from')::date) from jsonb_array_elements(p -> 'rates') e);
+  hi date := (select max((r ->> 'month')::date) from jsonb_array_elements(p -> 'chargers') c, jsonb_array_elements(c -> 'readings') r);
+begin
+  delete from public.ev_rates x where x.building_id = b and x.effective_from >= lo and x.effective_from <= greatest(lo, hi)
+    and x.effective_from not in (select (e ->> 'effective_from')::date from jsonb_array_elements(p -> 'rates') e);
+  insert into public.ev_rates (building_id, rate, effective_from)
+  select b, (e ->> 'rate')::numeric, (e ->> 'effective_from')::date from jsonb_array_elements(p -> 'rates') e
+  on conflict (building_id, effective_from) do update set rate = excluded.rate;
+end;
+$$;
+
 -- Returns {chargers (new), readings, kept_manual, rates, payments}.
 create function public.import_ev(payload jsonb) returns jsonb
 language plpgsql security definer set search_path = ''
@@ -290,6 +308,7 @@ declare
   b constant uuid := public.default_building_id();
   c jsonb;
   res jsonb;
+  rid uuid;
   n_new int := 0;
   n_read int := 0;
   n_kept int := 0;
@@ -299,14 +318,18 @@ begin
   end if;
   perform public.ev_validate(payload);
   perform pg_advisory_xact_lock(hashtext('public.import_ev'));
-  insert into public.ev_rates (building_id, rate, effective_from)
-  select b, (e ->> 'rate')::numeric, (e ->> 'effective_from')::date from jsonb_array_elements(payload -> 'rates') e
-  on conflict (building_id, effective_from) do update set rate = excluded.rate;
+  perform public.ev_import_rates(payload, b);
   for c in select * from jsonb_array_elements(payload -> 'chargers') loop
     res := public.ev_import_charger(c, b);
     n_new := n_new + (res ->> 'created')::int;
     n_read := n_read + (res ->> 'readings')::int;
     n_kept := n_kept + (res ->> 'kept')::int;
+  end loop;
+  -- Rates changed from the first imported rate on: every charger's readings from then on follow them.
+  for rid in select x.id from public.ev_readings x where x.building_id = b
+    and x.month >= (select min((e ->> 'effective_from')::date) from jsonb_array_elements(payload -> 'rates') e)
+    order by x.charger_id, x.month loop
+    perform public.ev_charge_reading(rid);
   end loop;
   return jsonb_build_object('chargers', n_new, 'readings', n_read, 'kept_manual', n_kept,
     'rates', jsonb_array_length(payload -> 'rates'), 'payments', public.ev_import_payments(payload, b));
@@ -320,6 +343,7 @@ revoke execute on function public.ev_is_number(jsonb, numeric, numeric) from pub
 revoke execute on function public.ev_validate(jsonb) from public, anon, authenticated;
 revoke execute on function public.ev_import_charger(jsonb, uuid) from public, anon, authenticated;
 revoke execute on function public.ev_import_payments(jsonb, uuid) from public, anon, authenticated;
+revoke execute on function public.ev_import_rates(jsonb, uuid) from public, anon, authenticated;
 revoke execute on function public.record_ev_reading(uuid, date, numeric, date, text) from public, anon;
 grant execute on function public.record_ev_reading(uuid, date, numeric, date, text) to authenticated;
 revoke execute on function public.delete_ev_reading(uuid) from public, anon;

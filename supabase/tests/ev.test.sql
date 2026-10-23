@@ -3,7 +3,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(40);
+select plan(42);
 
 -- ---------------------------------------------------------------- fixtures (as postgres)
 insert into auth.users (id, email, aud, role) values
@@ -124,6 +124,7 @@ create temp table p as select $json$
 }
 $json$::jsonb as j;
 
+insert into public.ev_rates (rate, effective_from) values (0.9, '2030-02-01');
 create temp table imp as select public.import_ev((select j from p)) as j;
 select is((select row(j ->> 'chargers', j ->> 'readings', j ->> 'kept_manual', j ->> 'payments')::text from imp), '(1,2,1,1)',
   'import creates the missing charger, imports 2 readings, keeps the manual one, adds the payment');
@@ -132,6 +133,9 @@ select is((select string_agg(c.amount::text, ',' order by r.month) from public.e
   join public.charges c on c.ev_reading_id = r.id where a.number = 945), '5.00,6.65',
   'imported readings get the same charges as record_ev_reading (10 kWh x 0.5, 13.3 kWh x 0.5)');
 select is((select reading from ev_charge where month = '2030-01-01'), 150.55::numeric, 'a manual reading in an imported month is kept');
+select is((select string_agg(rate::text, ',' order by effective_from) from public.ev_rates), '0.5000,0.6000',
+  'a rate inside the imported span that the import does not have is replaced; later rates are kept');
+select is((select amount from ev_charge where month = '2030-03-01'), 95.67::numeric, 'other chargers are recomputed with the imported rates');
 select lives_ok($$ select public.import_ev((select j from p)) $$, 're-import succeeds');
 select is((select count(*)::text || ':' || (select count(*) from public.payments where source = 'ev-import')::text
   from public.charges where source = 'ev-import'), '2:1', 're-import replaces the imported readings, charges and payments');

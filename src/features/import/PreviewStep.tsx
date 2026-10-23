@@ -10,12 +10,12 @@ import type { ImportSummary, Overlap } from './buildImport'
 
 const XLSX_TYPES = '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
-interface UploadStepProps { fileName: string; busy: boolean; error: string; onFile: (f: File) => void }
+interface UploadStepProps { fileName: string; busy: boolean; error: string; onFile: (f: File) => void; intro?: string }
 
-export function UploadStep({ fileName, busy, error, onFile }: UploadStepProps) {
+export function UploadStep({ fileName, busy, error, onFile, intro = he.import.intro }: UploadStepProps) {
   return (
     <Stack gap="sm">
-      <Text>{he.import.intro}</Text>
+      <Text>{intro}</Text>
       <FileButton accept={XLSX_TYPES} onChange={(f) => f && onFile(f)}>
         {(props) => (
           <Button {...props} loading={busy} fullWidth variant="light"
