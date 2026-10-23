@@ -650,7 +650,7 @@ isOneToOne: false
           Views: {
             "apartment_balances": {
                   Row: {
-                    "apartment_id": string,"balance": number | null,"charged": number | null,"paid": number | null
+                    "apartment_id": string,"balance": number | null,"charged": number | null,"paid": number | null,"scheduled_charges": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -702,6 +702,9 @@ isOneToOne: false
 { Args: { "p_month": string }; Returns: {
               "amount_due_total": number,"apartments_paid_up": number,"apartments_total": number
             }[]
+                           },
+"current_month":
+{ Args: Record<PropertyKey, never>; Returns: string
                            },
 "default_building_id":
 { Args: Record<PropertyKey, never>; Returns: string

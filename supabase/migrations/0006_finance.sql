@@ -47,7 +47,7 @@ create table public.payments (
   id uuid primary key default gen_random_uuid(),
   building_id uuid not null default public.default_building_id() references public.buildings on delete cascade,
   apartment_id uuid not null references public.apartments on delete restrict,
-  paid_on date not null default current_date,
+  paid_on date not null default (now() at time zone 'Asia/Jerusalem')::date,
   amount numeric(12,2) not null check (amount >= 0),
   method text not null check (method in ('cash', 'transfer', 'cheque', 'app', 'other')),
   note text not null default '',
@@ -70,7 +70,7 @@ create table public.expenses (
   id uuid primary key default gen_random_uuid(),
   building_id uuid not null default public.default_building_id() references public.buildings on delete cascade,
   category_id uuid not null references public.expense_categories on delete restrict,
-  spent_on date not null default current_date,
+  spent_on date not null default (now() at time zone 'Asia/Jerusalem')::date,
   amount numeric(12,2) not null check (amount >= 0),
   vendor text not null default '',
   note text not null default '',
@@ -105,7 +105,8 @@ create table public.budgets (
 create index budgets_building_id_idx on public.budgets (building_id);
 create index budgets_category_id_idx on public.budgets (category_id);
 
--- maintenance_log.expense_id (0005) becomes a real link.
+-- maintenance_log.expense_id (0005) becomes a real link; "today" means today in Israel.
+alter table public.maintenance_log alter column done_on set default (now() at time zone 'Asia/Jerusalem')::date;
 alter table public.maintenance_log
   add constraint maintenance_log_expense_id_fkey foreign key (expense_id) references public.expenses on delete set null;
 create index maintenance_log_expense_id_idx on public.maintenance_log (expense_id);
@@ -162,8 +163,19 @@ create policy budgets_admin on public.budgets for all to authenticated
   using ((select public.is_admin())) with check ((select public.is_admin()));
 
 -- ---------------------------------------------------------------- views
+-- The current billing month (first of the month, Israel time). Balances count nothing after it.
+create function public.current_month() returns date
+language sql stable security invoker set search_path = ''
+as $$
+  select date_trunc('month', now() at time zone 'Asia/Jerusalem')::date;
+$$;
+revoke execute on function public.current_month() from anon, public;
+grant execute on function public.current_month() to authenticated;
+
 -- True when the caller may see this apartment's money: admins, its approved residents, or server
 -- roles (postgres / service_role, which bypass RLS anyway). Security invoker: evaluated as the caller.
+-- API roles are exactly 'authenticated' and 'anon' (what PostgREST switches to); any other role is
+-- treated as a trusted server session. building_cash_balance() uses the same rule. Pinned by pgTAP.
 create function public.can_read_apartment_finance(p_apartment_id uuid) returns boolean
 language sql stable security invoker set search_path = ''
 as $$
@@ -183,7 +195,7 @@ join public.buildings b on b.id = a.building_id
 cross join lateral (
   select s::date as month
   from generate_series(date_trunc('month', b.billing_start::timestamp),
-    date_trunc('month', now() at time zone 'Asia/Jerusalem'), interval '1 month') s
+    public.current_month()::timestamp, interval '1 month') s
 ) g
 left join lateral (
   select x.amount from public.apartment_fee_overrides x
@@ -197,7 +209,8 @@ left join lateral (
 ) f on true
 where b.billing_start is not null and public.can_read_apartment_finance(a.id);
 
--- Month-by-month charged vs paid. Payments land in the month of paid_on (they aren't tied to a month).
+-- Month-by-month charged vs paid, through the current month only: pre-entered future charges (and
+-- post-dated payments) aren't owed/paid yet. Payments land in the month of paid_on.
 create view public.apartment_ledger with (security_invoker = true) as
 select t.apartment_id, t.month,
   sum(t.charged)::numeric(12,2) as charged, sum(t.paid)::numeric(12,2) as paid
@@ -208,14 +221,18 @@ from (
   union all
   select apartment_id, date_trunc('month', paid_on::timestamp)::date, 0, amount from public.payments
 ) t
+where t.month <= public.current_month()
 group by t.apartment_id, t.month;
 
--- Running totals per apartment (every visible apartment, zeros when nothing is recorded).
+-- Running totals per apartment through the current month (every visible apartment, zeros when nothing
+-- is recorded). scheduled_charges: charges entered for later months ("חיובים עתידיים"), not in balance.
 create view public.apartment_balances with (security_invoker = true) as
 select a.id as apartment_id,
   coalesce(sum(l.charged), 0)::numeric(12,2) as charged,
   coalesce(sum(l.paid), 0)::numeric(12,2) as paid,
-  (coalesce(sum(l.charged), 0) - coalesce(sum(l.paid), 0))::numeric(12,2) as balance
+  (coalesce(sum(l.charged), 0) - coalesce(sum(l.paid), 0))::numeric(12,2) as balance,
+  coalesce((select sum(c.amount) from public.charges c
+    where c.apartment_id = a.id and c.month > public.current_month()), 0)::numeric(12,2) as scheduled_charges
 from public.apartments a
 left join public.apartment_ledger l on l.apartment_id = a.id
 where public.can_read_apartment_finance(a.id)
@@ -225,6 +242,7 @@ group by a.id;
 -- definer function that only answers approved users. Opening cash is the balance at the start of
 -- opening_cash_date: payments and expenses on or after that date count. Server sessions (no API role
 -- set, or service_role) also get an answer; current_setting('role') is the API role even inside a definer.
+-- Only 'authenticated' and 'anon' count as API roles here (same rule as can_read_apartment_finance).
 create function public.building_cash_balance(p_building_id uuid) returns numeric
 language sql stable security definer set search_path = ''
 as $$

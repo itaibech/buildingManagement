@@ -3,7 +3,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(57);
+select plan(64);
 
 -- ---------------------------------------------------------------- fixtures (as postgres)
 insert into auth.users (id, email, aud, role) values
@@ -68,9 +68,10 @@ reset role;
 delete from public.apartment_fee_overrides;
 delete from public.fee_schedule;
 create temp table tm as
-  select m0, (m0 + interval '1 month')::date as m1, (m0 + interval '2 months')::date as m2
+  select m0, (m0 + interval '1 month')::date as m1, (m0 + interval '2 months')::date as m2,
+    (select id from public.buildings limit 1) as b_id
   from (select (date_trunc('month', now() at time zone 'Asia/Jerusalem') - interval '2 months')::date as m0) s;
-grant select on tm to authenticated;
+grant select on tm to authenticated, service_role;
 update public.buildings set billing_start = (select m0 from tm), opening_cash = 1000, opening_cash_date = (select m0 from tm);
 insert into public.fee_schedule (amount, effective_from) select 390, m0 from tm;
 insert into public.payments (apartment_id, paid_on, amount, method)
@@ -97,12 +98,18 @@ select lives_ok($$insert into public.payments (apartment_id, paid_on, amount, me
   select 'b9000000-0000-0000-0000-00000000000b', m0, 100, 'cash' from tm$$, 'admin records a payment');
 insert into public.charges (apartment_id, month, amount, kind, label)
   select 'b9000000-0000-0000-0000-00000000000a', m2, 100, 'extra', 'טעינת רכב' from tm;
+insert into public.charges (apartment_id, month, amount, kind, label)
+  select 'b9000000-0000-0000-0000-00000000000a', (m2 + interval '1 month')::date, 500, 'levy', 'היטל עתידי' from tm;
 insert into public.apartment_fee_overrides (apartment_id, amount, effective_from)
   values ('b9000000-0000-0000-0000-00000000000b', 1, '2099-01-01');
 select is((select balance from public.apartment_balances where apartment_id = 'b9000000-0000-0000-0000-00000000000b'),
   870::numeric, 'fees 1170 - opening 200 - paid 100 = 870');
 select is((select balance from public.apartment_balances where apartment_id = 'b9000000-0000-0000-0000-00000000000a'),
-  -1070::numeric, 'extra charge adds to the balance');
+  -1070::numeric, 'extra charge adds to the balance; future levy does not');
+select is((select scheduled_charges from public.apartment_balances where apartment_id = 'b9000000-0000-0000-0000-00000000000a'),
+  500::numeric, 'future levy shows as scheduled');
+select is((select count(*) from public.apartment_ledger where month > (select m2 from tm)), 0::bigint,
+  'ledger stops at the current month');
 
 -- ---------------------------------------------------------------- collection summary (admin)
 select is((select row(apartments_total, apartments_paid_up, amount_due_total)::text
@@ -128,7 +135,9 @@ set local request.jwt.claims = '{"sub":"a9000000-0000-0000-0000-000000000002","r
 select is((select count(*) from public.payments), 1::bigint, 'resident: one payment visible');
 select is((select count(*) from public.payments where apartment_id <> 'b9000000-0000-0000-0000-00000000000a'), 0::bigint,
   'resident: no other apartment payments');
-select is((select count(*) from public.charges), 1::bigint, 'resident: only own charges');
+select is((select count(*) from public.charges), 2::bigint, 'resident: only own charges');
+select is((select count(*) from public.charges where apartment_id <> 'b9000000-0000-0000-0000-00000000000a'), 0::bigint,
+  'resident: no other apartment charges');
 select is((select count(*) from public.apartment_fee_overrides), 0::bigint, 'resident: no other overrides');
 select is((select array_agg(distinct apartment_id)::text from public.apartment_balances),
   '{b9000000-0000-0000-0000-00000000000a}', 'resident: only own balance');
@@ -178,6 +187,19 @@ select throws_ok($$select public.mark_task_done('d9000000-0000-0000-0000-0000000
 
 select lives_ok($$insert into storage.objects (bucket_id, name) values ('receipts', 'r1.pdf')$$, 'admin: uploads a receipt');
 select is((select count(*) from storage.objects where bucket_id = 'receipts'), 1::bigint, 'admin: reads receipts');
+
+select lives_ok($$delete from public.apartment_fee_overrides$$, 'admin: can delete (revert) an override');
+select is((select count(*) from public.apartment_fee_overrides), 0::bigint, 'admin: override gone');
+
+-- ---------------------------------------------------------------- API-role rule (pinned)
+-- Only authenticated/anon are API roles; other roles (server sessions) get answers.
+set local role service_role;
+select is(public.building_cash_balance((select b_id from tm)) is not null
+  and public.can_read_apartment_finance('b9000000-0000-0000-0000-00000000000b'), true, 'service_role: treated as a server session');
+set local role authenticated;
+set local request.jwt.claims = '{"role":"authenticated"}';
+select is(public.building_cash_balance((select b_id from tm)) is null
+  and not public.can_read_apartment_finance('b9000000-0000-0000-0000-00000000000b'), true, 'authenticated without a profile: no access');
 
 select * from finish();
 rollback;
