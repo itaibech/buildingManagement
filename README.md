@@ -46,3 +46,7 @@ added here as the app is built.
 npm install
 npm run dev
 ```
+
+## License
+
+[MIT](LICENSE)
