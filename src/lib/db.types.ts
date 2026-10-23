@@ -315,14 +315,14 @@ isOneToOne: false
                   ]
                 },"expenses": {
                   Row: {
-                    "amount": number,"building_id": string,"category_id": string,"created_at": string,"id": string,"note": string,"receipt_path": string | null,"source": string,"spent_on": string,"vendor": string
+                    "amount": number,"building_id": string,"category_id": string,"created_at": string,"id": string,"note": string,"receipt_path": string | null,"source": string,"spent_on": string,"template_id": string | null,"vendor": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount": number,"building_id"?: string,"category_id": string,"created_at"?: string,"id"?: string,"note"?: string,"receipt_path"?: string | null,"source"?: string,"spent_on"?: string,"vendor"?: string
+                    "amount": number,"building_id"?: string,"category_id": string,"created_at"?: string,"id"?: string,"note"?: string,"receipt_path"?: string | null,"source"?: string,"spent_on"?: string,"template_id"?: string | null,"vendor"?: string
                   }
                   Update: {
-                    "amount"?: number,"building_id"?: string,"category_id"?: string,"created_at"?: string,"id"?: string,"note"?: string,"receipt_path"?: string | null,"source"?: string,"spent_on"?: string,"vendor"?: string
+                    "amount"?: number,"building_id"?: string,"category_id"?: string,"created_at"?: string,"id"?: string,"note"?: string,"receipt_path"?: string | null,"source"?: string,"spent_on"?: string,"template_id"?: string | null,"vendor"?: string
                   }
                   Relationships: [
                     {
@@ -342,6 +342,12 @@ isOneToOne: false
       columns: ["category_id"]
 isOneToOne: false
       referencedRelation: "expense_categories"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "expenses_template_id_fkey"
+      columns: ["template_id"]
+isOneToOne: false
+      referencedRelation: "expense_templates"
       referencedColumns: ["id"]
     }
                   ]

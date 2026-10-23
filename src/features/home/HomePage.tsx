@@ -1,12 +1,15 @@
 import { Anchor, Box, Button, Card, Group, Progress, Stack, Text, Title } from '@mantine/core'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { useAuth } from '../../auth/AuthProvider'
 import { formatDate, formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
-import { EmptyState, ListSkeleton, Money, PageHeader, StatusBadge } from '../../ui'
+import { AptPlate, EmptyState, ListSkeleton, Money, PageHeader, StatusBadge } from '../../ui'
 import { useAnnouncements } from '../announcements/api'
+import { useBalances, useCollectionSummary, useFeeSchedule } from '../finance/api'
+import { MyBalanceHero } from '../finance/cards'
+import { monthOf } from '../finance/ledger'
 import { useTasks } from '../maintenance/api'
 import { dueBucket } from '../maintenance/nextDue'
 import { useTickets } from '../tickets/api'
@@ -18,6 +21,7 @@ import { todayISO } from '../../lib/dates'
 const LINK_STYLE = { display: 'inline-flex', alignItems: 'center' } as const
 
 const MAX_DUE = 5
+const MAX_DEBTORS = 5
 
 /** Dimmed failure line with a retry button, shown instead of content when a section's query fails. */
 function LoadError({ onRetry }: { onRetry: () => void }) {
@@ -40,37 +44,49 @@ function Section({ title, to, linkLabel, children }: { title: string; to: string
   )
 }
 
-/** Resident hero: their own balance. `balance` is null until the finance module lands. */
-export function BalanceHero({ balance }: { balance: number | null }) {
+/** Admin hero: how many apartments are paid up for the current month (Israel time). */
+function CollectionHero() {
+  const navigate = useNavigate()
+  const fees = useFeeSchedule()
+  const noFees = fees.data?.length === 0
+  const q = useCollectionSummary(monthOf(todayISO()), fees.isSuccess && !noFees)
+  const rate = noFees ? undefined : q.data
   return (
     <Card>
-      <Text fw={600} c="dimmed" size="sm">{he.home.myBalance}</Text>
-      {balance === null ? (
-        <Text c="dimmed" mt="xs">{he.home.balanceSoon}</Text>
-      ) : (
-        <Stack gap={4} mt="xs">
-          <Money amount={balance} size="xl" />
-          <Text fw={600}>{balance > 0 ? he.home.balanceDue(formatILS(balance)) : he.home.allPaid}</Text>
+      <Text fw={600} c="dimmed" size="sm">{he.home.collectionThisMonth}</Text>
+      {(fees.isLoading || (q.isLoading && !noFees)) && <ListSkeleton rows={1} />}
+      {(fees.isError || q.isError) && <LoadError onRetry={() => { void fees.refetch(); void q.refetch() }} />}
+      {noFees && <EmptyState title={he.home.setFeesFirst} action={{ label: he.home.setFeesAction, onClick: () => navigate('/finance?tab=charges') }} />}
+      {rate?.total === 0 && <EmptyState title={he.home.collectionSoon} />}
+      {rate && rate.total > 0 && (
+        <Stack gap="xs" mt="xs">
+          <Text className="bm-display bm-num" fz="h1">{he.home.collected(rate.paidUp, rate.total)}</Text>
+          <Progress value={(rate.paidUp / rate.total) * 100} color="paid.7" size="lg" radius="xl"
+            aria-label={he.home.collected(rate.paidUp, rate.total)} />
+          {rate.due > 0 && <Text size="sm" c="dimmed" className="bm-num">{he.home.amountDue(formatILS(rate.due))}</Text>}
         </Stack>
       )}
     </Card>
   )
 }
 
-/** Admin hero: the month's collection rate. `rate` is null until the finance module lands. */
-export function CollectionHero({ rate }: { rate: { paid: number; total: number } | null }) {
+/** Admin: the five largest debts. */
+function Debtors() {
+  const q = useBalances()
+  const debtors = (q.data ?? []).filter((b) => b.balance > 0).slice(0, MAX_DEBTORS)
   return (
-    <Card>
-      <Text fw={600} c="dimmed" size="sm">{he.home.collectionThisMonth}</Text>
-      {rate === null ? (
-        <EmptyState title={he.home.collectionSoon} />
-      ) : (
-        <Stack gap="xs" mt="xs">
-          <Text className="bm-display bm-num" fz="h1">{he.home.collected(rate.paid, rate.total)}</Text>
-          <Progress value={rate.total ? (rate.paid / rate.total) * 100 : 0} color="paid.7" size="lg" radius="xl" />
-        </Stack>
-      )}
-    </Card>
+    <Section title={he.home.debtors} to="/finance" linkLabel={he.home.allBalances}>
+      {q.isLoading && <ListSkeleton rows={3} />}
+      {q.isError && <LoadError onRetry={q.refetch} />}
+      {q.data && debtors.length === 0 && <EmptyState title={he.home.noDebtors} />}
+      {debtors.map((b) => (
+        <Group key={b.apartmentId} gap="sm" wrap="nowrap" mih={44}>
+          <AptPlate number={b.number} size="sm" />
+          <Text fw={600} truncate="end" style={{ flex: 1, minWidth: 0 }}>{b.names.join(', ') || he.apartment(b.number)}</Text>
+          <Money amount={b.balance} />
+        </Group>
+      ))}
+    </Section>
   )
 }
 
@@ -159,7 +175,7 @@ function MyTickets() {
 function ResidentHome() {
   return (
     <Stack gap="lg">
-      <BalanceHero balance={null} />
+      <MyBalanceHero />
       <LatestAnnouncement showUnread />
       <MyTickets />
     </Stack>
@@ -169,7 +185,8 @@ function ResidentHome() {
 function AdminHome() {
   return (
     <Stack gap="lg">
-      <CollectionHero rate={null} />
+      <CollectionHero />
+      <Debtors />
       <OpenTickets />
       <MaintenanceDue />
       <LatestAnnouncement showUnread={false} />
