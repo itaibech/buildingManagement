@@ -17,6 +17,18 @@ import { todayISO } from '../../lib/dates'
 
 const LINK_STYLE = { display: 'inline-flex', alignItems: 'center' } as const
 
+const MAX_DUE = 5
+
+/** Dimmed failure line with a retry button, shown instead of content when a section's query fails. */
+function LoadError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <Group gap="sm" justify="space-between">
+      <Text size="sm" c="dimmed">{he.home.loadFailed}</Text>
+      <Button variant="subtle" mih={44} onClick={onRetry}>{he.home.retry}</Button>
+    </Group>
+  )
+}
+
 /** A home section: heading, content, and a link to the full page. */
 function Section({ title, to, linkLabel, children }: { title: string; to: string; linkLabel: string; children: ReactNode }) {
   return (
@@ -34,7 +46,7 @@ export function BalanceHero({ balance }: { balance: number | null }) {
     <Card>
       <Text fw={600} c="dimmed" size="sm">{he.home.myBalance}</Text>
       {balance === null ? (
-        <Text c="dimmed" mt="xs">{he.home.financeSoon}</Text>
+        <Text c="dimmed" mt="xs">{he.home.balanceSoon}</Text>
       ) : (
         <Stack gap={4} mt="xs">
           <Money amount={balance} size="xl" />
@@ -68,12 +80,13 @@ function UnreadDot() {
 
 /** The newest visible announcement (pinned first), or an empty state. */
 function LatestAnnouncement({ showUnread }: { showUnread: boolean }) {
-  const { data, isLoading } = useAnnouncements()
+  const { data, isLoading, isError, refetch } = useAnnouncements()
   const latest = data?.[0]
   return (
     <Section title={he.home.latestAnnouncement} to="/announcements" linkLabel={he.announcements.seeAll}>
       {isLoading && <ListSkeleton rows={1} />}
-      {!isLoading && !latest && <EmptyState title={he.home.noAnnouncements} body={he.home.noAnnouncementsBody} />}
+      {isError && <LoadError onRetry={() => void refetch()} />}
+      {!isLoading && !isError && !latest && <EmptyState title={he.home.noAnnouncements} body={he.home.noAnnouncementsBody} />}
       {latest && (
         <>
           <Group gap="xs" wrap="nowrap">
@@ -90,10 +103,11 @@ function LatestAnnouncement({ showUnread }: { showUnread: boolean }) {
 
 /** Admin: open calls count plus the 3 newest. */
 function OpenTickets() {
-  const { data, isLoading } = useTickets(['open'])
+  const { data, isLoading, isError, refetch } = useTickets(['open', 'in_progress'])
   return (
     <Section title={he.home.openTickets} to="/tickets" linkLabel={he.home.allTickets}>
       {isLoading && <ListSkeleton rows={2} />}
+      {isError && <LoadError onRetry={() => void refetch()} />}
       {data?.length === 0 && <EmptyState title={he.home.noOpenTickets} />}
       {data && data.length > 0 && <Text fw={600} className="bm-num">{he.home.openTicketsCount(data.length)}</Text>}
       {data?.slice(0, 3).map((t) => <TicketRow key={t.id} ticket={t} />)}
@@ -103,12 +117,16 @@ function OpenTickets() {
 
 /** Admin: overdue and soon-due maintenance. */
 function MaintenanceDue() {
-  const { data, isLoading } = useTasks()
+  const { data, isLoading, isError, refetch } = useTasks()
   const today = todayISO()
-  const due = (data ?? []).map((task) => ({ task, bucket: dueBucket(task.next_due, today) })).filter((x) => x.bucket === 'overdue' || x.bucket === 'soon')
+  const due = (data ?? [])
+    .map((task) => ({ task, bucket: dueBucket(task.next_due, today) }))
+    .filter((x) => x.bucket === 'overdue' || x.bucket === 'soon')
+    .slice(0, MAX_DUE)
   return (
     <Section title={he.home.maintenanceDue} to="/maintenance" linkLabel={he.home.allTasks}>
       {isLoading && <ListSkeleton rows={2} />}
+      {isError && <LoadError onRetry={() => void refetch()} />}
       {data && due.length === 0 && <EmptyState title={he.home.noMaintenanceDue} />}
       {due.map(({ task, bucket }) => (
         <Group key={task.id} justify="space-between" wrap="nowrap" mih={44}>
@@ -126,26 +144,15 @@ function MaintenanceDue() {
 /** Resident: the calls this user opened that are still active. */
 function MyTickets() {
   const userId = useAuth().session?.user.id
-  const { data, isLoading } = useTickets(['open', 'in_progress'])
+  const { data, isLoading, isError, refetch } = useTickets(['open', 'in_progress'])
   const mine = data?.filter((t) => t.opened_by === userId)
   return (
     <Section title={he.home.myTickets} to="/tickets" linkLabel={he.home.allTickets}>
       {isLoading && <ListSkeleton rows={2} />}
+      {isError && <LoadError onRetry={() => void refetch()} />}
       {mine?.length === 0 && <EmptyState title={he.home.noMyTickets} />}
       {mine?.map((t) => <TicketRow key={t.id} ticket={t} />)}
     </Section>
-  )
-}
-
-function ReportTicket() {
-  const [open, setOpen] = useState(false)
-  return (
-    <>
-      <Button size="md" mih={44} fullWidth onClick={() => setOpen(true)}>{he.home.reportTicket}</Button>
-      <FormModal opened={open} title={he.tickets.add} onClose={() => setOpen(false)}>
-        {open && <TicketForm onDone={() => setOpen(false)} />}
-      </FormModal>
-    </>
   )
 }
 
@@ -153,7 +160,6 @@ function ResidentHome() {
   return (
     <Stack gap="lg">
       <BalanceHero balance={null} />
-      <ReportTicket />
       <LatestAnnouncement showUnread />
       <MyTickets />
     </Stack>
@@ -173,10 +179,15 @@ function AdminHome() {
 
 export default function HomePage() {
   const { profile, isAdmin } = useAuth()
+  const [reporting, setReporting] = useState(false)
+  const action = isAdmin ? undefined : { label: he.home.reportTicket, onClick: () => setReporting(true) }
   return (
     <>
-      <PageHeader title={profile?.full_name ? he.welcomeUser(profile.full_name) : he.welcome} />
+      <PageHeader title={profile?.full_name ? he.welcomeUser(profile.full_name) : he.welcome} action={action} />
       {isAdmin ? <AdminHome /> : <ResidentHome />}
+      <FormModal opened={reporting} title={he.tickets.add} onClose={() => setReporting(false)}>
+        {reporting && <TicketForm onDone={() => setReporting(false)} />}
+      </FormModal>
     </>
   )
 }
