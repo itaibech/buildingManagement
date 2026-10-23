@@ -8,22 +8,37 @@ import { he } from '../../lib/he'
 import { theme } from '../../ui/theme'
 import { AnnouncementForm } from './AnnouncementForm'
 import { AnnouncementItem } from './AnnouncementItem'
+import AnnouncementsPage from './AnnouncementsPage'
 import type { AnnouncementItem as Item } from './api'
 
-const db = vi.hoisted(() => ({ inserts: [] as unknown[] }))
+const db = vi.hoisted(() => ({ inserts: [] as unknown[], updates: [] as unknown[], deletes: [] as string[], rows: [] as unknown[] }))
 const toast = vi.hoisted(() => ({ success: vi.fn() }))
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
-    from: () => ({
+    from: (table: string) => ({
+      select: () => Promise.resolve({ data: table === 'announcements' ? db.rows : [], error: null }),
       insert: (values: unknown) => {
         db.inserts.push(values)
         return Promise.resolve({ error: null })
       },
+      update: (values: unknown) => ({
+        eq: (_col: string, id: string) => {
+          db.updates.push({ id, values })
+          return Promise.resolve({ error: null })
+        },
+      }),
+      delete: () => ({
+        eq: (_col: string, id: string) => {
+          db.deletes.push(id)
+          return Promise.resolve({ error: null })
+        },
+      }),
     }),
   },
 }))
-vi.mock('../../ui', () => ({ notifySuccess: toast.success }))
+vi.mock('../../auth/AuthProvider', () => ({ useAuth: () => ({ isAdmin: true, session: { user: { id: 'me' } } }) }))
+vi.mock('../../ui', async (orig) => ({ ...(await orig<typeof import('../../ui')>()), notifySuccess: toast.success }))
 
 const wrap = (node: ReactNode) =>
   render(
@@ -61,6 +76,8 @@ describe('AnnouncementItem', () => {
 describe('AnnouncementForm', () => {
   beforeEach(() => {
     db.inserts.length = 0
+    db.updates.length = 0
+    db.deletes.length = 0
     toast.success.mockReset()
   })
 
@@ -80,5 +97,35 @@ describe('AnnouncementForm', () => {
     await waitFor(() => expect(onDone).toHaveBeenCalled())
     expect(db.inserts).toEqual([{ title: 'ניקיון', body: 'פרטים', pinned: false, expires_at: null }])
     expect(toast.success).toHaveBeenCalledWith(he.announcements.published)
+  })
+
+  it('edits with the id, pre-filled values, and toasts the update', async () => {
+    const onDone = vi.fn()
+    wrap(<AnnouncementForm announcement={item({ id: 'a1', title: 'ישן' })} onDone={onDone} />)
+    const title = screen.getByLabelText(new RegExp(he.announcements.title))
+    expect(title).toHaveValue('ישן')
+    fireEvent.change(title, { target: { value: 'חדש' } })
+    fireEvent.click(screen.getByRole('button', { name: he.announcements.save }))
+    await waitFor(() => expect(onDone).toHaveBeenCalled())
+    expect(db.updates).toEqual([{ id: 'a1', values: { title: 'חדש', body: 'גוף', pinned: false, expires_at: null } }])
+    expect(toast.success).toHaveBeenCalledWith(he.announcements.updated)
+  })
+})
+
+describe('AnnouncementsPage admin menu', () => {
+  beforeEach(() => {
+    db.deletes.length = 0
+    toast.success.mockReset()
+    db.rows = [{ ...item({ id: 'a1', title: 'למחיקה', author_id: 'someone' }) }]
+  })
+
+  it('deletes only after confirming, then toasts', async () => {
+    wrap(<AnnouncementsPage />)
+    fireEvent.click(await screen.findByRole('button', { name: he.announcements.actions('למחיקה') }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: he.announcements.delete }))
+    expect(db.deletes).toEqual([])
+    fireEvent.click(await screen.findByRole('button', { name: he.announcements.delete }))
+    await waitFor(() => expect(db.deletes).toEqual(['a1']))
+    expect(toast.success).toHaveBeenCalledWith(he.announcements.deleted)
   })
 })

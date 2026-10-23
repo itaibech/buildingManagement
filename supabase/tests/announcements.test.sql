@@ -2,7 +2,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(12);
+select plan(16);
 
 -- ---------------------------------------------------------------- fixtures
 insert into auth.users (id, email, aud, role) values
@@ -34,6 +34,8 @@ select throws_ok(
 );
 update public.announcements set title = 'hacked';
 select is((select title from public.announcements), 'הודעת בדיקה', 'resident: cannot update announcements');
+delete from public.announcements;
+select is((select count(*) from public.announcements), 1::bigint, 'resident: cannot delete announcements');
 select lives_ok(
   $$insert into public.announcement_reads (announcement_id, user_id)
     values ('d1000000-0000-0000-0000-000000000001', 'a1000000-0000-0000-0000-000000000002')$$,
@@ -67,6 +69,12 @@ select is(
   (select author_id from public.announcements where title = 'מנהל'),
   'a1000000-0000-0000-0000-000000000001'::uuid, 'admin: author_id defaults to the caller'
 );
+
+update public.announcements set title = 'עודכן' where id = 'd1000000-0000-0000-0000-000000000001';
+select is((select title from public.announcements where id = 'd1000000-0000-0000-0000-000000000001'), 'עודכן', 'admin: can update announcements');
+delete from public.announcements where title = 'מנהל';
+select is((select count(*) from public.announcements where title = 'מנהל'), 0::bigint, 'admin: can delete announcements');
+select is((select count(*) from public.announcements), 1::bigint, 'admin: delete removed only the target');
 
 -- ---------------------------------------------------------------- anon
 set local role anon;

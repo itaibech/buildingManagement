@@ -1,5 +1,5 @@
-import { Badge, Box, Card, Collapse, Group, Stack, Text, UnstyledButton } from '@mantine/core'
-import { IconChevronDown, IconPin } from '@tabler/icons-react'
+import { ActionIcon, Badge, Box, Card, Collapse, Group, Menu, Stack, Text, UnstyledButton } from '@mantine/core'
+import { IconChevronDown, IconDots, IconPencil, IconPin, IconTrash } from '@tabler/icons-react'
 import { useRef, useState } from 'react'
 import { formatDate } from '../../lib/format'
 import { he } from '../../lib/he'
@@ -18,15 +18,38 @@ function Meta({ a, expired }: { a: Item; expired: boolean }) {
   )
 }
 
+export interface AdminActions {
+  onEdit: (item: Item) => void
+  onDelete: (item: Item) => void
+}
+
+function ItemMenu({ item, actions }: { item: Item; actions: AdminActions }) {
+  return (
+    <Menu position="bottom-start" withinPortal>
+      <Menu.Target>
+        <ActionIcon variant="subtle" color="stone.7" size={44} mx="xs" aria-label={he.announcements.actions(item.title)}>
+          <IconDots size={20} stroke={1.75} aria-hidden="true" />
+        </ActionIcon>
+      </Menu.Target>
+      <Menu.Dropdown>
+        <Menu.Item leftSection={<IconPencil size={18} stroke={1.75} />} onClick={() => actions.onEdit(item)}>{he.announcements.edit}</Menu.Item>
+        <Menu.Item color="debt" leftSection={<IconTrash size={18} stroke={1.75} />} onClick={() => actions.onDelete(item)}>{he.announcements.delete}</Menu.Item>
+      </Menu.Dropdown>
+    </Menu>
+  )
+}
+
 export interface AnnouncementItemProps {
   item: Item
   expired?: boolean
   /** Called the first time an unread item is opened. */
   onOpen?: (item: Item) => void
+  /** Admin only: shows the edit/delete menu. */
+  actions?: AdminActions
 }
 
 /** One announcement: tap the header to read it. Opening an unread item marks it read. */
-export function AnnouncementItem({ item, expired = false, onOpen }: AnnouncementItemProps) {
+export function AnnouncementItem({ item, expired = false, onOpen, actions }: AnnouncementItemProps) {
   const [opened, setOpened] = useState(false)
   const reported = useRef(false)
   const toggle = () => {
@@ -38,7 +61,8 @@ export function AnnouncementItem({ item, expired = false, onOpen }: Announcement
   }
   return (
     <Card padding={0} data-testid={`announcement-${item.id}`} style={expired ? { opacity: 0.8 } : undefined}>
-      <UnstyledButton onClick={toggle} aria-expanded={opened} w="100%" mih={44} p="md" className="bm-row">
+      <Group wrap="nowrap" gap={0} align="center">
+      <UnstyledButton onClick={toggle} aria-expanded={opened} mih={44} p="md" className="bm-row" style={{ flex: 1, minWidth: 0 }}>
         <Group wrap="nowrap" gap="sm" align="center">
           {!item.isRead && !expired ? <UnreadDot /> : <Box w={10} style={{ flexShrink: 0 }} />}
           <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
@@ -51,6 +75,8 @@ export function AnnouncementItem({ item, expired = false, onOpen }: Announcement
           <IconChevronDown size={20} stroke={1.75} aria-hidden="true" style={{ transform: opened ? 'rotate(180deg)' : undefined }} />
         </Group>
       </UnstyledButton>
+      {actions && <ItemMenu item={item} actions={actions} />}
+      </Group>
       <Collapse expanded={opened}>
         <Text px="md" pb="md" style={{ whiteSpace: 'pre-wrap' }}>{item.body}</Text>
       </Collapse>

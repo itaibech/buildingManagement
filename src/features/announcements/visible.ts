@@ -26,3 +26,8 @@ export function visibleAnnouncements<T extends AnnouncementLike>(list: readonly 
 export function expiredAnnouncements<T extends AnnouncementLike>(list: readonly T[], today: string): T[] {
   return list.filter((a) => isExpired(a, today)).sort(newestFirst)
 }
+
+/** Read when the user has a receipt, or authored it themselves. */
+export function isReadBy(a: { id: string; author_id: string | null }, readIds: ReadonlySet<string>, userId: string | undefined): boolean {
+  return readIds.has(a.id) || (userId !== undefined && a.author_id === userId)
+}

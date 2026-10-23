@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { expiredAnnouncements, todayISO, visibleAnnouncements, type AnnouncementLike } from './visible'
+import { expiredAnnouncements, isReadBy, todayISO, visibleAnnouncements, type AnnouncementLike } from './visible'
 
 const a = (id: string, o: Partial<AnnouncementLike> = {}): AnnouncementLike & { id: string } => ({
   id,
@@ -49,5 +49,19 @@ describe('expiredAnnouncements', () => {
 describe('todayISO', () => {
   it('formats the local calendar date as YYYY-MM-DD', () => {
     expect(todayISO(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05')
+  })
+})
+
+describe('isReadBy', () => {
+  const reads = new Set(['r1'])
+  it('is read when a receipt exists', () => {
+    expect(isReadBy({ id: 'r1', author_id: 'other' }, reads, 'me')).toBe(true)
+  })
+  it('counts the author\'s own announcement as read', () => {
+    expect(isReadBy({ id: 'x', author_id: 'me' }, reads, 'me')).toBe(true)
+  })
+  it('is unread otherwise, including when the user is unknown', () => {
+    expect(isReadBy({ id: 'x', author_id: 'other' }, reads, 'me')).toBe(false)
+    expect(isReadBy({ id: 'x', author_id: null }, reads, undefined)).toBe(false)
   })
 })

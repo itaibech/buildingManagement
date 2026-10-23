@@ -2,41 +2,60 @@ import { Stack, Text, Title } from '@mantine/core'
 import { useState } from 'react'
 import { useAuth } from '../../auth/AuthProvider'
 import { he } from '../../lib/he'
-import { EmptyState, ListSkeleton, PageHeader } from '../../ui'
-import { FormModal } from '../tenants/dialogs'
+import { EmptyState, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
+import { ConfirmDialog, FormModal } from '../tenants/dialogs'
 import { AnnouncementForm } from './AnnouncementForm'
-import { AnnouncementItem } from './AnnouncementItem'
-import { useAnnouncements, useExpiredAnnouncements, useMarkRead } from './api'
+import { AnnouncementItem, type AdminActions } from './AnnouncementItem'
+import { useAnnouncements, useDeleteAnnouncement, useExpiredAnnouncements, useMarkRead, type Announcement } from './api'
 
-function ExpiredSection() {
+type Dialog = { kind: 'add' } | { kind: 'edit' | 'delete'; item: Announcement } | null
+
+function ExpiredSection({ actions }: { actions?: AdminActions }) {
   const { data } = useExpiredAnnouncements()
   if (!data?.length) return null
   return (
     <Stack gap="sm">
       <Title order={2} size="h4">{he.announcements.expiredSection}</Title>
-      {data.map((a) => <AnnouncementItem key={a.id} item={a} expired />)}
+      {data.map((a) => <AnnouncementItem key={a.id} item={a} expired actions={actions} />)}
     </Stack>
   )
 }
 
-/** Building notices: pinned first, then newest. Admins publish from the header action. */
+function Dialogs({ dialog, close }: { dialog: Dialog; close: () => void }) {
+  const del = useDeleteAnnouncement()
+  const item = dialog && dialog.kind !== 'add' ? dialog.item : undefined
+  const onDelete = () => item && del.mutate(item.id, { onSuccess: () => { notifySuccess(he.announcements.deleted); close() } })
+  return (
+    <>
+      <FormModal opened={dialog?.kind === 'add' || dialog?.kind === 'edit'} title={dialog?.kind === 'edit' ? he.announcements.edit : he.announcements.add} onClose={close}>
+        {dialog?.kind === 'add' && <AnnouncementForm onDone={close} />}
+        {dialog?.kind === 'edit' && <AnnouncementForm key={dialog.item.id} announcement={dialog.item} onDone={close} />}
+      </FormModal>
+      <ConfirmDialog opened={dialog?.kind === 'delete'} title={he.announcements.deleteConfirm(item?.title ?? '')} body={he.announcements.deleteBody}
+        confirmLabel={he.announcements.delete} loading={del.isPending} failed={del.isError} onClose={close} onConfirm={onDelete} />
+    </>
+  )
+}
+
+/** Building notices: pinned first, then newest. Admins publish, edit and delete. */
 export default function AnnouncementsPage() {
   const { isAdmin } = useAuth()
   const list = useAnnouncements()
   const markRead = useMarkRead()
-  const [adding, setAdding] = useState(false)
-  const add = isAdmin ? { label: he.announcements.add, onClick: () => setAdding(true) } : undefined
+  const [dialog, setDialog] = useState<Dialog>(null)
+  const add = isAdmin ? { label: he.announcements.add, onClick: () => setDialog({ kind: 'add' }) } : undefined
+  const actions: AdminActions | undefined = isAdmin
+    ? { onEdit: (item) => setDialog({ kind: 'edit', item }), onDelete: (item) => setDialog({ kind: 'delete', item }) }
+    : undefined
   return (
     <Stack gap="md">
       <PageHeader title={he.nav.announcements} action={add} />
       {list.isError && <Text c="debt.7">{he.announcements.errors.load}</Text>}
       {list.isLoading && <ListSkeleton rows={4} />}
       {list.data?.length === 0 && <EmptyState title={he.announcements.empty} body={he.announcements.emptyBody} action={add} />}
-      {list.data?.map((a) => <AnnouncementItem key={a.id} item={a} onOpen={(i) => markRead.mutate(i.id)} />)}
-      {isAdmin && <ExpiredSection />}
-      <FormModal opened={adding} title={he.announcements.add} onClose={() => setAdding(false)}>
-        <AnnouncementForm onDone={() => setAdding(false)} />
-      </FormModal>
+      {list.data?.map((a) => <AnnouncementItem key={a.id} item={a} actions={actions} onOpen={(i) => markRead.mutate(i.id)} />)}
+      {isAdmin && <ExpiredSection actions={actions} />}
+      <Dialogs dialog={dialog} close={() => setDialog(null)} />
     </Stack>
   )
 }
