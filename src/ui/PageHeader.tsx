@@ -12,7 +12,7 @@ export function PageHeader({ title, action }: PageHeaderProps) {
   const icon = action?.icon ?? <IconPlus size={22} stroke={1.75} />
   return (
     <Group justify="space-between" align="center" mb="lg" wrap="nowrap">
-      <Title order={1} fz={{ base: '1.75rem', sm: '2.25rem' }}>
+      <Title order={1} fz={{ base: 'h2', sm: 'h1' }}>
         {title}
       </Title>
       {action && (

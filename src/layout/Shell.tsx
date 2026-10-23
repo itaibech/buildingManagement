@@ -1,5 +1,6 @@
 import { ActionIcon, AppShell, Box, Group, NavLink, Stack, Text, Tooltip } from '@mantine/core'
 import { IconCoin, IconDots, IconHome2, IconLogout, IconSpeakerphone, IconTool, type Icon } from '@tabler/icons-react'
+import type { ReactNode } from 'react'
 import { Link, Outlet, useLocation } from 'react-router'
 import { useExit } from '../auth/useExit'
 import { he } from '../lib/he'
@@ -25,32 +26,36 @@ function isActive(pathname: string, to: string): boolean {
   return to === '/' ? pathname === '/' : pathname === to || pathname.startsWith(`${to}/`)
 }
 
-function BuildingIdentity({ name, apartment }: { name: string; apartment: number | null }) {
+/** Building name on the start side; the user's plate (and any trailing controls) on the end side. */
+function BuildingIdentity({ name, apartment, children }: { name: string; apartment: number | null; children?: ReactNode }) {
   return (
     <Group justify="space-between" wrap="nowrap" gap="sm" style={{ minWidth: 0 }}>
-      <Text className="bm-display" fz="1.125rem" truncate>
-        {name}
-      </Text>
-      {apartment !== null && <AptPlate number={apartment} size="md" />}
-    </Group>
-  )
-}
-
-function MobileHeader({ name, apartment, onExit }: { name: string; apartment: number | null; onExit: () => void }) {
-  return (
-    <Group h="100%" px="md" justify="space-between" wrap="nowrap" gap="sm">
-      <Text className="bm-display" fz="1.125rem" truncate>
+      <Text className="bm-display" fz="lg" truncate>
         {name}
       </Text>
       <Group gap="xs" wrap="nowrap">
         {apartment !== null && <AptPlate number={apartment} size="md" />}
-        <Tooltip label={he.exit}>
-          <ActionIcon variant="subtle" color="stone.7" size={44} aria-label={he.exit} onClick={onExit}>
-            <IconLogout {...ICON} />
-          </ActionIcon>
-        </Tooltip>
+        {children}
       </Group>
     </Group>
+  )
+}
+
+function ExitIcon() {
+  return <IconLogout {...ICON} className="bm-mirror" aria-hidden="true" />
+}
+
+function MobileHeader({ name, apartment, onExit }: { name: string; apartment: number | null; onExit: () => void }) {
+  return (
+    <Box h="100%" px="md" className="bm-header" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+      <BuildingIdentity name={name} apartment={apartment}>
+        <Tooltip label={he.exit}>
+          <ActionIcon variant="subtle" color="stone.7" size={44} aria-label={he.exit} onClick={onExit}>
+            <ExitIcon />
+          </ActionIcon>
+        </Tooltip>
+      </BuildingIdentity>
+    </Box>
   )
 }
 
@@ -67,7 +72,7 @@ function SideNav({ pathname, name, apartment, onExit }: { pathname: string; name
           ))}
         </nav>
       </Stack>
-      <NavLink component="button" label={he.exit} leftSection={<IconLogout {...ICON} />} onClick={onExit} c="stone.8" />
+      <NavLink component="button" label={he.exit} leftSection={<ExitIcon />} onClick={onExit} c="stone.8" />
     </Stack>
   )
 }
@@ -96,7 +101,7 @@ export default function Shell() {
   const onExit = () => void exit()
   return (
     <AppShell
-      header={{ height: { base: 56, sm: 0 } }}
+      header={{ height: { base: 'calc(56px + env(safe-area-inset-top, 0px))', sm: 0 } }}
       navbar={{ width: 240, breakpoint: 'sm', collapsed: { mobile: true } }}
       footer={{ height: { base: 'calc(64px + env(safe-area-inset-bottom, 0px))', sm: 0 } }}
       padding={{ base: 'md', sm: 'xl' }}

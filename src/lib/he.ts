@@ -20,7 +20,6 @@ export const he = {
   retry: 'נסה שוב',
   pendingApproval: 'החשבון שלך ממתין לאישור הוועד',
   pendingHint: 'לאחר האישור תוכל להיכנס לאפליקציה. אפשר לסגור את הדף ולחזור מאוחר יותר.',
-  signOut: 'התנתקות',
   exit: 'יציאה',
   apartment: (n: number) => `דירה ${n}`,
   credit: 'זיכוי',

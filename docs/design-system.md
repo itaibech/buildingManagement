@@ -31,6 +31,7 @@ Status mapping (never deviate):
 - calls: פתוחה = `signal`, בטיפול = `enamel`, סגורה = `stone`
 - maintenance: overdue = `debt`, soon = `signal`, later = `stone`
 - balance: > 0 is owed (`debt`), 0 is settled (`paid`), < 0 is credit (`paid` with the label "זיכוי")
+- `paid` and `debt` may also be used for success progress (e.g. the collection bar) and for destructive actions / error alerts.
 
 ## Type
 

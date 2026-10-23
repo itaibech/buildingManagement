@@ -25,10 +25,10 @@ export default function PendingPage() {
         <AuthIdentity />
         <Paper withBorder radius="lg" p={{ base: 'lg', sm: 'xl' }}>
           <Stack gap="md" ta="center">
-            <Title order={2} fz="1.375rem">{he.pendingApproval}</Title>
+            <Title order={2} size="h3">{he.pendingApproval}</Title>
             <Text c="dimmed">{he.pendingHint}</Text>
             {email && <Text size="sm" c="dimmed">{he.signedInAs} <bdi dir="ltr">{email}</bdi></Text>}
-            <Button variant="default" fullWidth size="lg" leftSection={<IconLogout size={20} stroke={1.75} />} onClick={() => void exit()}>
+            <Button variant="default" fullWidth size="lg" leftSection={<IconLogout size={20} stroke={1.75} className="bm-mirror" />} onClick={() => void exit()}>
               {he.exit}
             </Button>
           </Stack>

@@ -8,7 +8,7 @@ import { EmptyState, Money, PageHeader } from '../../ui'
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <Card>
-      <Title order={2} fz="1.125rem" mb="xs">{title}</Title>
+      <Title order={2} size="h4" mb="xs">{title}</Title>
       {children}
     </Card>
   )
@@ -40,7 +40,7 @@ export function CollectionHero({ rate }: { rate: { paid: number; total: number }
         <Text c="dimmed" mt="xs">{he.home.financeSoon}</Text>
       ) : (
         <Stack gap="xs" mt="xs">
-          <Text className="bm-display bm-num" fz="2.25rem">{he.home.collected(rate.paid, rate.total)}</Text>
+          <Text className="bm-display bm-num" fz="h1">{he.home.collected(rate.paid, rate.total)}</Text>
           <Progress value={rate.total ? (rate.paid / rate.total) * 100 : 0} color="paid.7" size="lg" radius="xl" />
         </Stack>
       )}

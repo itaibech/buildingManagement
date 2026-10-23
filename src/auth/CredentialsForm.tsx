@@ -1,4 +1,4 @@
-import { Alert, Anchor, Button, PasswordInput, Stack, Text, TextInput, Title } from '@mantine/core'
+import { Alert, Button, PasswordInput, Stack, TextInput, Title } from '@mantine/core'
 import { useState, type ChangeEvent, type SyntheticEvent } from 'react'
 import { he } from '../lib/he'
 import { supabase } from '../lib/supabase'
@@ -56,18 +56,16 @@ export default function CredentialsForm() {
   return (
     <form onSubmit={(e) => void onSubmit(e)}>
       <Stack gap="md">
-        <Title order={2} fz="1.375rem">{mode === 'signIn' ? he.signIn : he.signUp}</Title>
+        <Title order={2} size="h3">{mode === 'signIn' ? he.signIn : he.signUp}</Title>
         {mode === 'signUp' && <TextInput label={he.fullName} autoComplete="name" value={fullName} onChange={field(setFullName)} required />}
         <TextInput label={he.email} type="email" autoComplete="email" value={email} onChange={field(setEmail)} required />
         <PasswordInput label={he.password} autoComplete={mode === 'signIn' ? 'current-password' : 'new-password'} value={password} onChange={field(setPassword)} required />
         {result.error && <Alert color="debt" role="alert">{result.error}</Alert>}
         {result.info && <Alert color="enamel">{result.info}</Alert>}
         <Button type="submit" fullWidth size="lg" loading={busy}>{mode === 'signIn' ? he.signIn : he.signUp}</Button>
-        <Text ta="center" size="sm">
-          <Anchor component="button" type="button" fw={600} onClick={() => setMode(mode === 'signIn' ? 'signUp' : 'signIn')}>
-            {mode === 'signIn' ? he.noAccountYet : he.haveAccount}
-          </Anchor>
-        </Text>
+        <Button variant="subtle" fullWidth onClick={() => setMode(mode === 'signIn' ? 'signUp' : 'signIn')}>
+          {mode === 'signIn' ? he.noAccountYet : he.haveAccount}
+        </Button>
       </Stack>
     </form>
   )
