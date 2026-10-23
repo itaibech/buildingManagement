@@ -8,7 +8,7 @@ import { ConfirmDialog, FormModal } from '../tenants/dialogs'
 import { useDeleteFeeRow } from './api'
 import { LoadFailed } from './cards'
 import { ExemptToggleForm, FeeChangeForm } from './FeeForms'
-import { affectsPast, currentMonth, nextChangeLabel, rowEffect, shortMonth, type TimelineRow } from './feeTimeline'
+import { affectsPast, currentMonth, nextChangeLabel, shortMonth, type TimelineRow } from './feeTimeline'
 import { DeleteButton, Row } from './fields'
 import { useApartmentFees, useDesktop, type ApartmentFeeRow } from './hooks'
 
@@ -69,7 +69,7 @@ function FeeTable({ rows, onSheet }: { rows: ApartmentFeeRow[]; onSheet: (s: She
 function HistoryRow({ row, onDelete }: { row: TimelineRow; onDelete: () => void }) {
   return (
     <Row title={he.finance.fromMonth(monthLabel(row.effective_from))} badge={<StatusBadge kind="fee" value={row.mode} />}
-      end={row.mode === 'custom' && row.amount !== null ? <Money amount={row.amount} tone="neutral" /> : <Text size="sm" c="dimmed">{rowEffect(row)}</Text>}
+      end={row.mode === 'custom' && row.amount !== null ? <Money amount={row.amount} tone="neutral" /> : null}
       trailing={<DeleteButton label={he.fees.deleteRow(shortMonth(row.effective_from))} onClick={onDelete} />} />
   )
 }
