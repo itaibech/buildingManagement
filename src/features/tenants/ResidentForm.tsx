@@ -1,6 +1,7 @@
 import { Alert, Button, Checkbox, Stack, TextInput } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { he } from '../../lib/he'
+import { notifySuccess } from '../../ui'
 import { useSaveResident, type Resident } from './api'
 
 const PHONE = /^0\d{1,2}-?\d{7}$/
@@ -43,7 +44,7 @@ export function ResidentForm({ apartmentId, resident, onDone }: ResidentFormProp
       email: v.email.trim() || null,
       is_owner: v.is_owner,
     }
-    save.mutate(resident ? { id: resident.id, ...values } : values, { onSuccess: onDone })
+    save.mutate(resident ? { id: resident.id, ...values } : values, { onSuccess: () => { notifySuccess(he.toast.residentSaved); onDone() } })
   })
   return (
     <form onSubmit={submit} noValidate>

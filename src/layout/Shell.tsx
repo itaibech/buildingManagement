@@ -3,6 +3,7 @@ import { IconCoin, IconDots, IconHome2, IconLogout, IconSpeakerphone, IconTool, 
 import type { ReactNode } from 'react'
 import { Link, Outlet, useLocation } from 'react-router'
 import { useExit } from '../auth/useExit'
+import { useUnreadCount } from '../features/announcements/api'
 import { he } from '../lib/he'
 import { AptPlate } from '../ui'
 import { useShellInfo } from './useShellInfo'
@@ -21,6 +22,18 @@ const NAV: NavItem[] = [
   { to: '/more', label: he.nav.more, icon: IconDots },
 ]
 const ICON = { size: 22, stroke: 1.75 } as const
+const ANNOUNCEMENTS = '/announcements'
+
+/** Small `signal` count pill for unread announcements. */
+function UnreadBadge({ count }: { count: number }) {
+  return (
+    <span className="bm-unread" role="img" aria-label={he.announcements.unreadCount(count)}>
+      {count > 9 ? '9+' : count}
+    </span>
+  )
+}
+
+const badgeFor = (to: string, unread: number) => (to === ANNOUNCEMENTS && unread > 0 ? <UnreadBadge count={unread} /> : undefined)
 
 function isActive(pathname: string, to: string): boolean {
   return to === '/' ? pathname === '/' : pathname === to || pathname.startsWith(`${to}/`)
@@ -59,7 +72,7 @@ function MobileHeader({ name, apartment, onExit }: { name: string; apartment: nu
   )
 }
 
-function SideNav({ pathname, name, apartment, onExit }: { pathname: string; name: string; apartment: number | null; onExit: () => void }) {
+function SideNav({ pathname, name, apartment, unread, onExit }: { pathname: string; name: string; apartment: number | null; unread: number; onExit: () => void }) {
   return (
     <Stack h="100%" gap="xs" justify="space-between">
       <Stack gap={4}>
@@ -68,7 +81,7 @@ function SideNav({ pathname, name, apartment, onExit }: { pathname: string; name
         </Box>
         <nav aria-label={he.mainNav}>
           {NAV.map(({ to, label, icon: I }) => (
-            <NavLink key={to} component={Link} to={to} label={label} leftSection={<I {...ICON} />} active={isActive(pathname, to)} aria-current={isActive(pathname, to) ? 'page' : undefined} />
+            <NavLink key={to} component={Link} to={to} label={label} leftSection={<I {...ICON} />} rightSection={badgeFor(to, unread)} active={isActive(pathname, to)} aria-current={isActive(pathname, to) ? 'page' : undefined} />
           ))}
         </nav>
       </Stack>
@@ -77,14 +90,17 @@ function SideNav({ pathname, name, apartment, onExit }: { pathname: string; name
   )
 }
 
-function TabBar({ pathname }: { pathname: string }) {
+function TabBar({ pathname, unread }: { pathname: string; unread: number }) {
   return (
     <nav className="bm-tabbar" aria-label={he.mainNav}>
       {NAV.map(({ to, label, icon: I }) => {
         const active = isActive(pathname, to)
         return (
           <Link key={to} to={to} className="bm-tab" data-active={active || undefined} aria-current={active ? 'page' : undefined}>
-            <I {...ICON} aria-hidden="true" />
+            <span className="bm-tab-icon">
+              <I {...ICON} aria-hidden="true" />
+              {badgeFor(to, unread)}
+            </span>
             <span>{label}</span>
           </Link>
         )
@@ -97,6 +113,7 @@ export default function Shell() {
   const { pathname } = useLocation()
   const exit = useExit()
   const { buildingName, apartmentNumber } = useShellInfo()
+  const unread = useUnreadCount()
   const name = buildingName ?? he.appName
   const onExit = () => void exit()
   return (
@@ -110,7 +127,7 @@ export default function Shell() {
         <MobileHeader name={name} apartment={apartmentNumber} onExit={onExit} />
       </AppShell.Header>
       <AppShell.Navbar p="sm" visibleFrom="sm">
-        <SideNav pathname={pathname} name={name} apartment={apartmentNumber} onExit={onExit} />
+        <SideNav pathname={pathname} name={name} apartment={apartmentNumber} unread={unread} onExit={onExit} />
       </AppShell.Navbar>
       <AppShell.Main>
         <Box maw={1100} mx="auto">
@@ -118,7 +135,7 @@ export default function Shell() {
         </Box>
       </AppShell.Main>
       <AppShell.Footer hiddenFrom="sm">
-        <TabBar pathname={pathname} />
+        <TabBar pathname={pathname} unread={unread} />
       </AppShell.Footer>
     </AppShell>
   )

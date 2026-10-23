@@ -68,3 +68,18 @@ where u.email in ('admin@example.test', 'resident@example.test', 'pending@exampl
 update public.profiles
 set status = 'approved', resident_id = '20000000-0000-0000-0000-000000000001'
 where email = 'resident@example.test';
+
+-- Sample announcements: one pinned, one regular, one already expired (admins see it under "שפג תוקפן").
+insert into public.announcements (title, body, pinned, expires_at, author_id, created_at)
+select v.title, v.body, v.pinned, v.expires_at, '30000000-0000-0000-0000-000000000001'::uuid, v.created_at
+from (values
+  ('ניקיון חדר המדרגות ביום שלישי',
+   E'שלום לכולם,\nביום שלישי בבוקר ינקו את חדר המדרגות. נא לא להשאיר חפצים על המדרגות.',
+   true, null::date, now() - interval '2 days'),
+  ('אסיפת דיירים בסוף החודש',
+   'אסיפת הדיירים השנתית תתקיים בלובי. פרטים נוספים יישלחו בקרוב.',
+   false, null::date, now() - interval '5 days'),
+  ('הפסקת מים זמנית',
+   'בשבוע שעבר הייתה הפסקת מים מתוכננת לצורך תיקון צנרת. הנושא הסתיים.',
+   false, (current_date - 14)::date, now() - interval '20 days')
+) as v(title, body, pinned, expires_at, created_at);

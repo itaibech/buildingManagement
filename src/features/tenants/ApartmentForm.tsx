@@ -1,6 +1,7 @@
 import { Alert, Button, NumberInput, Stack, Textarea } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { he } from '../../lib/he'
+import { notifySuccess } from '../../ui'
 import { DbFailure, useSaveApartment, type Apartment } from './api'
 
 interface Values {
@@ -38,7 +39,7 @@ export function ApartmentForm({ apartment, onDone }: ApartmentFormProps) {
       floor: typeof v.floor === 'number' ? v.floor : null,
       notes: v.notes.trim() || null,
     }
-    save.mutate(apartment ? { id: apartment.id, ...values } : values, { onSuccess: onDone })
+    save.mutate(apartment ? { id: apartment.id, ...values } : values, { onSuccess: () => { notifySuccess(he.toast.apartmentSaved); onDone() } })
   })
   const error = errorText(save.error)
   return (

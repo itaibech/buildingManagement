@@ -2,7 +2,7 @@ import { Badge, Button, Card, Group, SegmentedControl, Select, Stack, Text, Titl
 import { useMemo, useState, type ReactNode } from 'react'
 import { useAuth } from '../../auth/AuthProvider'
 import { he } from '../../lib/he'
-import { AptPlate, EmptyState, ListSkeleton, PageHeader } from '../../ui'
+import { AptPlate, EmptyState, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
 import {
   useApproveProfile,
   useDirectory,
@@ -71,7 +71,7 @@ function PendingRow({ p, residents, options }: { p: Profile; residents: Director
   const [state, setState] = useState<'idle' | 'busy' | 'failed'>('idle')
   const onApprove = () => {
     setState('busy')
-    approve({ userId: p.user_id, residentId, role }).then(() => setState('idle'), () => setState('failed'))
+    approve({ userId: p.user_id, residentId, role }).then(() => { setState('idle'); notifySuccess(he.toast.userApproved) }, () => setState('failed'))
   }
   return (
     <Card padding="md" data-testid={`pending-${p.user_id}`}>
@@ -92,7 +92,7 @@ function UserRow({ p, residents, options, isMe }: { p: Profile; residents: Direc
   const update = useUpdateProfile()
   const locked = p.is_super_admin || isMe
   const linked = residents.find((r) => r.id === p.resident_id)
-  const patch = (values: Parameters<typeof update.mutate>[0]['patch']) => update.mutate({ userId: p.user_id, patch: values })
+  const patch = (values: Parameters<typeof update.mutate>[0]['patch']) => update.mutate({ userId: p.user_id, patch: values }, { onSuccess: () => notifySuccess(he.toast.userUpdated) })
   return (
     <Card padding="md" data-testid={`user-${p.user_id}`}>
       <Stack gap="sm">

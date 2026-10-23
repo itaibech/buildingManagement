@@ -23,7 +23,53 @@ export type Database = {
           }
         },"public": {
           Tables: {
-            "apartments": {
+            "announcement_reads": {
+                  Row: {
+                    "announcement_id": string,"building_id": string,"created_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "announcement_id": string,"building_id"?: string,"created_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "announcement_id"?: string,"building_id"?: string,"created_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "announcement_reads_announcement_id_fkey"
+      columns: ["announcement_id"]
+isOneToOne: false
+      referencedRelation: "announcements"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "announcement_reads_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"announcements": {
+                  Row: {
+                    "author_id": string | null,"body": string,"building_id": string,"created_at": string,"expires_at": string | null,"id": string,"pinned": boolean,"title": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "author_id"?: string | null,"body"?: string,"building_id"?: string,"created_at"?: string,"expires_at"?: string | null,"id"?: string,"pinned"?: boolean,"title": string
+                  }
+                  Update: {
+                    "author_id"?: string | null,"body"?: string,"building_id"?: string,"created_at"?: string,"expires_at"?: string | null,"id"?: string,"pinned"?: boolean,"title"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "announcements_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"apartments": {
                   Row: {
                     "building_id": string,"created_at": string,"floor": number | null,"id": string,"notes": string | null,"number": number
                   }

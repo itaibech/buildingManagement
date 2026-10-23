@@ -1,9 +1,11 @@
-import { Card, Progress, SimpleGrid, Stack, Text, Title } from '@mantine/core'
+import { Anchor, Card, Progress, SimpleGrid, Stack, Text, Title } from '@mantine/core'
 import type { ReactNode } from 'react'
+import { Link } from 'react-router'
 import { useAuth } from '../../auth/AuthProvider'
-import { formatILS } from '../../lib/format'
+import { formatDate, formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
-import { EmptyState, Money, PageHeader } from '../../ui'
+import { EmptyState, ListSkeleton, Money, PageHeader } from '../../ui'
+import { useAnnouncements } from '../announcements/api'
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -48,13 +50,31 @@ export function CollectionHero({ rate }: { rate: { paid: number; total: number }
   )
 }
 
+/** The newest visible announcement (pinned first), or an empty state. */
+function LatestAnnouncement() {
+  const { data, isLoading } = useAnnouncements()
+  const latest = data?.[0]
+  if (isLoading) return <ListSkeleton rows={1} />
+  if (!latest) return <EmptyState title={he.home.noAnnouncements} body={he.home.noAnnouncementsBody} />
+  return (
+    <Stack gap={4}>
+      <Text fw={600}>{latest.title}</Text>
+      <Text size="sm" c="dimmed" className="bm-num">{formatDate(latest.created_at)}</Text>
+      <Text lineClamp={3} style={{ whiteSpace: 'pre-wrap' }}>{latest.body}</Text>
+      <Anchor component={Link} to="/announcements" fw={600} mih={44} style={{ display: 'inline-flex', alignItems: 'center' }}>
+        {he.announcements.seeAll}
+      </Anchor>
+    </Stack>
+  )
+}
+
 function ResidentHome() {
   return (
     <Stack gap="lg">
       <BalanceHero balance={null} />
       <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg">
         <Section title={he.home.latestAnnouncement}>
-          <EmptyState title={he.home.noAnnouncements} body={he.home.noAnnouncementsBody} />
+          <LatestAnnouncement />
         </Section>
         <Section title={he.home.myOpenTickets}>
           <EmptyState title={he.home.noOpenTickets} />
