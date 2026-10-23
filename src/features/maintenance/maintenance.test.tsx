@@ -10,13 +10,14 @@ import MaintenancePage from './MaintenancePage'
 import type { Task } from './api'
 
 const db = vi.hoisted(() => ({ rpcs: [] as unknown[], tasks: [] as unknown[], admin: true, rpcError: null as { message: string } | null }))
+const CATEGORIES = [{ id: 'c1', name: 'ניקיון', sort_order: 2 }, { id: 'c2', name: 'מעלית', sort_order: 9 }]
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     rpc: (fn: string, args: unknown) => { db.rpcs.push({ fn, args }); return Promise.resolve({ error: db.rpcError }) },
     from: (table: string) => {
-      const rows = { data: table === 'maintenance_tasks' ? db.tasks : [], error: null }
+      const rows = { data: table === 'maintenance_tasks' ? db.tasks : table === 'expense_categories' ? CATEGORIES : [], error: null }
       const select = { order: () => select, eq: () => select, then: (r: (v: typeof rows) => unknown) => Promise.resolve(rows).then(r) }
       return { select: () => select }
     },
@@ -41,12 +42,29 @@ describe('DoneForm', () => {
     wrap(<DoneForm task={task()} onDone={onDone} />)
     fireEvent.change(screen.getByLabelText(new RegExp(he.maintenance.doneOn)), { target: { value: '2026-03-15' } })
     fireEvent.change(screen.getByLabelText(he.maintenance.note), { target: { value: 'הכול תקין' } })
-    expect(screen.queryByText(/עלות/)).toBeNull()
     expect(screen.getByText(he.maintenance.nextDuePreview('15/03/2027'))).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: he.maintenance.markDone }))
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith(he.maintenance.markedDone))
     expect(db.rpcs).toEqual([{ fn: 'mark_task_done', args: { p_task_id: 't1', p_done_on: '2026-03-15', p_note: 'הכול תקין' } }])
     expect(onDone).toHaveBeenCalled()
+  })
+
+  it('posts the cost as an expense in the chosen category', async () => {
+    wrap(<DoneForm task={task()} onDone={vi.fn()} />)
+    fireEvent.change(screen.getByLabelText(he.maintenance.cost), { target: { value: '250' } })
+    fireEvent.click(screen.getAllByLabelText(new RegExp(he.maintenance.category))[0])
+    fireEvent.click(await screen.findByRole('option', { name: 'מעלית', hidden: true }))
+    fireEvent.click(screen.getByRole('button', { name: he.maintenance.markDone }))
+    await waitFor(() => expect(db.rpcs).toHaveLength(1))
+    expect(db.rpcs[0]).toMatchObject({ args: { p_cost: 250, p_category_id: 'c2' } })
+  })
+
+  it('requires a category when a cost is entered', async () => {
+    wrap(<DoneForm task={task()} onDone={vi.fn()} />)
+    fireEvent.change(screen.getByLabelText(he.maintenance.cost), { target: { value: '80' } })
+    fireEvent.click(screen.getByRole('button', { name: he.maintenance.markDone }))
+    expect(await screen.findByText(he.maintenance.errors.category)).toBeInTheDocument()
+    expect(db.rpcs).toEqual([])
   })
 })
 

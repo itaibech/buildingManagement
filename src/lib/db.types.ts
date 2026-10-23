@@ -45,6 +45,12 @@ isOneToOne: false
       foreignKeyName: "announcement_reads_building_id_fkey"
       columns: ["building_id"]
 isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "announcement_reads_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
       referencedRelation: "buildings"
       referencedColumns: ["id"]
     }
@@ -63,6 +69,56 @@ isOneToOne: false
                   Relationships: [
                     {
       foreignKeyName: "announcements_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "announcements_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"apartment_fee_overrides": {
+                  Row: {
+                    "amount": number,"apartment_id": string,"building_id": string,"created_at": string,"effective_from": string,"id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount": number,"apartment_id": string,"building_id"?: string,"created_at"?: string,"effective_from": string,"id"?: string
+                  }
+                  Update: {
+                    "amount"?: number,"apartment_id"?: string,"building_id"?: string,"created_at"?: string,"effective_from"?: string,"id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "apartment_fee_overrides_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: false
+      referencedRelation: "apartment_balances"
+      referencedColumns: ["apartment_id"]
+    },{
+      foreignKeyName: "apartment_fee_overrides_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: false
+      referencedRelation: "apartments"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "apartment_fee_overrides_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: false
+      referencedRelation: "monthly_fees"
+      referencedColumns: ["apartment_id"]
+    },{
+      foreignKeyName: "apartment_fee_overrides_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "apartment_fee_overrides_building_id_fkey"
       columns: ["building_id"]
 isOneToOne: false
       referencedRelation: "buildings"
@@ -85,6 +141,12 @@ isOneToOne: false
       foreignKeyName: "apartments_building_id_fkey"
       columns: ["building_id"]
 isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "apartments_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
       referencedRelation: "buildings"
       referencedColumns: ["id"]
     }
@@ -103,6 +165,38 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"budgets": {
+                  Row: {
+                    "amount": number,"building_id": string,"category_id": string,"created_at": string,"id": string,"year": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount": number,"building_id"?: string,"category_id": string,"created_at"?: string,"id"?: string,"year": number
+                  }
+                  Update: {
+                    "amount"?: number,"building_id"?: string,"category_id"?: string,"created_at"?: string,"id"?: string,"year"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "budgets_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "budgets_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "budgets_category_id_fkey"
+      columns: ["category_id"]
+isOneToOne: false
+      referencedRelation: "expense_categories"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"buildings": {
                   Row: {
                     "address": string | null,"billing_start": string | null,"created_at": string,"id": string,"name": string,"opening_cash": number,"opening_cash_date": string | null
@@ -116,6 +210,166 @@ isOneToOne: false
                   }
                   Relationships: [
                     
+                  ]
+                },"charges": {
+                  Row: {
+                    "amount": number,"apartment_id": string,"building_id": string,"created_at": string,"id": string,"kind": string,"label": string,"month": string,"source": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount": number,"apartment_id": string,"building_id"?: string,"created_at"?: string,"id"?: string,"kind": string,"label"?: string,"month": string,"source"?: string
+                  }
+                  Update: {
+                    "amount"?: number,"apartment_id"?: string,"building_id"?: string,"created_at"?: string,"id"?: string,"kind"?: string,"label"?: string,"month"?: string,"source"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "charges_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: false
+      referencedRelation: "apartment_balances"
+      referencedColumns: ["apartment_id"]
+    },{
+      foreignKeyName: "charges_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: false
+      referencedRelation: "apartments"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "charges_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: false
+      referencedRelation: "monthly_fees"
+      referencedColumns: ["apartment_id"]
+    },{
+      foreignKeyName: "charges_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "charges_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"expense_categories": {
+                  Row: {
+                    "building_id": string,"created_at": string,"id": string,"name": string,"sort_order": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "building_id"?: string,"created_at"?: string,"id"?: string,"name": string,"sort_order"?: number
+                  }
+                  Update: {
+                    "building_id"?: string,"created_at"?: string,"id"?: string,"name"?: string,"sort_order"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "expense_categories_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "expense_categories_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"expense_templates": {
+                  Row: {
+                    "amount": number,"building_id": string,"category_id": string,"created_at": string,"id": string,"label": string,"vendor": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount": number,"building_id"?: string,"category_id": string,"created_at"?: string,"id"?: string,"label": string,"vendor"?: string
+                  }
+                  Update: {
+                    "amount"?: number,"building_id"?: string,"category_id"?: string,"created_at"?: string,"id"?: string,"label"?: string,"vendor"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "expense_templates_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "expense_templates_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "expense_templates_category_id_fkey"
+      columns: ["category_id"]
+isOneToOne: false
+      referencedRelation: "expense_categories"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"expenses": {
+                  Row: {
+                    "amount": number,"building_id": string,"category_id": string,"created_at": string,"id": string,"note": string,"receipt_path": string | null,"source": string,"spent_on": string,"vendor": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount": number,"building_id"?: string,"category_id": string,"created_at"?: string,"id"?: string,"note"?: string,"receipt_path"?: string | null,"source"?: string,"spent_on"?: string,"vendor"?: string
+                  }
+                  Update: {
+                    "amount"?: number,"building_id"?: string,"category_id"?: string,"created_at"?: string,"id"?: string,"note"?: string,"receipt_path"?: string | null,"source"?: string,"spent_on"?: string,"vendor"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "expenses_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "expenses_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "expenses_category_id_fkey"
+      columns: ["category_id"]
+isOneToOne: false
+      referencedRelation: "expense_categories"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"fee_schedule": {
+                  Row: {
+                    "amount": number,"building_id": string,"created_at": string,"effective_from": string,"id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount": number,"building_id"?: string,"created_at"?: string,"effective_from": string,"id"?: string
+                  }
+                  Update: {
+                    "amount"?: number,"building_id"?: string,"created_at"?: string,"effective_from"?: string,"id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "fee_schedule_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "fee_schedule_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    }
                   ]
                 },"maintenance_log": {
                   Row: {
@@ -133,7 +387,19 @@ isOneToOne: false
       foreignKeyName: "maintenance_log_building_id_fkey"
       columns: ["building_id"]
 isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "maintenance_log_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
       referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "maintenance_log_expense_id_fkey"
+      columns: ["expense_id"]
+isOneToOne: false
+      referencedRelation: "expenses"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "maintenance_log_task_id_fkey"
@@ -159,6 +425,56 @@ isOneToOne: false
       foreignKeyName: "maintenance_tasks_building_id_fkey"
       columns: ["building_id"]
 isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "maintenance_tasks_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"payments": {
+                  Row: {
+                    "amount": number,"apartment_id": string,"building_id": string,"created_at": string,"id": string,"method": string,"note": string,"paid_on": string,"source": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount": number,"apartment_id": string,"building_id"?: string,"created_at"?: string,"id"?: string,"method": string,"note"?: string,"paid_on"?: string,"source"?: string
+                  }
+                  Update: {
+                    "amount"?: number,"apartment_id"?: string,"building_id"?: string,"created_at"?: string,"id"?: string,"method"?: string,"note"?: string,"paid_on"?: string,"source"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "payments_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: false
+      referencedRelation: "apartment_balances"
+      referencedColumns: ["apartment_id"]
+    },{
+      foreignKeyName: "payments_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: false
+      referencedRelation: "apartments"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "payments_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: false
+      referencedRelation: "monthly_fees"
+      referencedColumns: ["apartment_id"]
+    },{
+      foreignKeyName: "payments_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "payments_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
       referencedRelation: "buildings"
       referencedColumns: ["id"]
     }
@@ -176,6 +492,12 @@ isOneToOne: false
                   }
                   Relationships: [
                     {
+      foreignKeyName: "profiles_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
       foreignKeyName: "profiles_building_id_fkey"
       columns: ["building_id"]
 isOneToOne: false
@@ -205,8 +527,26 @@ isOneToOne: false
       foreignKeyName: "residents_apartment_id_fkey"
       columns: ["apartment_id"]
 isOneToOne: false
+      referencedRelation: "apartment_balances"
+      referencedColumns: ["apartment_id"]
+    },{
+      foreignKeyName: "residents_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: false
       referencedRelation: "apartments"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "residents_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: false
+      referencedRelation: "monthly_fees"
+      referencedColumns: ["apartment_id"]
+    },{
+      foreignKeyName: "residents_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
     },{
       foreignKeyName: "residents_building_id_fkey"
       columns: ["building_id"]
@@ -228,6 +568,12 @@ isOneToOne: false
                   }
                   Relationships: [
                     {
+      foreignKeyName: "ticket_comments_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
       foreignKeyName: "ticket_comments_building_id_fkey"
       columns: ["building_id"]
 isOneToOne: false
@@ -257,6 +603,12 @@ isOneToOne: false
       foreignKeyName: "ticket_photos_building_id_fkey"
       columns: ["building_id"]
 isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "ticket_photos_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
       referencedRelation: "buildings"
       referencedColumns: ["id"]
     },{
@@ -283,6 +635,12 @@ isOneToOne: false
       foreignKeyName: "tickets_building_id_fkey"
       columns: ["building_id"]
 isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "tickets_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
       referencedRelation: "buildings"
       referencedColumns: ["id"]
     }
@@ -290,11 +648,63 @@ isOneToOne: false
                 }
           }
           Views: {
-            [_ in never]: never
+            "apartment_balances": {
+                  Row: {
+                    "apartment_id": string,"balance": number | null,"charged": number | null,"paid": number | null,"scheduled_charges": number | null
+                  }
+                  ComputedFields: never
+                  Relationships: [
+                    
+                  ]
+                },"apartment_ledger": {
+                  Row: {
+                    "apartment_id": string | null,"charged": number | null,"month": string | null,"paid": number | null
+                  }
+                  ComputedFields: never
+                  Relationships: [
+                    
+                  ]
+                },"building_cash": {
+                  Row: {
+                    "balance": number | null,"building_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                           "balance"?: never,"building_id"?: string | null
+                         }
+                        Update: {
+                           "balance"?: never,"building_id"?: string | null
+                         }
+                        Relationships: [
+                    
+                  ]
+                },"monthly_fees": {
+                  Row: {
+                    "amount": number | null,"apartment_id": string,"month": string | null
+                  }
+                  ComputedFields: never
+                  Relationships: [
+                    
+                  ]
+                }
           }
           Functions: {
-            "can_manage_ticket":
+            "building_cash_balance":
+{ Args: { "p_building_id": string }; Returns: number
+                           },
+"can_manage_ticket":
 { Args: { "p_ticket_id": string }; Returns: boolean
+                           },
+"can_read_apartment_finance":
+{ Args: { "p_apartment_id": string }; Returns: boolean
+                           },
+"collection_summary":
+{ Args: { "p_month": string }; Returns: {
+              "amount_due_total": number,"apartments_paid_up": number,"apartments_total": number
+            }[]
+                           },
+"current_month":
+{ Args: Record<PropertyKey, never>; Returns: string
                            },
 "default_building_id":
 { Args: Record<PropertyKey, never>; Returns: string
@@ -306,7 +716,7 @@ isOneToOne: false
 { Args: Record<PropertyKey, never>; Returns: boolean
                            },
 "mark_task_done":
-{ Args: { "p_done_on": string,"p_note": string,"p_task_id": string }; Returns: string
+{ Args: { "p_category_id"?: string,"p_cost"?: number,"p_done_on": string,"p_note": string,"p_task_id": string }; Returns: string
                            },
 "my_apartment_id":
 { Args: Record<PropertyKey, never>; Returns: string
