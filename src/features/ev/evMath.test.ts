@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { chargeAmount, evPreview, historyRows, isEvPayment, previousReading, rateFor } from './evMath'
+import { chargeAmount, evPreview, historyRows, isEvPayment, previousReading, rateFor, readingPreview } from './evMath'
 
 describe('evPreview', () => {
   it('computes kWh and the amount rounded to agorot (half up, like Postgres round)', () => {
@@ -22,6 +22,14 @@ describe('evPreview', () => {
 
   it('flags a missing rate', () => {
     expect(evPreview(100, 120, null)).toEqual({ kwh: 20, amount: 0, error: 'noRate' })
+  })
+})
+
+describe('readingPreview', () => {
+  it('flags a month after the current month', () => {
+    const rates = [{ rate: 0.5, effective_from: '2026-01-01' }]
+    expect(readingPreview([], 0, rates, '2026-11-01', 10, '2026-10-01')?.error).toBe('future')
+    expect(readingPreview([], 0, rates, '2026-10-01', 10, '2026-10-01')).toMatchObject({ kwh: 10, amount: 5 })
   })
 })
 

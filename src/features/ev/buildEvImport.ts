@@ -10,6 +10,8 @@ export type EvImportPayload = {
   chargers: { apartment: number; initial_reading: number; readings: { month: string; reading: number }[] }[]
   rates: { effective_from: string; rate: number }[]
   payments: { apartment: number; paid_on: string; amount: number }[]
+  /** Remove the main workbook's imported EV charges and payments in the covered months (server side). */
+  replace_main_ev?: boolean
 }
 export type ChargerPlan = EvImportPayload['chargers'][number]
 export interface Derived { chargers: ChargerPlan[]; names: Record<number, string>; warnings: string[] }
@@ -103,12 +105,21 @@ export function summarizeEv(chargers: ChargerPlan[], rates: readonly Rate[]): Ye
 /** `${apartment}|YYYY-MM-01` */
 export const paymentKey = (apartment: number, month: string): string => `${apartment}|${month.slice(0, 7)}-01`
 
-export interface PayloadOptions { includePayments: boolean; skipPayments: ReadonlySet<string> }
+export interface PayloadOptions { includePayments: boolean; skipPayments: ReadonlySet<string>; replaceMain?: boolean }
+
+/** paymentKey()s of every apartment-month the import covers (readings and payments). */
+export function coveredKeys(chargers: ChargerPlan[], payments: EvPaymentRow[]): Set<string> {
+  return new Set([
+    ...chargers.flatMap((c) => c.readings.map((r) => paymentKey(c.apartment, r.month))),
+    ...payments.map((p) => paymentKey(p.apartment, p.paid_on)),
+  ])
+}
 
 export function buildEvPayload(chargers: ChargerPlan[], rates: readonly Rate[], payments: EvPaymentRow[], opts: PayloadOptions): EvImportPayload {
   return {
     chargers,
     rates: rates.map((r) => ({ effective_from: r.effective_from, rate: r.rate })),
     payments: opts.includePayments ? payments.filter((p) => !opts.skipPayments.has(paymentKey(p.apartment, p.paid_on))) : [],
+    replace_main_ev: opts.replaceMain ?? false,
   }
 }

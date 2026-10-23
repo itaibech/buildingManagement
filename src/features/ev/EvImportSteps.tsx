@@ -97,7 +97,7 @@ export function PaymentsStep({ d, include, onInclude, overlapsIn, onOverlaps }: 
   )
 }
 
-export function EvPreviewStep({ d, error }: { d: EvDerived; error: string }) {
+export function EvPreviewStep({ d, error, replaceMain, onReplaceMain }: { d: EvDerived; error: string; replaceMain: boolean; onReplaceMain: (v: boolean) => void }) {
   const kwh = money(d.summary.reduce((t, s) => t + s.kwh, 0))
   const amount = money(d.summary.reduce((t, s) => t + s.amount, 0))
   return (
@@ -117,14 +117,19 @@ export function EvPreviewStep({ d, error }: { d: EvDerived; error: string }) {
       <Text fw={600} className="bm-num">{T.totals(formatKwh(kwh), formatILS(amount))}</Text>
       <Text size="sm" className="bm-num">{he.import.paymentsTotal(formatILS(money(d.payload.payments.reduce((t, p) => t + p.amount, 0))))}</Text>
       <Alert color="enamel">{T.replaceNote}</Alert>
-      <Alert color="signal">{T.mainEvCharges}</Alert>
+      {d.mainCharges > 0 && (
+        <Alert color="signal" title={replaceMain ? T.replaceMain(d.mainCharges) : undefined}>
+          <Text size="sm">{T.replaceMainBody}</Text>
+          <Toggle label={T.replaceMainToggle} checked={replaceMain} onChange={onReplaceMain} />
+        </Alert>
+      )}
       <Warnings items={d.warnings} />
       {error && <Alert color="debt">{error}</Alert>}
     </Stack>
   )
 }
 
-const DONE = ['chargers', 'readings', 'kept_manual', 'payments'] as const
+const DONE = ['chargers', 'readings', 'kept_manual', 'payments', 'main_charges'] as const
 
 export function EvDoneStep({ counts, onAgain }: { counts: EvImportCounts; onAgain: () => void }) {
   return (

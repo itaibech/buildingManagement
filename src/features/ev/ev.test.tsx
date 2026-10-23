@@ -61,6 +61,13 @@ describe('ReadingForm', () => {
     expect(saveButton()).toBeDisabled()
   })
 
+  it('a month after the current month is refused', async () => {
+    const edit = { id: 'r9', charger_id: 'c1', month: '2100-01-01', reading: 600, read_on: null, note: '', source: 'manual', kwh: null, rate: null, amount: null }
+    wrap(<ReadingForm charger={CHARGER} edit={edit} onDone={() => undefined} />)
+    expect(await screen.findByText(he.ev.errors.future)).toBeInTheDocument()
+    expect(saveButton()).toBeDisabled()
+  })
+
   it('previews kWh and the amount while typing, then records and toasts the charge', async () => {
     const done = vi.fn()
     wrap(<ReadingForm charger={CHARGER} onDone={done} />)

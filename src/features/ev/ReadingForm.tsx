@@ -21,6 +21,7 @@ function errorText(p: ReadingPreview | null): string | null {
   if (!p?.error) return null
   if (p.error === 'lower') return he.ev.errors.lower(formatKwh(p.previous))
   if (p.error === 'next') return he.ev.errors.next(formatKwh(p.next ?? 0))
+  if (p.error === 'future') return he.ev.errors.future
   return he.ev.errors.noRate
 }
 
@@ -58,7 +59,7 @@ export function ReadingForm({ charger, edit, onDone }: { charger: Charger; edit?
   const form = useForm<Values>({ initialValues: initialValues(edit) })
   const v = form.values
   // previous / next look strictly before / after the month, so an edited reading never compares with itself.
-  const preview = readingPreview(readings.data ?? [], charger.initial_reading, rates.data ?? [], v.month, typeof v.reading === 'number' ? v.reading : null)
+  const preview = readingPreview(readings.data ?? [], charger.initial_reading, rates.data ?? [], v.month, typeof v.reading === 'number' ? v.reading : null, monthOf(todayISO()))
   const existing = edit?.month === v.month ? null : preview?.existing ?? null
   const ready = readings.isSuccess && rates.isSuccess && preview !== null && !preview.error
   const submit = form.onSubmit((x) => {

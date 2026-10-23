@@ -87,7 +87,7 @@ function RatesSection() {
   const del = useDeleteRate()
   const [adding, setAdding] = useState(false)
   const [removing, setRemoving] = useState<EvRate | null>(null)
-  const confirm = () => removing && del.mutate(removing.id, { onSuccess: () => { notifySuccess(he.ev.rateDeleted); setRemoving(null) } })
+  const confirm = () => removing && del.mutate(removing.id, { onSuccess: (n) => { notifySuccess(he.ev.rateDeleted(n)); setRemoving(null) } })
   const today = monthOf(todayISO())
   const current = rates.data?.find((r) => r.effective_from <= today)
   return (

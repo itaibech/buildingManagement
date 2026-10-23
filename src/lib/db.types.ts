@@ -823,11 +823,19 @@ isOneToOne: false
 "default_building_id":
 { Args: Record<PropertyKey, never>; Returns: string
                            },
+"delete_ev_rate":
+{ Args: { "p_id": string }; Returns: number
+                           },
 "delete_ev_reading":
 { Args: { "p_reading_id": string }; Returns: undefined
                            },
 "ev_charge_reading":
 { Args: { "p_reading_id": string }; Returns: Json
+                           },
+"ev_covered":
+{ Args: { "p": Json }; Returns: {
+              "month": string,"number": number
+            }[]
                            },
 "ev_import_charger":
 { Args: { "b": string,"c": Json }; Returns: Json
@@ -844,8 +852,17 @@ isOneToOne: false
 "ev_is_number":
 { Args: { "hi": number,"j": Json,"lo": number }; Returns: boolean
                            },
+"ev_lock_all":
+{ Args: { "b": string }; Returns: undefined
+                           },
+"ev_recompute_from":
+{ Args: { "b": string,"p_from": string }; Returns: number
+                           },
 "ev_recompute_next":
 { Args: { "p_charger_id": string,"p_month": string }; Returns: undefined
+                           },
+"ev_replace_main":
+{ Args: { "b": string,"p": Json }; Returns: Json
                            },
 "ev_validate":
 { Args: { "p": Json }; Returns: undefined
@@ -861,6 +878,9 @@ isOneToOne: false
                            },
 "import_is_amount":
 { Args: { "j": Json }; Returns: boolean
+                           },
+"import_is_ev_row":
+{ Args: { "p_apartment": string,"p_kind": string,"p_label": string,"p_note": string }; Returns: boolean
                            },
 "import_is_int":
 { Args: { "hi": number,"j": Json,"lo": number }; Returns: boolean
@@ -906,6 +926,9 @@ isOneToOne: false
                            },
 "record_ev_reading":
 { Args: { "p_charger_id": string,"p_month": string,"p_note"?: string,"p_read_on"?: string,"p_reading": number }; Returns: Json
+                           },
+"save_ev_rate":
+{ Args: { "p_effective_from": string,"p_rate": number }; Returns: number
                            },
 "user_names":
 { Args: { "ids": (string)[] }; Returns: {

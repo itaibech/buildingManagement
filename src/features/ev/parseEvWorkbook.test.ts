@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildEvPayload, derivePayments, deriveRates, deriveReadings, paymentKey, summarizeEv } from './buildEvImport'
+import { buildEvPayload, coveredKeys, derivePayments, deriveRates, deriveReadings, paymentKey, summarizeEv } from './buildEvImport'
 import { evFixtureRows } from './fixture'
 import { parseEvSheet } from './parseEvWorkbook'
 
@@ -68,6 +68,10 @@ describe('payments and summary', () => {
     const payload = buildEvPayload(d.chargers, [], payments, { includePayments: true, skipPayments: new Set([paymentKey(9, '2023-01-01')]) })
     expect(payload.payments.some((p) => p.apartment === 9)).toBe(false)
     expect(buildEvPayload(d.chargers, [], payments, { includePayments: false, skipPayments: new Set() }).payments).toEqual([])
+    expect(buildEvPayload(d.chargers, [], payments, { includePayments: true, skipPayments: new Set(), replaceMain: true }).replace_main_ev).toBe(true)
+    const covered = coveredKeys(d.chargers, payments)
+    expect(covered.has(paymentKey(9, '2023-01-01'))).toBe(true)
+    expect(covered.has(paymentKey(7, '2026-10-01'))).toBe(false)
   })
 
   it('counts readings, kWh and amount per apartment and year', () => {

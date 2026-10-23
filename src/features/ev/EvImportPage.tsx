@@ -60,7 +60,7 @@ function stepBodies({ st, d, ctx, go, upload, save, confirm, counts, again }: Bo
       <StepNav onBack={go(2)} onNext={go(4)} nextLabel={he.import.next} disabled={false} />
     </>,
     preview: d && <>
-      <EvPreviewStep d={d} error={save.isError ? T.errors.failed : ''} />
+      <EvPreviewStep d={d} error={save.isError ? T.errors.failed : ''} replaceMain={st.replaceMain} onReplaceMain={st.setReplaceMain} />
       <StepNav onBack={go(3)} onNext={confirm} nextLabel={T.confirm} loading={save.isPending} disabled={!ratesOk || ctx.loading} />
     </>,
     done: <EvDoneStep counts={counts} onAgain={again} />,

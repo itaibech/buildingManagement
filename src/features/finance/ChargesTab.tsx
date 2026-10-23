@@ -83,8 +83,8 @@ function ChargeList({ onLevy, onCharge, onDelete }: { onLevy: () => void; onChar
         <Fragment key={c.id}>
           <Divider color="stone.1" />
           <Row plate={info.get(c.apartment_id)?.number} title={c.label || he.finance.kinds[c.kind]}
-            meta={[he.finance.kinds[c.kind], monthLabel(c.month)].join(' · ')} end={<Money amount={c.amount} />}
-            trailing={<DeleteButton label={he.finance.deleteCharge} onClick={() => onDelete(c)} />} />
+            meta={[he.finance.kinds[c.kind], monthLabel(c.month), c.ev_reading_id ? he.finance.evChargeLocked : ''].filter(Boolean).join(' · ')} end={<Money amount={c.amount} />}
+            trailing={c.ev_reading_id ? undefined : <DeleteButton label={he.finance.deleteCharge} onClick={() => onDelete(c)} />} />
         </Fragment>
       ))}
     </Section>

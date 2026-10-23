@@ -12,7 +12,7 @@ export interface Reading extends HistoryReading { charger_id: string; read_on: s
 export interface ReadingInput { charger_id: string; month: string; reading: number; read_on: string | null; note: string }
 export interface ReadingResult { kwh: number; rate: number; amount: number; previous: number }
 export interface EvPayment { apartment_id: string; paid_on: string; amount: number; note: string; source: string }
-export type EvImportCounts = Partial<Record<'chargers' | 'readings' | 'kept_manual' | 'rates' | 'payments', number>>
+export type EvImportCounts = Partial<Record<'chargers' | 'readings' | 'kept_manual' | 'rates' | 'payments' | 'main_charges', number>>
 
 // Under ['finance'] so finance mutations (payments) refresh EV views, and EV mutations refresh balances.
 const KEY = ['finance', 'ev'] as const
@@ -103,14 +103,26 @@ export function useAddCharger() {
     fail((await supabase.from('ev_chargers').insert(values)).error))
 }
 
-/** A rate from a month on; saving the same month again replaces it. */
+/** rpc('save_ev_rate'): a rate from a month on (same month replaces it). Returns how many charges were recomputed. */
 export function useSaveRate() {
-  return useEvMutation(async (values: { rate: number; effective_from: string }) =>
-    fail((await supabase.from('ev_rates').upsert(values, { onConflict: 'building_id,effective_from' })).error))
+  return useEvMutation(async (values: { rate: number; effective_from: string }): Promise<number> =>
+    num(must(await supabase.rpc('save_ev_rate', { p_effective_from: values.effective_from, p_rate: values.rate }))))
 }
 
+/** rpc('delete_ev_rate'): refused (22023) when recorded months would be left without a rate. Returns recomputed count. */
 export function useDeleteRate() {
-  return useEvMutation(async (id: string) => fail((await supabase.from('ev_rates').delete().eq('id', id)).error))
+  return useEvMutation(async (id: string): Promise<number> => num(must(await supabase.rpc('delete_ev_rate', { p_id: id }))))
+}
+
+/** The main workbook's imported EV charges (source 'import', labelled EV) of these apartments. */
+export function useMainEvCharges(apartmentIds: readonly string[]) {
+  return useQuery({
+    queryKey: [...KEY, 'main-charges', [...apartmentIds].sort().join(',')],
+    enabled: apartmentIds.length > 0,
+    queryFn: async (): Promise<{ apartment_id: string; month: string }[]> =>
+      must(await supabase.from('charges').select('apartment_id, month').in('apartment_id', [...apartmentIds])
+        .eq('source', 'import').eq('kind', 'extra').eq('label', he.ev.chargeLabel)),
+  })
 }
 
 /** rpc('record_ev_reading'): upserts the month's reading and its charge, and recomputes the next month. */
@@ -133,7 +145,7 @@ export function useImportEv() {
   return useMutation({
     mutationFn: async (payload: EvImportPayload): Promise<EvImportCounts> => {
       const data: unknown = must(await supabase.rpc('import_ev', { payload }))
-      const keys = ['chargers', 'readings', 'kept_manual', 'rates', 'payments'] as const
+      const keys = ['chargers', 'readings', 'kept_manual', 'rates', 'payments', 'main_charges'] as const
       return Object.fromEntries(keys.map((k) => [k, field(data, k)]))
     },
     onSettled: () => client.invalidateQueries(),

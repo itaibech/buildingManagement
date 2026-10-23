@@ -3,7 +3,7 @@ import { formatDate, formatRate } from '../../lib/format'
 import { he } from '../../lib/he'
 
 export interface Rate { rate: number; effective_from: string }
-export interface EvPreview { kwh: number; amount: number; error?: 'lower' | 'next' | 'noRate' }
+export interface EvPreview { kwh: number; amount: number; error?: 'lower' | 'next' | 'noRate' | 'future' }
 export interface HistoryReading { id: string; month: string; reading: number; kwh: number | null; rate: number | null; amount: number | null }
 export interface EvPaymentLike { paid_on: string; amount: number; note: string }
 export interface HistoryRow { id: string; month: string; reading: number; kwh: number | null; rate: number | null; amount: number | null; paid: number; diff: number }
@@ -73,13 +73,16 @@ export interface ReadingPreview extends EvPreview { previous: number; rate: numb
 /** What the reading form shows while typing: previous and next readings, the month's rate and the preview. */
 export function readingPreview(
   readings: readonly { month: string; reading: number }[], initial: number, rates: readonly Rate[], month: string, reading: number | null,
+  currentMonth?: string,
 ): ReadingPreview | null {
   const previous = previousReading(readings, initial, month)
   const rate = rateFor(rates, month)
   const next = nextReading(readings, month)
   const existing = readings.find((r) => r.month === month)?.reading ?? null
   if (reading === null) return null
-  return { ...evPreview(previous, reading, rate, next), previous, rate, next, existing }
+  const p = evPreview(previous, reading, rate, next)
+  const future = currentMonth !== undefined && month > currentMonth
+  return { ...p, ...(future ? { error: 'future' as const } : {}), previous, rate, next, existing }
 }
 
 /** "₪0.574 לקוט״ש מ-01/08/2022" */

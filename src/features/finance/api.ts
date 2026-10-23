@@ -19,7 +19,7 @@ export interface ApartmentBalance {
 }
 export interface Payment { id: string; apartment_id: string; paid_on: string; amount: number; method: PaymentMethod; note: string }
 export interface PaymentInput { apartment_id: string; paid_on: string; amount: number; method: PaymentMethod; note: string }
-export interface Charge { id: string; apartment_id: string; month: string; amount: number; kind: ChargeKind; label: string }
+export interface Charge { id: string; apartment_id: string; month: string; amount: number; kind: ChargeKind; label: string; ev_reading_id: string | null }
 export interface ChargeInput { apartment_ids: string[]; month: string; amount: number; kind: ChargeKind; label: string }
 export interface Fee { id: string; effective_from: string; amount: number }
 export interface FeeOverride { id: string; apartment_id: string; effective_from: string; amount: number }
@@ -184,7 +184,7 @@ export function useCharges(year: number) {
   return useQuery({
     queryKey: [...KEY, 'charges', year],
     queryFn: async (): Promise<Charge[]> =>
-      must(await supabase.from('charges').select('id, apartment_id, month, amount, kind, label')
+      must(await supabase.from('charges').select('id, apartment_id, month, amount, kind, label, ev_reading_id')
         .gte('month', `${year}-01-01`).lt('month', `${year + 1}-01-01`).order('month', { ascending: false }))
         .map((c) => ({ ...c, amount: num(c.amount), kind: c.kind as ChargeKind })),
   })

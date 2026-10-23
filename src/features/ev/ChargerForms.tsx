@@ -52,7 +52,7 @@ export function RateForm({ onDone }: { onDone: () => void }) {
   const form = useForm<{ month: string; rate: number | string }>({ initialValues: { month: monthOf(todayISO()), rate: '' }, validate: { rate: positive } })
   const submit = form.onSubmit((v) => {
     if (typeof v.rate !== 'number') return
-    save.mutate({ rate: v.rate, effective_from: v.month }, { onSuccess: () => { notifySuccess(he.ev.rateSaved); onDone() } })
+    save.mutate({ rate: v.rate, effective_from: v.month }, { onSuccess: (n) => { notifySuccess(he.ev.rateSaved(n)); onDone() } })
   })
   return (
     <form onSubmit={submit} noValidate>
