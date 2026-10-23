@@ -60,6 +60,9 @@ Migrations live in `supabase/migrations` and are applied to the hosted
 project by the deploy workflow on push to `main`. The hosted bootstrap admin
 email is set once outside the repo:
 `insert into app_settings values ('bootstrap_admin_email', '<email>')`.
+Keep **Confirm email** on in the hosted project (Auth → Providers → Email):
+the bootstrap profile is created at sign-up, so the bootstrap email must be
+one the admin controls and confirms (Google sign-in is verified already).
 
 ## License
 
