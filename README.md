@@ -64,6 +64,24 @@ Keep **Confirm email** on in the hosted project (Auth → Providers → Email):
 the bootstrap profile is created at sign-up, so the bootstrap email must be
 one the admin controls and confirms (Google sign-in is verified already).
 
+## Google sign-in setup (hosted)
+
+1. Google Cloud Console → APIs & Services → Credentials → Create OAuth client ID,
+   type **Web application**. Add the authorized redirect URI
+   `https://kttyozquueaoacrwbnmx.supabase.co/auth/v1/callback`.
+2. Supabase → Authentication → Providers → Google: enable it and paste the
+   client ID and client secret.
+3. Supabase → Authentication → URL Configuration: set **Site URL** to
+   `https://itaibech.github.io/buildingManagement/` and add that URL plus
+   `http://localhost:5173/buildingManagement/` to **Redirect URLs**.
+
+The Google button only shows when Google is enabled on the Supabase instance.
+It's off on the local stack by default. To enable it locally, put
+`SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID` and
+`SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET` in the git-ignored `supabase/.env`, set
+`enabled = true` under `[auth.external.google]` in `supabase/config.toml`, and add
+`http://127.0.0.1:54321/auth/v1/callback` as a redirect URI on the Google OAuth client.
+
 ## License
 
 [MIT](LICENSE)
