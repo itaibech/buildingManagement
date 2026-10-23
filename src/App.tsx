@@ -18,6 +18,9 @@ const ApartmentsPage = lazy(() => import('./features/tenants/ApartmentsPage'))
 const ApartmentPage = lazy(() => import('./features/tenants/ApartmentPage'))
 const UsersPage = lazy(() => import('./features/tenants/UsersPage'))
 const ImportPage = lazy(() => import('./features/import/ImportPage'))
+const EvPage = lazy(() => import('./features/ev/EvPage'))
+const ChargerPage = lazy(() => import('./features/ev/ChargerPage'))
+const EvImportPage = lazy(() => import('./features/ev/EvImportPage'))
 
 const fallback = (
   <Center mih="50vh">
@@ -46,6 +49,9 @@ export default function App() {
                 <Route path="apartments/:id" element={<ApartmentPage />} />
                 <Route path="users" element={<UsersPage />} />
                 <Route path="import" element={<ImportPage />} />
+                <Route path="ev" element={<EvPage />} />
+                <Route path="ev/import" element={<EvImportPage />} />
+                <Route path="ev/:id" element={<ChargerPage />} />
               </Route>
             </Route>
           </Route>

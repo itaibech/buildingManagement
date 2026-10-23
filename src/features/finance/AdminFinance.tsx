@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router'
 import { he } from '../../lib/he'
 import { PageHeader } from '../../ui'
+import { EvPanel } from '../ev/EvPanel'
 import { useExportAction } from '../export/useExport'
 import { BalancesTab } from './BalancesTab'
 import { BudgetTab } from './BudgetTab'
@@ -12,7 +13,7 @@ import { ExpensesTab } from './ExpensesTab'
 import { ExportRegistration, type ExportSource } from './exportSlot'
 import { PaymentsTab } from './PaymentsTab'
 
-const TABS = ['balances', 'payments', 'charges', 'expenses', 'budget'] as const
+const TABS = ['balances', 'payments', 'charges', 'expenses', 'budget', 'ev'] as const
 type Tab = (typeof TABS)[number]
 const isTab = (v: string | null): v is Tab => TABS.some((t) => t === v)
 
@@ -23,6 +24,7 @@ const ACTION: Record<Tab, { label: string; icon: ReactNode }> = {
   charges: { label: he.finance.newLevy, icon: <IconPlus {...ICON} /> },
   expenses: { label: he.finance.addExpense, icon: <IconPlus {...ICON} /> },
   budget: { label: he.finance.addBudget, icon: <IconPlus {...ICON} /> },
+  ev: { label: he.ev.addCharger, icon: <IconPlus {...ICON} /> },
 }
 
 // Scrolls sideways on narrow screens instead of wrapping onto two lines.
@@ -53,6 +55,7 @@ export function AdminFinance() {
         <Tabs.Panel value="charges"><ChargesTab levying={primary} onLevyingClose={close} /></Tabs.Panel>
         <Tabs.Panel value="expenses"><ExpensesTab adding={primary} onAddingClose={close} /></Tabs.Panel>
         <Tabs.Panel value="budget"><BudgetTab adding={primary} onAddingClose={close} /></Tabs.Panel>
+        <Tabs.Panel value="ev"><EvPanel adding={primary} onAddingClose={close} /></Tabs.Panel>
       </Tabs>
     </ExportRegistration.Provider>
   )

@@ -13,6 +13,7 @@ const COMMON = [
 const ADMIN = [
   { to: '/apartments', label: he.nav.apartments },
   { to: '/users', label: he.nav.users },
+  { to: '/ev', label: he.nav.ev },
   { to: '/import', label: he.nav.import },
 ]
 

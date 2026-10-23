@@ -5,6 +5,7 @@ import { useMyApartment } from './api'
 import { ApartmentYear } from './ApartmentLedger'
 import { CategoryTotals } from './BudgetTab'
 import { CashCard, LoadFailed, MyBalanceHero } from './cards'
+import { MyEvCard } from '../ev/MyEvCard'
 
 /** The resident's own month grid. Only their apartment's rows are requested and shown. */
 function MyLedger() {
@@ -32,6 +33,7 @@ export function ResidentFinance() {
       <Stack gap="lg">
         <MyBalanceHero />
         <MyLedger />
+        <MyEvCard />
         <CashCard />
         <CategoryTotals />
       </Stack>
