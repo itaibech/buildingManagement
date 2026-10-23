@@ -5,3 +5,5 @@ dist
 coverage
 *.tsbuildinfo
 .DS_Store
+supabase/.env
+supabase/seed.local.sql

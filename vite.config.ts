@@ -4,5 +4,5 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   base: '/buildingManagement/',
   plugins: [react()],
-  test: { environment: 'node' },
+  test: { environment: 'node', setupFiles: ['./src/test/setup.ts'] },
 })
