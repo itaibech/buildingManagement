@@ -96,16 +96,23 @@ export function useTicket(id: string) {
   return useQuery({ queryKey: [...KEY, 'detail', id], queryFn: () => fetchTicket(id) })
 }
 
-async function uploadPhotos(ticketId: string, files: readonly File[]): Promise<void> {
-  const paths = files.map((f) => photoPath(ticketId, f))
+/** Uploads each photo, records rows for the ones that made it, and returns how many failed. */
+async function uploadPhotos(ticketId: string, files: readonly File[]): Promise<number> {
   const bucket = supabase.storage.from(PHOTO_BUCKET)
-  const results = await Promise.all(files.map((f, i) => bucket.upload(paths[i], f, { contentType: f.type })))
-  results.forEach((r) => fail(r.error))
-  const { error } = await supabase.from('ticket_photos').insert(paths.map((path) => ({ ticket_id: ticketId, path })))
-  fail(error)
+  const results = await Promise.all(
+    files.map(async (f) => {
+      const path = photoPath(ticketId, f)
+      const { error } = await bucket.upload(path, f, { contentType: f.type })
+      return error ? null : path
+    }),
+  )
+  const uploaded = results.filter((p): p is string => p !== null)
+  if (uploaded.length === 0) return files.length
+  const { error } = await supabase.from('ticket_photos').insert(uploaded.map((path) => ({ ticket_id: ticketId, path })))
+  return error ? files.length : files.length - uploaded.length
 }
 
-/** Opens a ticket, then uploads its photos and records them. `photosFailed` when only the photos failed. */
+/** Opens a ticket, then uploads its photos. `failedPhotos` counts photos that could not be saved. */
 export function useCreateTicket() {
   const client = useQueryClient()
   return useMutation({
@@ -113,9 +120,8 @@ export function useCreateTicket() {
       const { data, error } = await supabase.from('tickets').insert(values).select('id').single()
       fail(error)
       if (!data) throw new Error('Ticket was not created')
-      if (files.length === 0) return { id: data.id, photosFailed: false }
-      const photosFailed = await uploadPhotos(data.id, files).then(() => false, () => true)
-      return { id: data.id, photosFailed }
+      const failedPhotos = files.length === 0 ? 0 : await uploadPhotos(data.id, files).catch(() => files.length)
+      return { id: data.id, failedPhotos }
     },
     onSettled: () => client.invalidateQueries({ queryKey: KEY }),
   })
@@ -145,14 +151,22 @@ export function useAddComment() {
   })
 }
 
-/** Admin: removes the ticket's storage objects, then the ticket (comments and photo rows cascade). */
+/** Every object under the ticket's folder, including any that never got a photo row. */
+async function folderPaths(ticketId: string): Promise<string[]> {
+  const { data, error } = await supabase.storage.from(PHOTO_BUCKET).list(ticketId)
+  fail(error)
+  return (data ?? []).map((o) => `${ticketId}/${o.name}`)
+}
+
+/** Admin: deletes the ticket (comments and photo rows cascade), then its storage folder. */
 export function useDeleteTicket() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, paths }: { id: string; paths: string[] }) => {
-      if (paths.length > 0) fail((await supabase.storage.from(PHOTO_BUCKET).remove(paths)).error)
+    mutationFn: async (id: string) => {
       const { error } = await supabase.from('tickets').delete().eq('id', id)
       fail(error)
+      const paths = await folderPaths(id)
+      if (paths.length > 0) fail((await supabase.storage.from(PHOTO_BUCKET).remove(paths)).error)
     },
     onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
   })

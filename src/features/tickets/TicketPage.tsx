@@ -67,7 +67,7 @@ function Dialogs({ ticket, dialog, close }: { ticket: TicketDetail; dialog: Dial
   const navigate = useNavigate()
   const del = useDeleteTicket()
   const onDelete = () =>
-    del.mutate({ id: ticket.id, paths: ticket.photos.map((p) => p.path) }, {
+    del.mutate(ticket.id, {
       onSuccess: () => { notifySuccess(he.tickets.deleted); void navigate('/tickets', { replace: true }) },
     })
   return (

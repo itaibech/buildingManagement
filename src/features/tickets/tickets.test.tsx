@@ -119,7 +119,7 @@ describe('TicketForm', () => {
   })
 
   it('shows previews and sends trimmed values with the photos', () => {
-    m.create.mockImplementation((_v, o) => o?.onSuccess?.({ id: 'new', photosFailed: false }))
+    m.create.mockImplementation((_v, o) => o?.onSuccess?.({ id: 'new', failedPhotos: 0 }))
     const onDone = vi.fn()
     const { container } = wrap(<TicketForm onDone={onDone} />)
     fireEvent.change(screen.getByLabelText(new RegExp(he.tickets.title)), { target: { value: '  מים בחניה ' } })
@@ -130,6 +130,27 @@ describe('TicketForm', () => {
     expect(m.create).toHaveBeenCalledWith({ values: { title: 'מים בחניה', description: '', location: '' }, files: [photo] }, expect.anything())
     expect(m.success).toHaveBeenCalledWith(he.tickets.sent)
     expect(onDone).toHaveBeenCalled()
+  })
+})
+
+describe('TicketForm partial upload', () => {
+  it('reports how many photos failed', () => {
+    m.create.mockImplementation((_v, o) => o?.onSuccess?.({ id: 'new', failedPhotos: 2 }))
+    wrap(<TicketForm onDone={vi.fn()} />)
+    fireEvent.change(screen.getByLabelText(new RegExp(he.tickets.title)), { target: { value: 'x' } })
+    fireEvent.click(screen.getByRole('button', { name: he.tickets.send }))
+    expect(m.success).toHaveBeenCalledWith(he.tickets.sent)
+    expect(m.error).toHaveBeenCalledWith(he.tickets.errors.photos(2))
+  })
+})
+
+describe('TicketPhotos', () => {
+  it('shows a download tile when a HEIC photo cannot be displayed', () => {
+    m.detail = detail({ photos: [{ id: 'h', path: 't1/u.heic', url: 'https://x/u.heic' }] })
+    const { container } = wrap(<TicketPage />, '/tickets/t1')
+    fireEvent.error(container.querySelector('img[src="https://x/u.heic"]') as HTMLImageElement)
+    const link = screen.getByRole('link', { name: he.tickets.heicFallback })
+    expect(link).toHaveAttribute('href', 'https://x/u.heic')
   })
 })
 
@@ -157,7 +178,7 @@ describe('TicketPage', () => {
     await waitFor(() => expect(m.success).toHaveBeenCalledWith(he.tickets.statusUpdated))
   })
 
-  it('admin delete removes the photos too, only after confirming', async () => {
+  it('admin delete runs only after confirming', async () => {
     m.isAdmin = true
     wrap(<TicketPage />, '/tickets/t1')
     fireEvent.click(screen.getByRole('button', { name: he.tickets.actions }))
@@ -165,6 +186,6 @@ describe('TicketPage', () => {
     expect(m.remove).not.toHaveBeenCalled()
     const dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getByRole('button', { name: he.tickets.delete }))
-    expect(m.remove).toHaveBeenCalledWith({ id: 't1', paths: ['t1/p1.jpg'] }, expect.anything())
+    expect(m.remove).toHaveBeenCalledWith('t1', expect.anything())
   })
 })

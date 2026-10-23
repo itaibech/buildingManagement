@@ -2,7 +2,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(36);
+select plan(42);
 
 -- ---------------------------------------------------------------- fixtures
 insert into auth.users (id, email, aud, role, raw_user_meta_data) values
@@ -74,13 +74,26 @@ select is(
 );
 select lives_ok(
   $$insert into public.ticket_photos (ticket_id, path)
-    values ('e6000000-0000-0000-0000-000000000001', 'e6000000-0000-0000-0000-000000000001/a.jpg')$$,
+    values ('e6000000-0000-0000-0000-000000000001', 'e6000000-0000-0000-0000-000000000001/f6000000-0000-0000-0000-00000000000a.jpg')$$,
   'resident: can attach a photo row to own ticket'
 );
 select lives_ok(
   $$insert into storage.objects (bucket_id, name, metadata)
-    values ('ticket-photos', 'e6000000-0000-0000-0000-000000000001/a.jpg', '{"mimetype":"image/jpeg"}')$$,
+    values ('ticket-photos', 'e6000000-0000-0000-0000-000000000001/f6000000-0000-0000-0000-00000000000a.jpg', '{"mimetype":"image/jpeg"}')$$,
   'storage: opener can upload into own ticket folder'
+);
+select throws_ok(
+  $$insert into storage.objects (bucket_id, name)
+    values ('ticket-photos', 'e6000000-0000-0000-0000-000000000001/../e6000000-0000-0000-0000-000000000002/x.jpg')$$,
+  '42501', null, 'storage: path traversal name is rejected'
+);
+select throws_ok(
+  $$insert into storage.objects (bucket_id, name) values ('ticket-photos', 'e6000000-0000-0000-0000-000000000001/notes.txt')$$,
+  '42501', null, 'storage: name must be <uuid>.<image ext>'
+);
+select throws_ok(
+  $$insert into public.ticket_photos (ticket_id, path) values ('e6000000-0000-0000-0000-000000000001', 'e6000000-0000-0000-0000-000000000001/../x.jpg')$$,
+  '23514', null, 'ticket_photos: path must match <ticket_id>/<uuid>.<ext>'
 );
 
 -- ---------------------------------------------------------------- other resident
@@ -106,7 +119,7 @@ select throws_ok(
 );
 select throws_ok(
   $$insert into public.ticket_photos (ticket_id, path)
-    values ('e6000000-0000-0000-0000-000000000001', 'e6000000-0000-0000-0000-000000000001/b.jpg')$$,
+    values ('e6000000-0000-0000-0000-000000000001', 'e6000000-0000-0000-0000-000000000001/f6000000-0000-0000-0000-00000000000b.jpg')$$,
   '42501', null, 'other resident: cannot attach photos to someone else''s ticket'
 );
 select is(
@@ -114,7 +127,7 @@ select is(
   'storage: approved users can read ticket photos'
 );
 select throws_ok(
-  $$insert into storage.objects (bucket_id, name) values ('ticket-photos', 'e6000000-0000-0000-0000-000000000001/b.jpg')$$,
+  $$insert into storage.objects (bucket_id, name) values ('ticket-photos', 'e6000000-0000-0000-0000-000000000001/f6000000-0000-0000-0000-00000000000b.jpg')$$,
   '42501', null, 'storage: cannot upload into someone else''s ticket folder'
 );
 set local storage.allow_delete_query = 'true';
@@ -125,6 +138,10 @@ select is((select count(*) from public.tickets), 1::bigint, 'other resident: can
 select is(
   (select full_name from public.user_names(array['a6000000-0000-0000-0000-000000000002'::uuid])),
   'דייר ראשון', 'user_names: approved users see other users'' names'
+);
+select is(
+  (select count(*) from public.user_names(array['a6000000-0000-0000-0000-000000000004'::uuid])),
+  0::bigint, 'user_names: pending profiles are not returned'
 );
 
 -- ---------------------------------------------------------------- pending again (reads)
@@ -151,6 +168,16 @@ update public.tickets set title = 'late edit' where id = 'e6000000-0000-0000-000
 select is(
   (select title from public.tickets where id = 'e6000000-0000-0000-0000-000000000001'),
   'נורה שרופה בקומה 2', 'resident: cannot edit own ticket once it is in progress'
+);
+select throws_ok(
+  $$insert into storage.objects (bucket_id, name)
+    values ('ticket-photos', 'e6000000-0000-0000-0000-000000000001/f6000000-0000-0000-0000-00000000000c.jpg')$$,
+  '42501', null, 'storage: opener cannot upload once the ticket left open'
+);
+select throws_ok(
+  $$insert into public.ticket_photos (ticket_id, path)
+    values ('e6000000-0000-0000-0000-000000000001', 'e6000000-0000-0000-0000-000000000001/f6000000-0000-0000-0000-00000000000c.jpg')$$,
+  '42501', null, 'resident: cannot attach photo rows once the ticket left open'
 );
 
 -- ---------------------------------------------------------------- admin deletes

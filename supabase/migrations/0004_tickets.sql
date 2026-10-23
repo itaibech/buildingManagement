@@ -34,7 +34,8 @@ create table public.ticket_photos (
   id uuid primary key default gen_random_uuid(),
   building_id uuid not null default public.default_building_id() references public.buildings on delete cascade,
   ticket_id uuid not null references public.tickets on delete cascade,
-  path text not null unique check (path like ticket_id::text || '/%'),
+  path text not null unique
+    check (path ~ ('^' || ticket_id::text || '/[0-9a-f-]{36}\.(jpg|jpeg|png|webp|heic|heif|gif)$')),
   created_at timestamptz not null default now()
 );
 create index ticket_photos_ticket_id_idx on public.ticket_photos (ticket_id);
@@ -60,12 +61,13 @@ create trigger tickets_guard
   before update on public.tickets
   for each row execute function public.tickets_guard();
 
--- True when the caller opened the ticket or is an admin.
+-- True when the caller is an admin, or opened the ticket and it is still open (photos are added then).
 create function public.can_manage_ticket(p_ticket_id uuid) returns boolean
 language sql stable security definer set search_path = ''
 as $$
   select public.is_approved() and (public.is_admin() or exists (
-    select 1 from public.tickets where id = p_ticket_id and opened_by = (select auth.uid())
+    select 1 from public.tickets
+    where id = p_ticket_id and opened_by = (select auth.uid()) and status = 'open'
   ));
 $$;
 revoke execute on function public.can_manage_ticket(uuid) from anon, public;
@@ -77,7 +79,7 @@ create function public.user_names(ids uuid[]) returns table (user_id uuid, full_
 language sql stable security definer set search_path = ''
 as $$
   select p.user_id, p.full_name from public.profiles p
-  where public.is_approved() and p.user_id = any (ids);
+  where public.is_approved() and p.status = 'approved' and p.user_id = any (ids);
 $$;
 revoke execute on function public.user_names(uuid[]) from anon, public;
 grant execute on function public.user_names(uuid[]) to authenticated;
@@ -120,7 +122,7 @@ create policy ticket_photos_delete_admin on public.ticket_photos
   for delete to authenticated using (public.is_admin());
 
 -- ---------------------------------------------------------------- storage
--- Paths: <ticket_id>/<uuid>.<ext>. Images only, 5 MB each.
+-- Paths: <ticket_id>/<uuid>.<ext> (enforced by the upload policy). Images only, 5 MB each.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('ticket-photos', 'ticket-photos', false, 5242880,
   array['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif'])
@@ -136,8 +138,9 @@ create policy ticket_photos_storage_upload on storage.objects
   for insert to authenticated
   with check (
     bucket_id = 'ticket-photos'
+    and name ~ '^[0-9a-f-]{36}/[0-9a-f-]{36}\.(jpg|jpeg|png|webp|heic|heif|gif)$'
     and public.can_manage_ticket(case
-      when (storage.foldername(name))[1] ~ '^[0-9a-f-]{36}$' then (storage.foldername(name))[1]::uuid
+      when name ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/' then split_part(name, '/', 1)::uuid
     end)
   );
 create policy ticket_photos_storage_delete on storage.objects

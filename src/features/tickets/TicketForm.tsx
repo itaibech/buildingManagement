@@ -17,9 +17,9 @@ function useSubmit(ticket: Ticket | undefined, onDone: () => void) {
       return
     }
     create.mutate({ values, files }, {
-      onSuccess: ({ photosFailed }) => {
+      onSuccess: ({ failedPhotos }) => {
         notifySuccess(he.tickets.sent)
-        if (photosFailed) notifyError(he.tickets.errors.photos)
+        if (failedPhotos > 0) notifyError(he.tickets.errors.photos(failedPhotos))
         onDone()
       },
     })
