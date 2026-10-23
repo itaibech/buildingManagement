@@ -1,19 +1,18 @@
-import { ActionIcon, Button, Card, Divider, Group, Stack, Title } from '@mantine/core'
-import { IconArrowBackUp } from '@tabler/icons-react'
+import { Button, Card, Divider, Group, Stack, Text, Title } from '@mantine/core'
 import { Fragment, useState, type ReactNode } from 'react'
 import { todayISO } from '../../lib/dates'
 import { formatILS, monthLabel } from '../../lib/format'
 import { he } from '../../lib/he'
 import { EmptyState, ListSkeleton, Money, notifySuccess } from '../../ui'
 import { ConfirmDialog, FormModal } from '../tenants/dialogs'
-import { useCharges, useDeleteCharge, useDeleteOverride, useFeeSchedule, useOverrides, type Charge, type FeeOverride } from './api'
+import { ApartmentFeesSection } from './ApartmentFees'
+import { useCharges, useDeleteCharge, useFeeSchedule, type Charge } from './api'
 import { LoadFailed } from './cards'
-import { ChargeForm, FeeForm, LevyForm, OverrideForm } from './ChargeForms'
+import { ChargeForm, FeeForm, LevyForm } from './ChargeForms'
 import { DeleteButton, Row, YearStepper } from './fields'
 import { useApartmentInfo } from './hooks'
 
-type Sheet = 'fee' | 'override' | 'levy' | 'charge' | null
-type Removing = { kind: 'override'; row: FeeOverride } | { kind: 'charge'; row: Charge } | null
+type Sheet = 'fee' | 'levy' | 'charge' | null
 
 function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
@@ -31,6 +30,7 @@ function FeeList({ onAdd }: { onAdd: () => void }) {
   const q = useFeeSchedule()
   return (
     <Section title={he.finance.feeSchedule} action={<Button variant="light" onClick={onAdd}>{he.finance.setFee}</Button>}>
+      <Text size="sm" c="dimmed" px="md" pb="xs">{he.finance.feeHint}</Text>
       {q.isLoading && <Stack p="md"><ListSkeleton rows={2} /></Stack>}
       {q.isError && <Stack p="md"><LoadFailed onRetry={() => void q.refetch()} /></Stack>}
       {q.data?.length === 0 && <EmptyState title={he.finance.noFees} body={he.finance.noFeesBody} />}
@@ -39,29 +39,6 @@ function FeeList({ onAdd }: { onAdd: () => void }) {
           <Divider color="stone.1" />
           <Row title={he.finance.fromMonth(monthLabel(f.effective_from))} meta={i === 0 ? he.finance.currentFee : undefined}
             end={<Money amount={f.amount} tone="neutral" />} />
-        </Fragment>
-      ))}
-    </Section>
-  )
-}
-
-function OverrideList({ onAdd, onRevert }: { onAdd: () => void; onRevert: (o: FeeOverride) => void }) {
-  const q = useOverrides()
-  const info = useApartmentInfo()
-  const revert = (o: FeeOverride) => (
-    <ActionIcon variant="subtle" color="stone.7" size={44} aria-label={he.finance.revertOverride(info.get(o.apartment_id)?.number ?? 0)} onClick={() => onRevert(o)}>
-      <IconArrowBackUp size={20} stroke={1.75} aria-hidden="true" />
-    </ActionIcon>
-  )
-  return (
-    <Section title={he.finance.overrides} action={<Button variant="light" onClick={onAdd}>{he.finance.addOverride}</Button>}>
-      {q.isError && <Stack p="md"><LoadFailed onRetry={() => void q.refetch()} /></Stack>}
-      {q.data?.length === 0 && <EmptyState title={he.finance.noOverrides} />}
-      {q.data?.map((o) => (
-        <Fragment key={o.id}>
-          <Divider color="stone.1" />
-          <Row plate={info.get(o.apartment_id)?.number} title={info.get(o.apartment_id)?.names || he.finance.noResidents}
-            meta={he.finance.fromMonth(monthLabel(o.effective_from))} end={<Money amount={o.amount} tone="neutral" />} trailing={revert(o)} />
         </Fragment>
       ))}
     </Section>
@@ -91,39 +68,30 @@ function ChargeList({ onLevy, onCharge, onDelete }: { onLevy: () => void; onChar
   )
 }
 
-const SHEET_TITLE: Record<NonNullable<Sheet>, string> = { fee: he.finance.setFee, override: he.finance.addOverride, levy: he.finance.newLevy, charge: he.finance.newCharge }
+const SHEET_TITLE: Record<NonNullable<Sheet>, string> = { fee: he.finance.setFee, levy: he.finance.newLevy, charge: he.finance.newCharge }
 
-function RemoveDialog({ removing, onClose }: { removing: Removing; onClose: () => void }) {
-  const delOverride = useDeleteOverride()
-  const delCharge = useDeleteCharge()
-  const busy = removing?.kind === 'override' ? delOverride : delCharge
-  const done = (msg: string) => ({ onSuccess: () => { notifySuccess(msg); onClose() } })
-  const confirm = () => {
-    if (removing?.kind === 'override') delOverride.mutate(removing.row.id, done(he.finance.overrideReverted))
-    else if (removing) delCharge.mutate(removing.row.id, done(he.finance.chargeDeleted))
-  }
-  const isOverride = removing?.kind === 'override'
+function RemoveDialog({ removing, onClose }: { removing: Charge | null; onClose: () => void }) {
+  const del = useDeleteCharge()
   return (
-    <ConfirmDialog opened={!!removing} title={isOverride ? he.finance.revertConfirm : he.finance.deleteChargeConfirm(formatILS(removing?.row.amount ?? 0))}
-      body={isOverride ? he.finance.revertBody : he.finance.deleteChargeBody} confirmLabel={isOverride ? he.finance.revert : he.finance.delete}
-      loading={busy.isPending} failed={busy.isError} onClose={onClose} onConfirm={confirm} />
+    <ConfirmDialog opened={!!removing} title={he.finance.deleteChargeConfirm(formatILS(removing?.amount ?? 0))}
+      body={he.finance.deleteChargeBody} confirmLabel={he.finance.delete} loading={del.isPending} failed={del.isError} onClose={onClose}
+      onConfirm={() => removing && del.mutate(removing.id, { onSuccess: () => { notifySuccess(he.finance.chargeDeleted); onClose() } })} />
   )
 }
 
-/** Admin "חיובים": fee schedule, per-apartment fees, levies and one-off/opening charges. The page FAB adds a levy. */
+/** Admin "חיובים": levies and one-off/opening charges, each apartment's fee, and the building fee. The page FAB adds a levy. */
 export function ChargesTab({ levying, onLevyingClose }: { levying: boolean; onLevyingClose: () => void }) {
   const [sheet, setSheet] = useState<Sheet>(null)
-  const [removing, setRemoving] = useState<Removing>(null)
+  const [removing, setRemoving] = useState<Charge | null>(null)
   const active: Sheet = levying ? 'levy' : sheet
   const close = () => { setSheet(null); onLevyingClose() }
   return (
     <Stack gap="md">
-      <ChargeList onLevy={() => setSheet('levy')} onCharge={() => setSheet('charge')} onDelete={(row) => setRemoving({ kind: 'charge', row })} />
+      <ChargeList onLevy={() => setSheet('levy')} onCharge={() => setSheet('charge')} onDelete={setRemoving} />
+      <ApartmentFeesSection />
       <FeeList onAdd={() => setSheet('fee')} />
-      <OverrideList onAdd={() => setSheet('override')} onRevert={(row) => setRemoving({ kind: 'override', row })} />
       <FormModal opened={!!active} title={active ? SHEET_TITLE[active] : ''} onClose={close}>
         {active === 'fee' && <FeeForm onDone={close} />}
-        {active === 'override' && <OverrideForm onDone={close} />}
         {active === 'levy' && <LevyForm onDone={close} />}
         {active === 'charge' && <ChargeForm onDone={close} />}
       </FormModal>

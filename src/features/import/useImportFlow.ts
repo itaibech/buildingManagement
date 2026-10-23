@@ -5,7 +5,7 @@ import { useBudgets, useExpenses, useFeeSchedule } from '../finance/api'
 import { useChargers } from '../ev/api'
 import { useExpenseCategories } from '../maintenance/api'
 import {
-  budgetUpdates, buildImport, feesToReplace, findOverlaps, initialFees, NEW_CATEGORY, overlapKey,
+  budgetUpdates, buildImport, feesToReplace, findOverlaps, initialFees, likelyExempt, NEW_CATEGORY, overlapKey,
   type ExistingExpense, type ExistingFee, type FeeEntry, type ImportOptions,
 } from './buildImport'
 import type { ColumnMap } from './parseWorkbook'
@@ -48,6 +48,8 @@ export function useImportState() {
   /** null = the default (exclude when EV chargers exist). */
   const [includeEv, setIncludeEv] = useState<boolean | null>(null)
   const [importOverlaps, setImportOverlaps] = useState(false)
+  /** Apartments the admin ticked as exempt (opt-in, out of the hints). */
+  const [exempt, setExempt] = useState<number[]>([])
   const load = (r: ReadResult): void => {
     setRead(r)
     setColumns(r.parsed.income.columns)
@@ -57,10 +59,11 @@ export function useImportState() {
     setBudgetYear(r.parsed.budget.year)
     setIncludeEv(null)
     setImportOverlaps(false)
+    setExempt([])
   }
   return {
     read, load, columns, setColumns, feesEdit, setFees, choice, setChoice, year, setYear, budgetYear, setBudgetYear,
-    includeEv, setIncludeEv, importOverlaps, setImportOverlaps,
+    includeEv, setIncludeEv, importOverlaps, setImportOverlaps, exempt, setExempt,
   }
 }
 export type ImportState = ReturnType<typeof useImportState>
@@ -86,12 +89,13 @@ function evSkipped(ev: { apartment: number; byMonth: Record<string, number> }[],
 export function useDerived(st: ImportState, ctx: ImportContext) {
   return useMemo(() => {
     const { names, resolved, categoryMap } = categoryChoices(st, ctx.categories)
-    if (!st.read) return { names, resolved, fees: [], fromSystem: false, payload: null, overlaps: [], levies: [], ev: { apartments: [], total: 0 }, includeEv: false, evSkipped: 0, feesReplaced: 0, budgetsUpdated: 0 }
+    if (!st.read) return { names, resolved, fees: [], fromSystem: false, payload: null, overlaps: [], levies: [], ev: { apartments: [], total: 0 }, includeEv: false, evSkipped: 0, feesReplaced: 0, budgetsUpdated: 0, exemptHints: [] }
     const { income } = st.read.parsed
     const init = initialFees(ctx.fees, income, income.columns, st.year)
     const fees = st.feesEdit ?? init.fees
     const includeEv = st.includeEv ?? !ctx.hasChargers
-    const opts: ImportOptions = { year: st.year, budgetYear: st.budgetYear, categoryMap, includeEv }
+    const exemptHints = likelyExempt(income, st.columns)
+    const opts: ImportOptions = { year: st.year, budgetYear: st.budgetYear, categoryMap, includeEv, exempt: st.exempt.filter((n) => exemptHints.includes(n)) }
     const base = buildImport(st.read.parsed, st.columns, fees, opts)
     const overlaps = findOverlaps(base.expenses, ctx.expenses)
     const payload = st.importOverlaps || overlaps.length === 0 ? base
@@ -105,6 +109,7 @@ export function useDerived(st: ImportState, ctx: ImportContext) {
       evSkipped: evSkipped(income.ev, includeEv, ctx.chargerNumbers),
       feesReplaced: payload.fees.length > 0 ? feesToReplace(ctx.fees, st.year) : 0,
       budgetsUpdated: budgetUpdates(payload.budgets, ctx.budgets),
+      exemptHints,
     }
   }, [st, ctx])
 }

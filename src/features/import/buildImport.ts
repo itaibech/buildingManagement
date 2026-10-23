@@ -13,6 +13,8 @@ export interface ImportOptions {
   skipExpenses?: string[]
   /** Import the EV block's charges (default true). Its payments are real money and are always imported. */
   includeEv?: boolean
+  /** Apartment numbers the admin confirmed as exempt from the fee (from January of the import year). */
+  exempt?: number[]
 }
 export type PaymentRow = { apartment: number; paid_on: string; amount: number; note: string }
 export type ChargeRow = { apartment: number; month: string; amount: number; kind: 'levy' | 'extra'; label: string }
@@ -27,6 +29,7 @@ export type ImportPayload = {
   categories: string[]
   expenses: { category: string; spent_on: string; amount: number; note: string }[]
   budgets: { category: string; amount: number }[]
+  exempt: number[]
 }
 
 /** 'YYYY-MM' or 'YYYY-MM-DD' to the first of that month in the given year. */
@@ -116,7 +119,15 @@ export function buildImport(parsed: ParsedWorkbook, columns: ColumnMap[], fees: 
     categories: unique([...expenses.map((e) => e.category), ...budgets.map((b) => b.category)]),
     expenses,
     budgets,
+    exempt: unique(opts.exempt ?? []).filter((n) => numbers.includes(n)),
   }
+}
+
+/** Apartments that paid nothing in any month or levy column all year (every row of theirs): maybe exempt. */
+export function likelyExempt(income: IncomeSheet, columns: ColumnMap[]): number[] {
+  const dated = columns.filter((c) => columnMonth(c) !== null).map((c) => c.col)
+  const paid = new Set(income.apartments.filter((a) => dated.some((col) => (a.cells[col] ?? 0) > 0)).map((a) => a.number))
+  return unique(income.apartments.map((a) => a.number)).filter((n) => !paid.has(n)).sort((a, b) => a - b)
 }
 
 /** Fee schedule guess: the most common amount in each month column, with an entry whenever it changes. */

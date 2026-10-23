@@ -3,7 +3,9 @@ import { IconChevronRight, IconPencil, IconTrash } from '@tabler/icons-react'
 import { Fragment, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { he } from '../../lib/he'
-import { AptPlate, EmptyState, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
+import { formatILS } from '../../lib/format'
+import { AptPlate, EmptyState, ExemptBadge, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
+import { useApartmentFee } from '../finance/api'
 import { ApartmentForm } from './ApartmentForm'
 import { isMoneyHistoryError, useApartments, useDeleteApartment, useDeleteResident, useResidents, type Apartment, type Resident } from './api'
 import { ConfirmDialog, FormModal } from './dialogs'
@@ -36,6 +38,14 @@ function ResidentRow({ r, onEdit, onDelete }: { r: Resident; onEdit: () => void;
   )
 }
 
+/** "דמי ועד חודשיים: ₪X" plus the exempt badge while an exemption is in force. */
+function FeeLine({ apartmentId }: { apartmentId: string }) {
+  const q = useApartmentFee(apartmentId)
+  if (!q.data) return null
+  if (q.data.feeMode === 'exempt') return <div><ExemptBadge /></div>
+  return <Text size="sm" c="dimmed" className="bm-num">{he.fees.myFee(formatILS(q.data.fee))}</Text>
+}
+
 function ApartmentSummary({ apartment, onEdit, onDelete }: { apartment: Apartment; onEdit: () => void; onDelete: () => void }) {
   return (
     <Card padding="md">
@@ -45,6 +55,7 @@ function ApartmentSummary({ apartment, onEdit, onDelete }: { apartment: Apartmen
           <Stack gap={0} style={{ minWidth: 0 }}>
             {apartment.floor !== null && <Text fw={600}>{he.tenants.floorLabel(apartment.floor)}</Text>}
             {apartment.notes && <Text size="sm" c="dimmed">{apartment.notes}</Text>}
+            <FeeLine apartmentId={apartment.id} />
           </Stack>
         </Group>
         <Group gap="xs">

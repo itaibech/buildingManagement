@@ -3,7 +3,7 @@ import { useForm } from '@mantine/form'
 import { todayISO } from '../../lib/dates'
 import { he } from '../../lib/he'
 import { notifySuccess } from '../../ui'
-import { useSaveCharge, useSaveFee, useSaveOverride } from './api'
+import { useSaveCharge, useSaveFee } from './api'
 import { MonthField, MoneyInput } from './fields'
 import { useApartmentOptions } from './hooks'
 import { monthOf } from './ledger'
@@ -13,7 +13,7 @@ const positive = (v: number | string): string | null => (typeof v === 'number' &
 const nonNegative = (v: number | string): string | null => (typeof v === 'number' && v >= 0 ? null : he.finance.errors.nonNegative)
 const required = (v: string | null): string | null => (v && v.trim() ? null : he.finance.errors.required)
 
-/** Building fee from a month on. Saving the same month again replaces it. */
+/** "שינוי לכל הדירות": the building fee from a month on (apartments in building mode). Saving the same month again replaces it. */
 export function FeeForm({ onDone }: { onDone: () => void }) {
   const save = useSaveFee()
   const form = useForm<{ month: string; amount: number | string }>({ initialValues: { month: thisMonth(), amount: '' }, validate: { amount: nonNegative } })
@@ -27,30 +27,6 @@ export function FeeForm({ onDone }: { onDone: () => void }) {
         <MonthField label={he.finance.effectiveFrom} value={form.values.month} onChange={(m) => form.setFieldValue('month', m)} />
         <MoneyInput label={he.finance.monthlyFee} withAsterisk min={0} data-autofocus {...form.getInputProps('amount')} />
         <Text size="sm" c="dimmed">{he.finance.feeHint}</Text>
-        <Button type="submit" fullWidth loading={save.isPending}>{he.finance.save}</Button>
-      </Stack>
-    </form>
-  )
-}
-
-/** A different monthly fee for one apartment from a month on. */
-export function OverrideForm({ onDone }: { onDone: () => void }) {
-  const save = useSaveOverride()
-  const options = useApartmentOptions()
-  const form = useForm<{ apartmentId: string | null; month: string; amount: number | string }>({
-    initialValues: { apartmentId: null, month: thisMonth(), amount: '' },
-    validate: { apartmentId: required, amount: nonNegative },
-  })
-  const submit = form.onSubmit((v) => {
-    if (!(v.apartmentId && typeof v.amount === 'number')) return
-    save.mutate({ apartment_id: v.apartmentId, effective_from: v.month, amount: v.amount }, { onSuccess: () => { notifySuccess(he.finance.overrideSaved); onDone() } })
-  })
-  return (
-    <form onSubmit={submit} noValidate>
-      <Stack>
-        <Select label={he.finance.apartment} withAsterisk searchable data={options} {...form.getInputProps('apartmentId')} />
-        <MonthField label={he.finance.effectiveFrom} value={form.values.month} onChange={(m) => form.setFieldValue('month', m)} />
-        <MoneyInput label={he.finance.monthlyFee} withAsterisk min={0} {...form.getInputProps('amount')} />
         <Button type="submit" fullWidth loading={save.isPending}>{he.finance.save}</Button>
       </Stack>
     </form>

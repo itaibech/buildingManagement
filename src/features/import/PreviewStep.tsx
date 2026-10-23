@@ -155,3 +155,18 @@ export function ReplaceNotes({ fees, budgets }: { fees: number; budgets: number 
     </Alert>
   )
 }
+
+/** Apartments with no payment all year: an opt-in exempt row from January of the import year. */
+export function ExemptNotice({ hints, chosen, year, onChange }: { hints: number[]; chosen: number[]; year: number; onChange: (v: number[]) => void }) {
+  if (hints.length === 0) return null
+  const toggle = (n: number, on: boolean): void => onChange(on ? [...chosen, n] : chosen.filter((x) => x !== n))
+  return (
+    <Paper withBorder radius={12} p="sm">
+      <Text fw={600}>{he.import.exemptTitle}</Text>
+      <Text size="sm" c="dimmed">{he.import.exemptBody}</Text>
+      {hints.map((n) => (
+        <Toggle key={n} label={he.import.exemptToggle(n, `01/${year}`)} checked={chosen.includes(n)} onChange={(v) => toggle(n, v)} />
+      ))}
+    </Paper>
+  )
+}

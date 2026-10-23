@@ -1,7 +1,7 @@
 import { Button, Card, Group, Stack, Text } from '@mantine/core'
 import { formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
-import { ListSkeleton, Money } from '../../ui'
+import { ExemptBadge, ListSkeleton, Money } from '../../ui'
 import { useBuildingCash, useMyBalance } from './api'
 import { balanceSentence } from './ledger'
 
@@ -51,6 +51,21 @@ export function CashCard() {
           <Text size="sm" c="dimmed">{he.finance.cashHint}</Text>
         </Stack>
       )}
+    </Card>
+  )
+}
+
+/** Resident: "דמי ועד חודשיים: ₪X", or that the apartment is exempt. Nothing when not linked. */
+export function MyFeeCard() {
+  const q = useMyBalance()
+  if (!q.data) return null
+  const exempt = q.data.feeMode === 'exempt'
+  return (
+    <Card>
+      <Group gap="sm" justify="space-between" wrap="wrap">
+        <Text fw={600} className="bm-num">{exempt ? he.fees.myExempt : he.fees.myFee(formatILS(q.data.fee))}</Text>
+        {exempt && <ExemptBadge />}
+      </Group>
     </Card>
   )
 }

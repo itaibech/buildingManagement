@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { he } from '../../lib/he'
 import {
-  budgetUpdates, buildImport, feesToReplace, findOverlaps, initialFees, isExistingFee, overlapKey, proposeFees, summarize,
+  budgetUpdates, buildImport, feesToReplace, findOverlaps, initialFees, isExistingFee, likelyExempt, overlapKey, proposeFees, summarize,
 } from './buildImport'
 import { budgetFixture, expensesFixture, INCOME_HEADER, incomeFixture } from './fixture'
 import { excelSerialToMonth, parseBudgetSheet, parseExpensesSheet, parseIncomeSheet, type ColumnMap } from './parseWorkbook'
@@ -223,5 +223,27 @@ describe('import guards', () => {
   it('counts budget lines the import will overwrite', () => {
     const p = buildImport(parsed(), withLevyMonth(income.columns), FEES)
     expect(budgetUpdates(p.budgets, ['נקיון', 'חשמל'])).toBe(1)
+  })
+})
+
+describe('exempt hint', () => {
+  const withRows = {
+    ...income,
+    apartments: [
+      ...income.apartments,
+      { number: 4, name: 'דייר ד', phone: '', cells: {} },
+      // Only an ignored column (the total) has a value: still nothing paid in a month.
+      { number: 5, name: 'דייר ה', phone: '', cells: { 17: 100 } },
+    ],
+  }
+
+  it('flags apartments with no payment in any month column, across all their rows', () => {
+    expect(likelyExempt(withRows, withRows.columns)).toEqual([4, 5])
+    expect(likelyExempt(income, income.columns)).toEqual([])
+  })
+
+  it('sends the confirmed exempt apartments with the payload (none by default)', () => {
+    expect(buildImport(parsed(), income.columns, FEES).exempt).toEqual([])
+    expect(buildImport(parsed(), income.columns, FEES, { exempt: [3] }).exempt).toEqual([3])
   })
 })

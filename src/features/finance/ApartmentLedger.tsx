@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { todayISO } from '../../lib/dates'
 import { formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
-import { AptPlate, ListSkeleton, Money } from '../../ui'
+import { AptPlate, ExemptBadge, ListSkeleton, Money } from '../../ui'
 import { useLedger, type ApartmentBalance } from './api'
 import { LoadFailed } from './cards'
 import { YearStepper } from './fields'
@@ -40,6 +40,7 @@ export function ApartmentLedger({ apartment }: { apartment: ApartmentBalance }) 
           <Text fw={600} truncate="end">{apartment.names.join(', ') || he.finance.noResidents}</Text>
           <Money amount={apartment.balance} size="lg" />
           <Text size="sm" fw={600}>{balanceSentence(apartment.balance)}</Text>
+          {apartment.feeMode === 'exempt' && <div><ExemptBadge /></div>}
           {apartment.scheduled > 0 && <Text size="sm" c="dimmed" className="bm-num">{he.finance.scheduled(formatILS(apartment.scheduled))}</Text>}
         </Stack>
       </Group>
