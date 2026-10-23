@@ -1,6 +1,7 @@
 -- LOCAL DEVELOPMENT SEED ONLY (applied by `npm run db:reset`; never pushed to the hosted project).
 -- All names, phones and emails are invented. The building row comes from the migration.
--- Test accounts (password `password123`): admin@example.test, resident@example.test.
+-- Test accounts (password `password123`): admin@example.test, resident@example.test,
+-- pending@example.test (left pending so the users page has someone to approve).
 
 -- Bootstrap admin for the local stack. Must exist before the auth users are inserted,
 -- because the on_auth_user_created trigger reads it.
@@ -16,7 +17,8 @@ from public.buildings b,
     ('10000000-0000-0000-0000-000000000002', 2, 1),
     ('10000000-0000-0000-0000-000000000003', 3, 2),
     ('10000000-0000-0000-0000-000000000004', 4, 2),
-    ('10000000-0000-0000-0000-000000000005', 5, 3)
+    ('10000000-0000-0000-0000-000000000005', 5, 3),
+    ('10000000-0000-0000-0000-000000000006', 6, 3)
   ) as v(id, number, floor);
 
 insert into public.residents (id, building_id, apartment_id, full_name, phone, email, is_owner)
@@ -49,7 +51,8 @@ select '00000000-0000-0000-0000-000000000000', v.id::uuid, 'authenticated', 'aut
   now(), now(), '', '', '', ''
 from (values
   ('30000000-0000-0000-0000-000000000001', 'admin@example.test', 'מנהל ועד'),
-  ('30000000-0000-0000-0000-000000000002', 'resident@example.test', 'דנה בדיקה')
+  ('30000000-0000-0000-0000-000000000002', 'resident@example.test', 'דנה בדיקה'),
+  ('30000000-0000-0000-0000-000000000003', 'pending@example.test', 'נועם ממתין')
 ) as v(id, email, full_name);
 
 insert into auth.identities (
@@ -59,7 +62,7 @@ select gen_random_uuid(), u.id, u.id::text, 'email',
   jsonb_build_object('sub', u.id::text, 'email', u.email, 'email_verified', true),
   now(), now(), now()
 from auth.users u
-where u.email in ('admin@example.test', 'resident@example.test');
+where u.email in ('admin@example.test', 'resident@example.test', 'pending@example.test');
 
 -- Approve the resident and link them to apartment 1.
 update public.profiles

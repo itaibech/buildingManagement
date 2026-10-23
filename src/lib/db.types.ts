@@ -29,7 +29,7 @@ export type Database = {
                   }
                   ComputedFields: never
                   Insert: {
-                    "building_id": string,"created_at"?: string,"floor"?: number | null,"id"?: string,"notes"?: string | null,"number": number
+                    "building_id"?: string,"created_at"?: string,"floor"?: number | null,"id"?: string,"notes"?: string | null,"number": number
                   }
                   Update: {
                     "building_id"?: string,"created_at"?: string,"floor"?: number | null,"id"?: string,"notes"?: string | null,"number"?: number
@@ -73,14 +73,14 @@ isOneToOne: false
                   ]
                 },"profiles": {
                   Row: {
-                    "building_id": string,"created_at": string,"email": string | null,"full_name": string,"resident_id": string | null,"role": string,"status": string,"user_id": string
+                    "building_id": string,"created_at": string,"email": string | null,"full_name": string,"is_super_admin": boolean,"resident_id": string | null,"role": string,"status": string,"user_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "building_id": string,"created_at"?: string,"email"?: string | null,"full_name"?: string,"resident_id"?: string | null,"role"?: string,"status"?: string,"user_id": string
+                    "building_id": string,"created_at"?: string,"email"?: string | null,"full_name"?: string,"is_super_admin"?: boolean,"resident_id"?: string | null,"role"?: string,"status"?: string,"user_id": string
                   }
                   Update: {
-                    "building_id"?: string,"created_at"?: string,"email"?: string | null,"full_name"?: string,"resident_id"?: string | null,"role"?: string,"status"?: string,"user_id"?: string
+                    "building_id"?: string,"created_at"?: string,"email"?: string | null,"full_name"?: string,"is_super_admin"?: boolean,"resident_id"?: string | null,"role"?: string,"status"?: string,"user_id"?: string
                   }
                   Relationships: [
                     {
@@ -103,7 +103,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Insert: {
-                    "apartment_id": string,"building_id": string,"created_at"?: string,"email"?: string | null,"full_name": string,"id"?: string,"is_owner"?: boolean,"phone"?: string | null
+                    "apartment_id": string,"building_id"?: string,"created_at"?: string,"email"?: string | null,"full_name": string,"id"?: string,"is_owner"?: boolean,"phone"?: string | null
                   }
                   Update: {
                     "apartment_id"?: string,"building_id"?: string,"created_at"?: string,"email"?: string | null,"full_name"?: string,"id"?: string,"is_owner"?: boolean,"phone"?: string | null
@@ -129,7 +129,10 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "is_admin":
+            "default_building_id":
+{ Args: Record<PropertyKey, never>; Returns: string
+                           },
+"is_admin":
 { Args: Record<PropertyKey, never>; Returns: boolean
                            },
 "is_approved":

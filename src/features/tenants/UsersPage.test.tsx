@@ -1,0 +1,122 @@
+// @vitest-environment jsdom
+import { MantineProvider } from '@mantine/core'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { he } from '../../lib/he'
+import { theme } from '../../ui/theme'
+import UsersPage from './UsersPage'
+
+interface Call {
+  table: string
+  op: 'select' | 'update' | 'insert' | 'delete'
+  values?: unknown
+  filters: [string, unknown][]
+}
+
+const db = vi.hoisted(() => ({ calls: [] as Call[], rows: {} as Record<string, unknown[]> }))
+
+vi.mock('../../lib/supabase', () => {
+  function query(table: string) {
+    const call: Call = { table, op: 'select', filters: [] }
+    const q = {
+      select: () => q,
+      order: () => q,
+      update: (values: unknown) => Object.assign(call, { op: 'update', values }) && q,
+      eq: (col: string, val: unknown) => {
+        call.filters.push([col, val])
+        return q
+      },
+      then: (resolve: (r: { data: unknown; error: null }) => unknown) => {
+        db.calls.push(call)
+        return Promise.resolve(resolve({ data: call.op === 'select' ? (db.rows[table] ?? []) : null, error: null }))
+      },
+    }
+    return q
+  }
+  return { supabase: { from: query } }
+})
+
+vi.mock('../../auth/AuthProvider', () => ({ useAuth: () => ({ profile: { user_id: 'me' }, isAdmin: true }) }))
+
+function profile(user_id: string, full_name: string, over: Record<string, unknown> = {}) {
+  return {
+    user_id, full_name, email: `${user_id}@example.test`, building_id: 'b1', role: 'resident',
+    status: 'approved', resident_id: null, is_super_admin: false, created_at: '2026-10-01', ...over,
+  }
+}
+
+function renderPage() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(
+    <MantineProvider theme={theme}>
+      <QueryClientProvider client={client}>
+        <UsersPage />
+      </QueryClientProvider>
+    </MantineProvider>,
+  )
+}
+
+beforeEach(() => {
+  db.calls = []
+  db.rows = {
+    profiles: [
+      profile('p1', 'נועה ממתינה', { status: 'pending' }),
+      profile('s1', 'ראש הוועד', { role: 'admin', is_super_admin: true }),
+      profile('a1', 'מנהל נוסף', { role: 'admin' }),
+      profile('me', 'אני המנהל', { role: 'admin' }),
+    ],
+    apartments: [{ id: 'apt7', number: 7, floor: 3, notes: null, building_id: 'b1', created_at: '' }],
+    residents: [{ id: 'r1', apartment_id: 'apt7', full_name: 'נועה ממתינה', phone: null, email: null, is_owner: true, building_id: 'b1', created_at: '' }],
+  }
+})
+
+describe('UsersPage', () => {
+  it('lists pending profiles and approves with the chosen resident and role', async () => {
+    renderPage()
+    const row = await screen.findByTestId('pending-p1')
+    expect(within(row).getByText('נועה ממתינה')).toBeInTheDocument()
+
+    const select = within(row).getByLabelText(he.users.linkResident)
+    fireEvent.click(select)
+    const listbox = await waitFor(() => {
+      const el = document.getElementById(select.getAttribute('aria-controls') ?? '')
+      if (!el) throw new Error('listbox not open')
+      return el
+    })
+    fireEvent.click(within(listbox).getByRole('option', { name: he.users.residentOption(7, 'נועה ממתינה'), hidden: true }))
+    fireEvent.click(within(row).getByText(he.users.roleAdmin))
+    fireEvent.click(within(row).getByRole('button', { name: he.users.approve }))
+
+    await waitFor(() => {
+      const update = db.calls.find((c) => c.table === 'profiles' && c.op === 'update')
+      expect(update).toEqual({
+        table: 'profiles',
+        op: 'update',
+        values: { status: 'approved', resident_id: 'r1', role: 'admin' },
+        filters: [['user_id', 'p1']],
+      })
+    })
+  })
+
+  it('marks the super admin and disables its role and approval controls', async () => {
+    renderPage()
+    const row = await screen.findByTestId('user-s1')
+    expect(within(row).getByText(he.users.superAdmin)).toBeInTheDocument()
+    expect(within(row).getByRole('radio', { name: he.users.roleResident })).toBeDisabled()
+    expect(within(row).getByRole('button', { name: he.users.block })).toBeDisabled()
+  })
+
+  it('lets an admin demote another admin with the role toggle', async () => {
+    renderPage()
+    const row = await screen.findByTestId('user-a1')
+    const toResident = within(row).getByRole('radio', { name: he.users.roleResident })
+    expect(toResident).toBeEnabled()
+    fireEvent.click(toResident)
+    await waitFor(() => {
+      const update = db.calls.find((c) => c.table === 'profiles' && c.op === 'update')
+      expect(update?.values).toEqual({ role: 'resident' })
+      expect(update?.filters).toEqual([['user_id', 'a1']])
+    })
+  })
+})
