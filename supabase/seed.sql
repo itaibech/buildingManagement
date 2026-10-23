@@ -121,3 +121,53 @@ where maintenance_tasks.title = v.title;
 
 insert into public.maintenance_log (task_id, done_on, note)
 select id, current_date - 365, 'בוצע, הכול תקין' from public.maintenance_tasks where title = 'בדיקת מעלית';
+
+-- Finance: ₪390 from Jan 2026, ₪330 from Jul 2026; a few payments, charges and expenses.
+-- Apartment 1 (the resident) is paid up, 2 is in credit, the rest owe something.
+update public.buildings set billing_start = '2026-01-01', opening_cash = 12000, opening_cash_date = '2026-01-01';
+insert into public.fee_schedule (amount, effective_from) values (390, '2026-01-01'), (330, '2026-07-01');
+insert into public.apartment_fee_overrides (apartment_id, amount, effective_from)
+values ('10000000-0000-0000-0000-000000000006', 270, '2026-01-01');
+
+insert into public.charges (apartment_id, month, amount, kind, label) values
+  ('10000000-0000-0000-0000-000000000001', '2026-03-01', 500, 'levy', 'היטל שיפוץ לובי'),
+  ('10000000-0000-0000-0000-000000000002', '2026-03-01', 500, 'levy', 'היטל שיפוץ לובי'),
+  ('10000000-0000-0000-0000-000000000003', '2026-03-01', 500, 'levy', 'היטל שיפוץ לובי'),
+  ('10000000-0000-0000-0000-000000000005', '2026-05-01', 103.51, 'extra', 'טעינת רכב חשמלי'),
+  ('10000000-0000-0000-0000-000000000004', '2026-01-01', -200, 'opening', 'יתרת פתיחה');
+
+insert into public.payments (apartment_id, paid_on, amount, method, note) values
+  ('10000000-0000-0000-0000-000000000001', '2026-01-05', 2340, 'transfer', 'ינואר–יוני'),
+  ('10000000-0000-0000-0000-000000000001', '2026-03-10', 500, 'transfer', 'היטל'),
+  ('10000000-0000-0000-0000-000000000001', '2026-07-03', 1650, 'app', ''),
+  ('10000000-0000-0000-0000-000000000002', '2026-01-04', 5000, 'cheque', 'תשלום שנתי מראש'),
+  ('10000000-0000-0000-0000-000000000003', '2026-02-01', 780, 'cash', ''),
+  ('10000000-0000-0000-0000-000000000004', '2026-04-12', 1170, 'transfer', ''),
+  ('10000000-0000-0000-0000-000000000005', '2026-06-01', 1950, 'app', '');
+
+insert into public.expenses (category_id, spent_on, amount, vendor, note)
+select c.id, v.spent_on::date, v.amount, v.vendor, v.note
+from (values
+  ('חברת ניהול', '2026-01-31', 850, 'ניהול דוגמה בע"מ', ''),
+  ('ניקיון', '2026-01-31', 600, 'ניקיון לדוגמה', ''),
+  ('חשמל', '2026-02-15', 412.30, 'חברת החשמל', 'חשבון דו-חודשי'),
+  ('בנק', '2026-02-28', 35, 'בנק', 'עמלות'),
+  ('ניקיון', '2026-02-28', 600, 'ניקיון לדוגמה', ''),
+  ('מעלית', '2026-03-01', 1200, 'מעליות דוגמה בע"מ', 'שירות רבעוני'),
+  ('בזק', '2026-03-05', 120, 'בזק', 'אינטרנט ללובי')
+) as v(category, spent_on, amount, vendor, note)
+join public.expense_categories c on c.name = v.category;
+
+insert into public.expense_templates (category_id, amount, vendor, label)
+select c.id, v.amount, v.vendor, v.label
+from (values
+  ('ניקיון', 600, 'ניקיון לדוגמה', 'ניקיון חודשי'),
+  ('חברת ניהול', 850, 'ניהול דוגמה בע"מ', 'דמי ניהול'),
+  ('בזק', 120, 'בזק', 'אינטרנט')
+) as v(category, amount, vendor, label)
+join public.expense_categories c on c.name = v.category;
+
+insert into public.budgets (year, category_id, amount)
+select 2026, c.id, v.amount
+from (values ('חברת ניהול', 10200), ('ניקיון', 7200), ('חשמל', 2500), ('מעלית', 4800), ('בזק', 1440)) as v(category, amount)
+join public.expense_categories c on c.name = v.category;

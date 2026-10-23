@@ -1,7 +1,7 @@
-import { Card, Stack, Text } from '@mantine/core'
+import { Card, Group, Stack, Text } from '@mantine/core'
 import { formatDate } from '../../lib/format'
 import { he } from '../../lib/he'
-import { ListSkeleton } from '../../ui'
+import { ListSkeleton, Money } from '../../ui'
 import { useTaskLog, useTasks } from './api'
 
 /** Task summary and its done log, newest first. */
@@ -20,7 +20,10 @@ export function TaskDetail({ taskId }: { taskId: string }) {
       {log.data?.length === 0 && <Text c="dimmed">{he.maintenance.noLog}</Text>}
       {log.data?.map((e) => (
         <Card key={e.id} padding="sm" data-testid={`log-${e.id}`}>
-          <Text className="bm-num" fw={600}>{formatDate(e.done_on)}</Text>
+          <Group justify="space-between" wrap="nowrap">
+            <Text className="bm-num" fw={600}>{formatDate(e.done_on)}</Text>
+            {e.cost !== null && e.cost > 0 && <Money amount={e.cost} tone="neutral" size="sm" />}
+          </Group>
           {e.note && <Text style={{ whiteSpace: 'pre-wrap' }}>{e.note}</Text>}
         </Card>
       ))}

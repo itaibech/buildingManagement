@@ -19,7 +19,12 @@ export interface MarkDoneInput {
   task: Task
   doneOn: string
   note: string
+  /** Posted as a building expense in `categoryId` when > 0. */
+  cost: number | null
+  categoryId: string | null
 }
+
+export type ExpenseCategory = Pick<Database['public']['Tables']['expense_categories']['Row'], 'id' | 'name'>
 
 const KEY = ['maintenance'] as const
 const logKey = (taskId: string) => [...KEY, 'log', taskId] as const
@@ -55,12 +60,26 @@ export function useTaskLog(taskId: string | undefined) {
 export function useMarkDone() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: async ({ task, doneOn, note }: MarkDoneInput) => {
-      const { error } = await supabase.rpc('mark_task_done', { p_task_id: task.id, p_done_on: doneOn, p_note: note })
+    mutationFn: async ({ task, doneOn, note, cost, categoryId }: MarkDoneInput) => {
+      const { error } = await supabase.rpc('mark_task_done', {
+        p_task_id: task.id, p_done_on: doneOn, p_note: note, p_cost: cost ?? undefined, p_category_id: categoryId ?? undefined,
+      })
       if (error) throw new Error(error.message)
     },
     onSettled: () => client.invalidateQueries({ queryKey: KEY }),
     onError: () => notifyError(he.toast.failed),
+  })
+}
+
+/** Expense categories for the cost field, in the building's order. */
+export function useExpenseCategories() {
+  return useQuery({
+    queryKey: ['expense_categories'],
+    queryFn: async (): Promise<ExpenseCategory[]> => {
+      const { data, error } = await supabase.from('expense_categories').select('id, name').order('sort_order').order('name')
+      if (error) throw new Error(error.message)
+      return data
+    },
   })
 }
 
