@@ -11,7 +11,7 @@ describe('feeBadge', () => {
   it('maps each source to its label and colour', () => {
     expect(feeBadge('building')).toEqual({ label: 'לפי תעריף הבניין', color: 'stone' })
     expect(feeBadge('custom')).toEqual({ label: 'סכום מיוחד', color: 'enamel' })
-    expect(feeBadge('exempt')).toEqual({ label: 'פטור', color: 'signal' })
+    expect(feeBadge('exempt')).toEqual({ label: 'פטור', color: 'stone' })
   })
 })
 
@@ -31,7 +31,7 @@ describe('fee timeline', () => {
   })
 
   it('describes a change in words', () => {
-    expect(nextChangeLabel(row('2027-01-01', 'custom', 350))).toBe(`מ-01/2027: ${formatILS(350)}`)
+    expect(nextChangeLabel(row('2027-01-01', 'custom', 350))).toBe(`מינואר 2027: ${formatILS(350)}`)
     expect(rowEffect(row('2027-01-01', 'exempt'))).toBe(he.fees.modes.exempt)
     expect(rowEffect(row('2027-01-01', 'building'))).toBe(he.fees.modes.building)
   })

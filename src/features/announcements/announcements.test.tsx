@@ -53,21 +53,30 @@ const item = (o: Partial<Item> = {}): Item => ({
 })
 
 describe('AnnouncementItem', () => {
-  it('shows an unread dot and marks read once, when first opened', () => {
+  it('shows an unread item expanded with its full body and marks it read once', () => {
     const onOpen = vi.fn()
-    wrap(<AnnouncementItem item={item()} onOpen={onOpen} />)
+    wrap(<AnnouncementItem item={item({ body: 'גוף מלא' })} onOpen={onOpen} />)
     expect(screen.getByRole('img', { name: he.announcements.unread })).toBeInTheDocument()
     const header = screen.getByRole('button', { name: /כותרת/ })
-    fireEvent.click(header)
+    expect(header).toHaveAttribute('aria-expanded', 'true')
     fireEvent.click(header)
     fireEvent.click(header)
     expect(onOpen).toHaveBeenCalledTimes(1)
   })
 
-  it('has no dot and does not call onOpen for a read item', () => {
+  it('shows a pinned item expanded even when read', () => {
+    wrap(<AnnouncementItem item={item({ isRead: true, pinned: true })} />)
+    expect(screen.getByRole('button', { name: /כותרת/ })).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('collapses a read item to a 2-line preview and never calls onOpen', () => {
     const onOpen = vi.fn()
-    wrap(<AnnouncementItem item={item({ isRead: true })} onOpen={onOpen} />)
-    fireEvent.click(screen.getByRole('button', { name: /כותרת/ }))
+    wrap(<AnnouncementItem item={item({ isRead: true, body: 'תצוגה מקדימה' })} onOpen={onOpen} />)
+    const header = screen.getByRole('button', { name: /כותרת/ })
+    expect(header).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByTestId('announcement-preview')).toHaveTextContent('תצוגה מקדימה')
+    fireEvent.click(header)
+    expect(header).toHaveAttribute('aria-expanded', 'true')
     expect(screen.queryByRole('img', { name: he.announcements.unread })).not.toBeInTheDocument()
     expect(onOpen).not.toHaveBeenCalled()
   })

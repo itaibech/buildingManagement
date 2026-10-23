@@ -34,5 +34,5 @@ export function useExportAction(fileName: string, getRows: GetRows, ready = true
   const { isAdmin } = useAuth()
   const { run, loading } = useExporter(fileName, getRows)
   if (!isAdmin) return undefined
-  return { label: he.export.action, icon: <IconFileSpreadsheet size={22} stroke={1.75} />, onClick: run, loading, disabled: !ready, hint }
+  return { label: he.export.action, shortLabel: he.export.short, icon: <IconFileSpreadsheet size={22} stroke={1.75} />, onClick: run, loading, disabled: !ready, hint }
 }

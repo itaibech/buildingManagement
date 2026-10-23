@@ -1,7 +1,7 @@
 import { Alert, Button, Select, Stack, TextInput } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { he } from '../../lib/he'
-import { notifySuccess } from '../../ui'
+import { DateInput, focusFirstError, notifySuccess } from '../../ui'
 import { useSaveTask, type Task } from './api'
 import type { Frequency } from './nextDue'
 
@@ -29,14 +29,14 @@ export function TaskForm({ task, onDone }: { task?: Task; onDone: () => void }) 
         onDone()
       },
     })
-  })
+  }, focusFirstError)
   return (
     <form onSubmit={submit} noValidate>
       <Stack>
         <TextInput label={he.maintenance.title} withAsterisk data-autofocus {...form.getInputProps('title')} />
         <TextInput label={he.maintenance.vendor} {...form.getInputProps('vendor')} />
         <Select label={he.maintenance.frequency} data={OPTIONS} allowDeselect={false} {...form.getInputProps('frequency')} />
-        <TextInput label={he.maintenance.nextDue} description={he.maintenance.nextDueHint} type="date" dir="ltr" {...form.getInputProps('next_due')} />
+        <DateInput label={he.maintenance.nextDue} description={he.maintenance.nextDueHint} {...form.getInputProps('next_due')} />
         {save.isError && <Alert color="debt">{he.maintenance.errors.save}</Alert>}
         <Button type="submit" fullWidth loading={save.isPending}>{task ? he.maintenance.save : he.maintenance.create}</Button>
       </Stack>

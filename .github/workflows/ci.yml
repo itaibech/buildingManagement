@@ -2,6 +2,8 @@ name: CI
 on:
   pull_request:
   push:
+  # deploy.yml calls this workflow first, so prod migrations only run after lint, unit and pgTAP tests pass.
+  workflow_call:
 # Least privilege: CI only reads the repo. pull_request runs from forks get no secrets (none are used here).
 permissions:
   contents: read

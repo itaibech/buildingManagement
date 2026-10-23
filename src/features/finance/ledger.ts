@@ -139,6 +139,11 @@ export function balanceSentence(balance: number): string {
   return state === 'owed' ? he.home.balanceDue(formatILS(balance)) : he.finance.creditOf(formatILS(Math.abs(balance)))
 }
 
+/** The hero's line under the big amount, without repeating it: "יתרה לתשלום", or "הכול שולם" (also beside a credit). */
+export function heroState(balance: number): string {
+  return balanceState(balance) === 'owed' ? he.home.owed : he.home.allPaid
+}
+
 /** Hebrew error for a receipt we won't accept, or null. */
 export function receiptError(file: File): string | null {
   if (!Object.hasOwn(RECEIPT_EXT, file.type)) return he.finance.errors.receiptType

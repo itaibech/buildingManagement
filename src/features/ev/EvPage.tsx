@@ -4,7 +4,7 @@ import { he } from '../../lib/he'
 import { PageHeader } from '../../ui'
 import { EvPanel } from './EvPanel'
 
-/** Admin "טעינת רכב חשמלי" (/ev): also reachable as a tab in כספים. */
+/** Admin "טעינת רכב חשמלי" (/ev), linked from the כספים header and from עוד. */
 export default function EvPage() {
   const [adding, setAdding] = useState(false)
   return (

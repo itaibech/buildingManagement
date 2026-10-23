@@ -2,7 +2,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(24);
+select plan(26);
 
 -- ---------------------------------------------------------------- fixtures
 -- Start from "no admin yet" so the bootstrap trigger fires for our test user.
@@ -11,8 +11,19 @@ insert into public.app_settings (key, value)
 values ('bootstrap_admin_email', 'super@test.local')
 on conflict (key) do update set value = excluded.value;
 
+-- An email sign-up with the bootstrap email first: it must NOT become admin (0012, Google only).
+insert into auth.users (id, email, aud, role, raw_app_meta_data) values
+  ('d0000000-0000-0000-0000-000000000009', 'SUPER@test.local', 'authenticated', 'authenticated', '{"provider":"email"}');
+select is(
+  (select role || '/' || status || '/' || is_super_admin from public.profiles where user_id = 'd0000000-0000-0000-0000-000000000009'),
+  'resident/pending/false', 'an email sign-up with the bootstrap email gets resident/pending'
+);
+delete from auth.users where id = 'd0000000-0000-0000-0000-000000000009';
+
+insert into auth.users (id, email, aud, role, raw_app_meta_data) values
+  ('d0000000-0000-0000-0000-000000000001', 'super@test.local', 'authenticated', 'authenticated', '{"provider":"google","providers":["google"]}')
+;
 insert into auth.users (id, email, aud, role) values
-  ('d0000000-0000-0000-0000-000000000001', 'super@test.local', 'authenticated', 'authenticated'),
   ('d0000000-0000-0000-0000-000000000002', 'admin2@test.local', 'authenticated', 'authenticated'),
   ('d0000000-0000-0000-0000-000000000003', 'res@test.local', 'authenticated', 'authenticated'),
   ('d0000000-0000-0000-0000-000000000004', 'admin3@test.local', 'authenticated', 'authenticated');
@@ -25,6 +36,10 @@ update public.profiles set status = 'approved' where user_id = 'd0000000-0000-00
 select is(
   (select is_super_admin from public.profiles where user_id = 'd0000000-0000-0000-0000-000000000001'),
   true, 'bootstrap user gets is_super_admin = true'
+);
+select is(
+  (select role || '/' || status from public.profiles where user_id = 'd0000000-0000-0000-0000-000000000001'),
+  'admin/approved', 'a Google sign-up with the bootstrap email gets an approved admin profile'
 );
 select is(
   (select is_super_admin from public.profiles where user_id = 'd0000000-0000-0000-0000-000000000002'),

@@ -19,7 +19,7 @@ function meta(p: Payment): string {
 }
 
 /** Admin "תשלומים": the month's payments with a total; add via the page FAB, remove a mistaken one. */
-export function PaymentsTab({ adding, onAddingClose }: { adding: boolean; onAddingClose: () => void }) {
+export function PaymentsTab({ adding, onAdd, onAddingClose }: { adding: boolean; onAdd: () => void; onAddingClose: () => void }) {
   const [month, setMonth] = useState(() => monthOf(todayISO()))
   const q = usePayments(month)
   const info = useApartmentInfo()
@@ -34,7 +34,7 @@ export function PaymentsTab({ adding, onAddingClose }: { adding: boolean; onAddi
       <Card padding={0}>
         {q.isLoading && <Stack p="md"><ListSkeleton rows={4} /></Stack>}
         {q.isError && <Stack p="md"><LoadFailed onRetry={() => void q.refetch()} /></Stack>}
-        {q.data?.length === 0 && <EmptyState title={he.finance.noPayments} body={he.finance.noPaymentsBody} />}
+        {q.data?.length === 0 && <EmptyState title={he.finance.noPayments} body={he.finance.noPaymentsBody} action={{ label: he.finance.recordPayment, onClick: onAdd }} />}
         {q.data && q.data.length > 0 && (
           <Group justify="space-between" px="md" py="sm">
             <Text fw={600}>{he.finance.paymentsCount(q.data.length)}</Text>

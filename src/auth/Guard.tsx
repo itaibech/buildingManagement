@@ -1,4 +1,5 @@
-import { Button, Center, Loader, Stack, Text } from '@mantine/core'
+import { Box, Button, Center, Stack, Text } from '@mantine/core'
+import { ListSkeleton } from '../ui'
 import { Navigate, Outlet } from 'react-router'
 import { he } from '../lib/he'
 import { useAuth } from './AuthProvider'
@@ -8,9 +9,9 @@ export function RequireApproved() {
   const { session, profile, loading, error, retry } = useAuth()
   if (loading) {
     return (
-      <Center mih="100vh">
-        <Loader aria-label={he.loading} />
-      </Center>
+      <Box p="md" pt="xl" maw={1100} mx="auto">
+        <ListSkeleton rows={4} />
+      </Box>
     )
   }
   if (!session) return <Navigate to="/login" replace />

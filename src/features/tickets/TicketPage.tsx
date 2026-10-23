@@ -1,11 +1,11 @@
-import { ActionIcon, Anchor, Card, Group, Menu, Stack, Text, Title } from '@mantine/core'
-import { IconChevronRight, IconDots, IconPencil, IconTrash } from '@tabler/icons-react'
+import { ActionIcon, Card, Group, Menu, Stack, Text, Title } from '@mantine/core'
+import { IconDots, IconPencil, IconTrash } from '@tabler/icons-react'
 import { useState, type ReactNode } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { useNavigate, useParams } from 'react-router'
 import { useAuth } from '../../auth/AuthProvider'
 import { formatDate } from '../../lib/format'
 import { he } from '../../lib/he'
-import { ListSkeleton, notifySuccess, StatusBadge } from '../../ui'
+import { BackLink, ListSkeleton, notifySuccess, StatusBadge } from '../../ui'
 import { ConfirmDialog, FormModal } from '../tenants/dialogs'
 import { AdminControls } from './AdminControls'
 import { useDeleteTicket, useTicket, type TicketDetail } from './api'
@@ -15,15 +15,6 @@ import { TicketPhotos } from './TicketPhotos'
 
 type Dialog = 'edit' | 'delete' | null
 const ICON = { size: 18, stroke: 1.75 } as const
-
-function BackLink() {
-  return (
-    <Anchor component={Link} to="/tickets" fw={600} mih={44} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-      <IconChevronRight {...ICON} aria-hidden="true" />
-      {he.tickets.back}
-    </Anchor>
-  )
-}
 
 function ActionsMenu({ canEdit, canDelete, setDialog }: { canEdit: boolean; canDelete: boolean; setDialog: (d: Dialog) => void }) {
   if (!canEdit && !canDelete) return null
@@ -89,12 +80,12 @@ export default function TicketPage() {
   const [dialog, setDialog] = useState<Dialog>(null)
   const ticket = query.data
   if (query.isLoading) return <ListSkeleton />
-  if (!ticket) return <Stack align="flex-start"><BackLink /><Text>{query.isError ? he.tickets.errors.load : he.tickets.notFound}</Text></Stack>
+  if (!ticket) return <Stack align="flex-start"><BackLink to="/tickets" label={he.tickets.back} /><Text>{query.isError ? he.tickets.errors.load : he.tickets.notFound}</Text></Stack>
   const canEdit = isAdmin || (ticket.opened_by === session?.user.id && ticket.status === 'open')
   const menu = <ActionsMenu canEdit={canEdit} canDelete={isAdmin} setDialog={setDialog} />
   return (
     <Stack gap="md">
-      <BackLink />
+      <BackLink to="/tickets" label={he.tickets.back} />
       <Summary ticket={ticket} menu={menu} />
       {isAdmin && <AdminControls key={`${ticket.id}-${ticket.vendor ?? ''}`} ticket={ticket} />}
       <TicketComments ticketId={ticket.id} comments={ticket.comments} />

@@ -199,14 +199,14 @@ isOneToOne: false
                   ]
                 },"buildings": {
                   Row: {
-                    "address": string | null,"billing_start": string | null,"created_at": string,"id": string,"name": string,"opening_cash": number,"opening_cash_date": string | null
+                    "address": string | null,"billing_start": string | null,"committee_contact": string | null,"created_at": string,"id": string,"name": string,"opening_cash": number,"opening_cash_date": string | null,"payment_instructions": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "address"?: string | null,"billing_start"?: string | null,"created_at"?: string,"id"?: string,"name": string,"opening_cash"?: number,"opening_cash_date"?: string | null
+                    "address"?: string | null,"billing_start"?: string | null,"committee_contact"?: string | null,"created_at"?: string,"id"?: string,"name": string,"opening_cash"?: number,"opening_cash_date"?: string | null,"payment_instructions"?: string | null
                   }
                   Update: {
-                    "address"?: string | null,"billing_start"?: string | null,"created_at"?: string,"id"?: string,"name"?: string,"opening_cash"?: number,"opening_cash_date"?: string | null
+                    "address"?: string | null,"billing_start"?: string | null,"committee_contact"?: string | null,"created_at"?: string,"id"?: string,"name"?: string,"opening_cash"?: number,"opening_cash_date"?: string | null,"payment_instructions"?: string | null
                   }
                   Relationships: [
                     
@@ -908,10 +908,16 @@ isOneToOne: false
 "import_people":
 { Args: { "b": string,"p": Json }; Returns: Json
                            },
+"import_replaced_kinds":
+{ Args: { "p": Json }; Returns: (string)[]
+                           },
 "import_spending":
 { Args: { "b": string,"p": Json }; Returns: Json
                            },
 "import_validate_exempt":
+{ Args: { "p": Json }; Returns: undefined
+                           },
+"import_validate_keep":
 { Args: { "p": Json }; Returns: undefined
                            },
 "import_validate_refs":

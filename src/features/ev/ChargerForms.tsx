@@ -3,7 +3,7 @@ import { useForm } from '@mantine/form'
 import { useMemo } from 'react'
 import { todayISO } from '../../lib/dates'
 import { he } from '../../lib/he'
-import { notifySuccess } from '../../ui'
+import { focusFirstError, notifySuccess } from '../../ui'
 import { MonthField } from '../finance/fields'
 import { useApartmentOptions } from '../finance/hooks'
 import { monthOf } from '../finance/ledger'
@@ -33,7 +33,7 @@ export function ChargerForm({ onDone }: { onDone: () => void }) {
   const submit = form.onSubmit((v) => {
     if (!v.apartmentId || typeof v.initial !== 'number') return
     add.mutate({ apartment_id: v.apartmentId, initial_reading: v.initial }, { onSuccess: () => { notifySuccess(he.ev.chargerAdded); onDone() } })
-  })
+  }, focusFirstError)
   return (
     <form onSubmit={submit} noValidate>
       <Stack>
@@ -53,7 +53,7 @@ export function RateForm({ onDone }: { onDone: () => void }) {
   const submit = form.onSubmit((v) => {
     if (typeof v.rate !== 'number') return
     save.mutate({ rate: v.rate, effective_from: v.month }, { onSuccess: (n) => { notifySuccess(he.ev.rateSaved(n)); onDone() } })
-  })
+  }, focusFirstError)
   return (
     <form onSubmit={submit} noValidate>
       <Stack>
