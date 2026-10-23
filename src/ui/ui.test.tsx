@@ -68,3 +68,13 @@ describe('EmptyState and ListSkeleton', () => {
     expect(screen.getAllByTestId('skeleton-row')).toHaveLength(4)
   })
 })
+
+describe('theme', () => {
+  it('names every modal close button and makes it a 44px target', async () => {
+    const { Modal } = await import('@mantine/core')
+    const { he } = await import('../lib/he')
+    wrap(<Modal opened onClose={() => undefined} title="x">y</Modal>)
+    const close = await screen.findByRole('button', { name: he.close })
+    expect(close.style.getPropertyValue('--cb-size')).toBe('calc(2.75rem * var(--mantine-scale))')
+  })
+})

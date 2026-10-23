@@ -8,7 +8,7 @@ import { he } from '../../lib/he'
 import { AptPlate, EmptyState, ListSkeleton, Money, PageHeader, StatusBadge } from '../../ui'
 import { useAnnouncements } from '../announcements/api'
 import { useBalances, useCollectionSummary, useFeeSchedule } from '../finance/api'
-import { MyBalanceHero } from '../finance/cards'
+import { HowToPay, MyBalanceHero } from '../finance/cards'
 import { monthOf } from '../finance/ledger'
 import { useTasks } from '../maintenance/api'
 import { dueBucket } from '../maintenance/nextDue'
@@ -176,6 +176,7 @@ function ResidentHome() {
   return (
     <Stack gap="lg">
       <MyBalanceHero />
+      <HowToPay whenOwed />
       <LatestAnnouncement showUnread />
       <MyTickets />
     </Stack>

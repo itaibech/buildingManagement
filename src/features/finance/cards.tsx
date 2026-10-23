@@ -1,7 +1,9 @@
-import { Button, Card, Group, Stack, Text } from '@mantine/core'
+import { Anchor, Button, Card, Group, Stack, Text, Title } from '@mantine/core'
+import { IconCopy, IconPhone } from '@tabler/icons-react'
 import { formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
-import { ExemptBadge, ListSkeleton, Money } from '../../ui'
+import { ExemptBadge, ListSkeleton, Money, notifyError, notifySuccess } from '../../ui'
+import { telHref, useBuilding } from '../settings/api'
 import { useBuildingCash, useMyBalance } from './api'
 import { balanceSentence } from './ledger'
 
@@ -66,6 +68,45 @@ export function MyFeeCard() {
         <Text fw={600} className="bm-num">{exempt ? he.fees.myExempt : he.fees.myFee(formatILS(q.data.fee))}</Text>
         {exempt && <ExemptBadge />}
       </Group>
+    </Card>
+  )
+}
+
+async function copyText(text: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(text)
+    notifySuccess(he.pay.copied)
+  } catch {
+    notifyError(he.pay.copyFailed)
+  }
+}
+
+/**
+ * Resident "איך משלמים": the committee's payment instructions (copyable) and a tap-to-call contact.
+ * `whenOwed`: only while the resident has a balance to pay (home); finance always shows it.
+ */
+export function HowToPay({ whenOwed = false }: { whenOwed?: boolean }) {
+  const balance = useMyBalance()
+  const building = useBuilding()
+  if (!balance.data || !building.data || (whenOwed && balance.data.balance <= 0)) return null
+  const { payment_instructions: text, committee_contact: phone } = building.data
+  return (
+    <Card>
+      <Title order={2} size="h4" mb="xs">{he.pay.title}</Title>
+      <Text style={{ whiteSpace: 'pre-wrap' }} c={text ? undefined : 'dimmed'}>{text ?? he.pay.missing}</Text>
+      <Stack gap="xs" mt="md">
+        {text && (
+          <Button color="signal" fullWidth leftSection={<IconCopy size={20} stroke={1.75} aria-hidden="true" />} onClick={() => void copyText(text)}>
+            {he.pay.copy}
+          </Button>
+        )}
+        {phone && (
+          <Anchor href={telHref(phone)} fw={600} mih={44} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <IconPhone size={20} stroke={1.75} aria-hidden="true" />
+            <span>{he.pay.call(phone)}</span>
+          </Anchor>
+        )}
+      </Stack>
     </Card>
   )
 }

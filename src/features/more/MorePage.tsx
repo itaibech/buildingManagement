@@ -15,6 +15,7 @@ const ADMIN = [
   { to: '/users', label: he.nav.users },
   { to: '/ev', label: he.nav.ev },
   { to: '/import', label: he.nav.import },
+  { to: '/settings', label: he.nav.settings },
 ]
 
 export default function MorePage() {

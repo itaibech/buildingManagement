@@ -1,11 +1,11 @@
 import { ActionIcon, AppShell, Box, Group, NavLink, Stack, Text, Tooltip } from '@mantine/core'
 import { IconCoin, IconDots, IconHome2, IconLogout, IconSpeakerphone, IconTool, type Icon } from '@tabler/icons-react'
-import type { ReactNode } from 'react'
+import { Suspense, useEffect, type ReactNode } from 'react'
 import { Link, Outlet, useLocation } from 'react-router'
 import { useExit } from '../auth/useExit'
 import { useUnreadCount } from '../features/announcements/api'
 import { he } from '../lib/he'
-import { AptPlate } from '../ui'
+import { AptPlate, ListSkeleton } from '../ui'
 import { useShellInfo } from './useShellInfo'
 
 interface NavItem {
@@ -109,6 +109,19 @@ function TabBar({ pathname, unread }: { pathname: string; unread: number }) {
   )
 }
 
+/** Warm the tab pages' chunks once the shell is idle, so the first tap on a tab renders at once. */
+function usePrefetchTabs(): void {
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      void import('../features/announcements/AnnouncementsPage')
+      void import('../features/tickets/TicketsPage')
+      void import('../features/finance/FinancePage')
+      void import('../features/more/MorePage')
+    }, 1500)
+    return () => window.clearTimeout(id)
+  }, [])
+}
+
 export default function Shell() {
   const { pathname } = useLocation()
   const exit = useExit()
@@ -116,6 +129,7 @@ export default function Shell() {
   const unread = useUnreadCount()
   const name = buildingName ?? he.appName
   const onExit = () => void exit()
+  usePrefetchTabs()
   return (
     <AppShell
       header={{ height: { base: 'calc(56px + env(safe-area-inset-top, 0px))', sm: 0 } }}
@@ -129,9 +143,12 @@ export default function Shell() {
       <AppShell.Navbar p="sm" visibleFrom="sm">
         <SideNav pathname={pathname} name={name} apartment={apartmentNumber} unread={unread} onExit={onExit} />
       </AppShell.Navbar>
-      <AppShell.Main>
+      <AppShell.Main className="bm-main">
         <Box maw={1100} mx="auto">
-          <Outlet />
+          {/* A page's first load keeps the header and nav in place and shows skeleton rows. */}
+          <Suspense fallback={<ListSkeleton rows={4} />}>
+            <Outlet />
+          </Suspense>
         </Box>
       </AppShell.Main>
       <AppShell.Footer hiddenFrom="sm">

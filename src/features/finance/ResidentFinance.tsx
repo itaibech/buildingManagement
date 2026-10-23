@@ -4,7 +4,7 @@ import { AptPlate, ListSkeleton, PageHeader } from '../../ui'
 import { useMyApartment } from './api'
 import { ApartmentYear } from './ApartmentLedger'
 import { CategoryTotals } from './BudgetTab'
-import { CashCard, LoadFailed, MyBalanceHero, MyFeeCard } from './cards'
+import { CashCard, HowToPay, LoadFailed, MyBalanceHero, MyFeeCard } from './cards'
 import { MyEvCard } from '../ev/MyEvCard'
 
 /** The resident's own month grid. Only their apartment's rows are requested and shown. */
@@ -32,6 +32,7 @@ export function ResidentFinance() {
       <PageHeader title={he.nav.finance} />
       <Stack gap="lg">
         <MyBalanceHero />
+        <HowToPay />
         <MyFeeCard />
         <MyLedger />
         <MyEvCard />

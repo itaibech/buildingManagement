@@ -41,7 +41,7 @@ export function TicketPhotos({ photos }: { photos: TicketPhoto[] }) {
         )}
       </SimpleGrid>
       <Modal opened={current !== null} onClose={() => setOpen(null)} size="xl" centered radius="lg" padding="xs"
-        title={open !== null ? he.tickets.photo(open + 1) : ''} closeButtonProps={{ 'aria-label': he.tickets.close, size: 44 }}>
+        title={open !== null ? he.tickets.photo(open + 1) : ''}>
         {current?.url && <Image src={current.url} alt={he.tickets.photo((open ?? 0) + 1)} radius={10} fit="contain" mah="80vh" />}
       </Modal>
     </>
