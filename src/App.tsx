@@ -10,6 +10,7 @@ const HomePage = lazy(() => import('./features/home/HomePage'))
 const MorePage = lazy(() => import('./features/more/MorePage'))
 const AnnouncementsPage = lazy(() => import('./features/announcements/AnnouncementsPage'))
 const TicketsPage = lazy(() => import('./features/tickets/TicketsPage'))
+const TicketPage = lazy(() => import('./features/tickets/TicketPage'))
 const FinancePage = lazy(() => import('./features/finance/FinancePage'))
 const DirectoryPage = lazy(() => import('./features/tenants/DirectoryPage'))
 const MaintenancePage = lazy(() => import('./features/maintenance/MaintenancePage'))
@@ -35,6 +36,7 @@ export default function App() {
               <Route index element={<HomePage />} />
               <Route path="announcements" element={<AnnouncementsPage />} />
               <Route path="tickets" element={<TicketsPage />} />
+              <Route path="tickets/:id" element={<TicketPage />} />
               <Route path="finance" element={<FinancePage />} />
               <Route path="more" element={<MorePage />} />
               <Route path="directory" element={<DirectoryPage />} />

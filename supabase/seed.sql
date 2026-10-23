@@ -83,3 +83,25 @@ from (values
    'בשבוע שעבר הייתה הפסקת מים מתוכננת לצורך תיקון צנרת. הנושא הסתיים.',
    false, (current_date - 14)::date, now() - interval '20 days')
 ) as v(title, body, pinned, expires_at, created_at);
+
+-- Sample service calls across statuses (no photos), with a short comment thread on one.
+insert into public.tickets (id, title, description, location, status, vendor, opened_by, created_at)
+select v.id::uuid, v.title, v.description, v.location, v.status, v.vendor, v.opened_by::uuid, v.created_at
+from (values
+  ('40000000-0000-0000-0000-000000000001', 'נורה שרופה בחדר המדרגות',
+   'הנורה בין קומה 2 לקומה 3 לא נדלקת כבר יומיים.', 'חדר מדרגות', 'open', null,
+   '30000000-0000-0000-0000-000000000002', now() - interval '3 days'),
+  ('40000000-0000-0000-0000-000000000002', 'המעלית נתקעת בקומה 3',
+   'הדלת לא נסגרת עד הסוף ולפעמים המעלית לא זזה.', 'מעלית', 'in_progress', 'מעליות לדוגמה בע"מ',
+   '30000000-0000-0000-0000-000000000002', now() - interval '6 days'),
+  ('40000000-0000-0000-0000-000000000003', 'דליפת מים בחניה',
+   'שלולית ליד חניה 4 אחרי כל גשם.', 'חניה', 'closed', 'אינסטלציה פיקטיבית',
+   '30000000-0000-0000-0000-000000000001', now() - interval '20 days')
+) as v(id, title, description, location, status, vendor, opened_by, created_at);
+
+insert into public.ticket_comments (ticket_id, author_id, body, created_at)
+values
+  ('40000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000001',
+   'הזמנו טכנאי, הוא יגיע ביום ראשון.', now() - interval '5 days'),
+  ('40000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000002',
+   'תודה! הבעיה חזרה גם היום בבוקר.', now() - interval '1 day');

@@ -22,3 +22,25 @@ export function monthLabel(month: string): string {
   const [y, m] = month.split('-')
   return `${HEBREW_MONTHS[Number(m) - 1]} ${y}`
 }
+
+const rtf = new Intl.RelativeTimeFormat('he', { numeric: 'auto' })
+const STEPS: [Intl.RelativeTimeFormatUnit, number][] = [
+  ['minute', 60],
+  ['hour', 60],
+  ['day', 24],
+  ['month', 30],
+  ['year', 12],
+]
+
+/** "לפני 3 ימים" style relative time (Hebrew), from seconds up to years. */
+export function relativeDate(iso: string, now: Date = new Date()): string {
+  let value = (new Date(iso).getTime() - now.getTime()) / 1000
+  if (Math.abs(value) < 60) return rtf.format(0, 'second')
+  let unit: Intl.RelativeTimeFormatUnit = 'second'
+  for (const [next, size] of STEPS) {
+    if (Math.abs(value) < size) break
+    value /= size
+    unit = next
+  }
+  return rtf.format(Math.round(value), unit)
+}
