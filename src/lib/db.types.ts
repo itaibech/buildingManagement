@@ -169,13 +169,88 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"ticket_comments": {
+                  Row: {
+                    "author_id": string | null,"body": string,"building_id": string,"created_at": string,"id": string,"ticket_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "author_id"?: string | null,"body": string,"building_id"?: string,"created_at"?: string,"id"?: string,"ticket_id": string
+                  }
+                  Update: {
+                    "author_id"?: string | null,"body"?: string,"building_id"?: string,"created_at"?: string,"id"?: string,"ticket_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "ticket_comments_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "ticket_comments_ticket_id_fkey"
+      columns: ["ticket_id"]
+isOneToOne: false
+      referencedRelation: "tickets"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"ticket_photos": {
+                  Row: {
+                    "building_id": string,"created_at": string,"id": string,"path": string,"ticket_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "building_id"?: string,"created_at"?: string,"id"?: string,"path": string,"ticket_id": string
+                  }
+                  Update: {
+                    "building_id"?: string,"created_at"?: string,"id"?: string,"path"?: string,"ticket_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "ticket_photos_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "ticket_photos_ticket_id_fkey"
+      columns: ["ticket_id"]
+isOneToOne: false
+      referencedRelation: "tickets"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"tickets": {
+                  Row: {
+                    "building_id": string,"created_at": string,"description": string,"id": string,"location": string,"opened_by": string | null,"status": string,"title": string,"vendor": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "building_id"?: string,"created_at"?: string,"description"?: string,"id"?: string,"location"?: string,"opened_by"?: string | null,"status"?: string,"title": string,"vendor"?: string | null
+                  }
+                  Update: {
+                    "building_id"?: string,"created_at"?: string,"description"?: string,"id"?: string,"location"?: string,"opened_by"?: string | null,"status"?: string,"title"?: string,"vendor"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "tickets_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    }
+                  ]
                 }
           }
           Views: {
             [_ in never]: never
           }
           Functions: {
-            "default_building_id":
+            "can_manage_ticket":
+{ Args: { "p_ticket_id": string }; Returns: boolean
+                           },
+"default_building_id":
 { Args: Record<PropertyKey, never>; Returns: string
                            },
 "is_admin":
@@ -186,6 +261,11 @@ isOneToOne: false
                            },
 "my_apartment_id":
 { Args: Record<PropertyKey, never>; Returns: string
+                           },
+"user_names":
+{ Args: { "ids": (string)[] }; Returns: {
+              "full_name": string,"user_id": string
+            }[]
                            }
           }
           Enums: {

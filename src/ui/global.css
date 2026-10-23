@@ -167,6 +167,26 @@ body {
   outline-offset: -2px;
 }
 
+/* Ticket comment composer: sticks above the tab bar on mobile. */
+.bm-composer {
+  background: var(--bm-plaster);
+}
+@media (max-width: 767px) {
+  .bm-composer {
+    position: sticky;
+    bottom: calc(var(--bm-tabbar-height) + var(--bm-safe-bottom));
+    z-index: 5;
+    margin-inline: calc(var(--mantine-spacing-md) * -1);
+    padding: var(--mantine-spacing-xs) var(--mantine-spacing-md);
+    border-top: 1px solid rgba(107, 116, 128, 0.15);
+  }
+}
+
+/* Hairline between stacked items (e.g. comments). */
+.bm-divided > * + * {
+  border-top: 1px solid rgba(107, 116, 128, 0.15);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
