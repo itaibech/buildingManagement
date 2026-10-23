@@ -3,7 +3,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(64);
+select plan(65);
 
 -- ---------------------------------------------------------------- fixtures (as postgres)
 insert into auth.users (id, email, aud, role) values
@@ -123,6 +123,13 @@ insert into public.expenses (category_id, spent_on, amount, vendor)
 insert into public.expenses (category_id, spent_on, amount)
   select (select id from public.expense_categories where name = 'שונות'), m0 - 10, 999 from tm;
 select is((select balance from public.building_cash), 3140::numeric, 'cash = 1000 + 2440 - 300 (older expense excluded)');
+insert into public.payments (apartment_id, paid_on, amount, method, note)
+  values ('b9000000-0000-0000-0000-00000000000b', (now() at time zone 'Asia/Jerusalem')::date + 1, 700, 'cheque', 'דחוי');
+insert into public.expenses (category_id, spent_on, amount)
+  select id, (now() at time zone 'Asia/Jerusalem')::date + 1, 50 from public.expense_categories where name = 'שונות';
+select is((select balance from public.building_cash), 3140::numeric, 'cash: post-dated cheque and future expense excluded');
+delete from public.payments where note = 'דחוי';
+delete from public.expenses where amount = 50;
 select lives_ok($$insert into public.budgets (year, category_id, amount)
   values (2026, (select id from public.expense_categories where name = 'ניקיון'), 6000)$$, 'admin sets a budget');
 select throws_ok($$insert into public.budgets (year, category_id, amount)

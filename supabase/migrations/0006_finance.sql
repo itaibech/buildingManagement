@@ -240,7 +240,8 @@ group by a.id;
 
 -- Cash needs every payment, which residents can't read row by row, so the total is computed by a
 -- definer function that only answers approved users. Opening cash is the balance at the start of
--- opening_cash_date: payments and expenses on or after that date count. Server sessions (no API role
+-- opening_cash_date: payments and expenses on or after that date count, up to today (Israel time) —
+-- cash is money actually in the account, so a post-dated cheque counts only from its date. Server sessions (no API role
 -- set, or service_role) also get an answer; current_setting('role') is the API role even inside a definer.
 -- Only 'authenticated' and 'anon' count as API roles here (same rule as can_read_apartment_finance).
 create function public.building_cash_balance(p_building_id uuid) returns numeric
@@ -248,9 +249,11 @@ language sql stable security definer set search_path = ''
 as $$
   select (b.opening_cash
     + coalesce((select sum(p.amount) from public.payments p where p.building_id = b.id
-        and (b.opening_cash_date is null or p.paid_on >= b.opening_cash_date)), 0)
+        and (b.opening_cash_date is null or p.paid_on >= b.opening_cash_date)
+        and p.paid_on <= (now() at time zone 'Asia/Jerusalem')::date), 0)
     - coalesce((select sum(e.amount) from public.expenses e where e.building_id = b.id
-        and (b.opening_cash_date is null or e.spent_on >= b.opening_cash_date)), 0))::numeric(12,2)
+        and (b.opening_cash_date is null or e.spent_on >= b.opening_cash_date)
+        and e.spent_on <= (now() at time zone 'Asia/Jerusalem')::date), 0))::numeric(12,2)
   from public.buildings b
   where b.id = p_building_id
     and (public.is_approved() or current_setting('role') not in ('authenticated', 'anon'));
