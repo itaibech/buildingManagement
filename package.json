@@ -17,9 +17,12 @@
     "db:types": "supabase gen types typescript --local > src/lib/db.types.ts"
   },
   "dependencies": {
+    "@fontsource/assistant": "^5.3.0",
+    "@fontsource/secular-one": "^5.3.0",
     "@mantine/core": "^9.7.3",
     "@mantine/hooks": "^9.7.3",
     "@supabase/supabase-js": "^2.118.0",
+    "@tabler/icons-react": "^3.49.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-router": "^7.18.4"

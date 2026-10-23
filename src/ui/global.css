@@ -1,0 +1,129 @@
+/* Design system globals — see docs/design-system.md */
+:root {
+  --bm-plaster: #f4f6f9;
+  --bm-tabbar-height: 64px;
+  --bm-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --bm-heading-font: 'Secular One', Assistant, system-ui, sans-serif;
+}
+
+body {
+  background-color: var(--bm-plaster);
+}
+
+:focus-visible {
+  outline: 2px solid var(--mantine-color-enamel-6);
+  outline-offset: 2px;
+}
+
+.bm-num {
+  font-variant-numeric: tabular-nums;
+}
+
+.bm-display {
+  font-family: var(--bm-heading-font);
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+/* The enamel house-number sign: white numerals on deep blue, thin white inner border. */
+.bm-plate {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  background: var(--mantine-color-enamel-6);
+  color: #fff;
+  font-family: var(--bm-heading-font);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.bm-plate::after {
+  content: '';
+  position: absolute;
+  inset: var(--bm-plate-inset, 2px);
+  border: var(--bm-plate-line, 1px) solid rgba(255, 255, 255, 0.9);
+  border-radius: 4px;
+  pointer-events: none;
+}
+.bm-plate[data-size='sm'] {
+  height: 24px;
+  min-width: 30px;
+  padding: 0 6px;
+  font-size: 0.875rem;
+}
+.bm-plate[data-size='md'] {
+  height: 32px;
+  min-width: 40px;
+  padding: 0 9px;
+  font-size: 1.125rem;
+  --bm-plate-inset: 3px;
+}
+.bm-plate[data-size='lg'] {
+  height: 56px;
+  min-width: 68px;
+  padding: 0 16px;
+  font-size: 1.75rem;
+  --bm-plate-inset: 4px;
+  --bm-plate-line: 1.5px;
+}
+.bm-plate[data-size='mark'] {
+  height: 72px;
+  padding: 0 28px;
+  font-size: 1.75rem;
+  --bm-plate-inset: 5px;
+  --bm-plate-line: 2px;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(27, 35, 48, 0.18);
+}
+
+/* Bottom tab bar (mobile) */
+.bm-tabbar {
+  display: flex;
+  height: 100%;
+  padding-bottom: var(--bm-safe-bottom);
+  box-sizing: border-box;
+}
+.bm-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 44px;
+  color: var(--mantine-color-stone-7);
+  text-decoration: none;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.bm-tab[data-active] {
+  color: var(--mantine-color-enamel-6);
+}
+.bm-tab:focus-visible {
+  outline-offset: -2px;
+  border-radius: 10px;
+}
+
+/* Floating action button above the tab bar (mobile). End side = left in RTL. */
+.bm-fab {
+  position: fixed;
+  inset-inline-end: 16px;
+  bottom: calc(var(--bm-tabbar-height) + var(--bm-safe-bottom) + 16px);
+  z-index: 150;
+  box-shadow: 0 4px 12px rgba(27, 35, 48, 0.22);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

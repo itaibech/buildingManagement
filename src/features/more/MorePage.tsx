@@ -1,7 +1,9 @@
-import { Button, NavLink, Stack, Title } from '@mantine/core'
+import { Button, NavLink, Stack } from '@mantine/core'
 import { Link } from 'react-router'
 import { useAuth } from '../../auth/AuthProvider'
+import { useExit } from '../../auth/useExit'
 import { he } from '../../lib/he'
+import { PageHeader } from '../../ui'
 
 const COMMON = [
   { to: '/directory', label: he.nav.directory },
@@ -14,16 +16,17 @@ const ADMIN = [
 ]
 
 export default function MorePage() {
-  const { isAdmin, signOut } = useAuth()
+  const { isAdmin } = useAuth()
+  const exit = useExit()
   const items = isAdmin ? [...COMMON, ...ADMIN] : COMMON
   return (
     <Stack>
-      <Title order={2}>{he.nav.more}</Title>
+      <PageHeader title={he.nav.more} />
       {items.map((i) => (
         <NavLink key={i.to} component={Link} to={i.to} label={i.label} />
       ))}
-      <Button variant="light" color="red" onClick={() => void signOut()}>
-        {he.signOut}
+      <Button variant="light" color="debt" onClick={() => void exit()}>
+        {he.exit}
       </Button>
     </Stack>
   )
