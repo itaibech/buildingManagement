@@ -69,8 +69,9 @@ Merge to `main` (see [Deploy flow](#deploy-flow)). `deploy.yml` builds the site,
 
 ### 4. Bootstrap the super admin
 
-After the migrations are applied and **before** the admin signs in for the first time, run this once in
-Supabase → SQL Editor:
+Automatic: migration `0013_bootstrap_admin.sql` sets the `bootstrap_admin_email` app setting to
+`itai.bechor@gmail.com` (it doesn't overwrite a value that is already set). Only if you need another
+address, or the setting is missing, set it manually in Supabase → SQL Editor (fallback):
 
 ```sql
 insert into public.app_settings (key, value)
@@ -81,7 +82,7 @@ on conflict (key) do update set value = excluded.value;
 The first **Google** sign-in with that email (while no admin exists yet) becomes the approved **super
 admin**, whom nobody can demote, block or delete. An email/password sign-up with the same address does
 not; the grant needs Google, which has verified the address. Every other new user waits for an admin's
-approval. Sign in with Google right after running the SQL, before sharing the site URL.
+approval. Sign in with Google right after the first deploy, before sharing the site URL.
 
 If that account had already signed in before the setting existed (so it's a pending resident), promote
 it once from the SQL Editor (it runs as `postgres`, which the profile guards allow). First check
@@ -198,7 +199,7 @@ Before merging:
 
 Then, in this order:
 1. Merge to `main`: CI, then migrations, then Pages.
-2. Run the bootstrap SQL from step 4.
+2. The bootstrap email is set by migration 0013 (step 4; the SQL there is only a fallback).
 3. The super admin signs in with **Google** immediately, before the URL is shared with anyone.
 
 ## License

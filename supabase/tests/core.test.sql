@@ -3,9 +3,12 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(33);
+select plan(34);
 
 -- ---------------------------------------------------------------- fixtures
+-- 0013 seeds the bootstrap email (the local seed overrides the value, so only the key is checked).
+select is((select count(*) from public.app_settings where key = 'bootstrap_admin_email'), 1::bigint,
+  'the bootstrap admin email setting exists after migrations');
 -- Start from "no admin yet" (the local seed creates one); bootstrap is one-shot.
 update public.profiles set role = 'resident' where role = 'admin';
 -- Bootstrap email for this test only (overrides any seeded value).
