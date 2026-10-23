@@ -85,8 +85,8 @@ Onboarding flow (agreed with user):
 - Admins create, edit and delete apartments and residents, and approve
   pending users (linking a login to a resident and apartment).
 - Residents see a building directory (names, apartment numbers, and phone
-  numbers with tap-to-call on mobile). Whether residents see each other's
-  phone numbers is open question Q2.
+  numbers with tap-to-call on mobile). **Residents see each other's phone
+  numbers** (user decision).
 
 ### 5.2 הודעות — Announcements
 - Admins post an announcement with a title, body, optional pin-to-top and
@@ -100,7 +100,7 @@ Onboarding flow (agreed with user):
   "elevator"), optional photos (Supabase Storage), status
   (פתוחה / בטיפול / סגורה), and who opened it and when.
 - Admins change status, add comments and assign a vendor (free text).
-- Whether residents can open calls is open question Q1.
+- **Residents can open calls**, attach photos and add comments (user decision). Everyone approved sees all calls in the building (author's call); only admins change status or assign a vendor. This is the one exception to "residents are read-only".
 
 ### 5.4 משימות תחזוקה — Maintenance tasks
 - Recurring building tasks, mirroring the "planned annual costs" sheet:
@@ -201,7 +201,8 @@ table.
 
 RLS in short:
 - An approved user can read building-wide tables.
-- Only admins can write.
+- Only admins can write, except that approved residents can insert tickets,
+  ticket comments and ticket photos (their own rows).
 - `charges` and `payments` are readable by admins, or by residents whose
   apartment matches.
 - Pending users can read only their own profile.
@@ -276,7 +277,7 @@ rows).
   renter) sees that apartment's finances. Owner-only visibility can come with
   the later permissions phase.
 
-## 12. Open questions for the user
+## 12. User decisions after review
 
-- Q1: Can residents open service calls (and add photos/comments), or only admins?
-- Q2: Do residents see each other's phone numbers in the directory?
+- Residents can open service calls, with photos and comments.
+- Residents see each other's phone numbers in the directory.
