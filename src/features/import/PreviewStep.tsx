@@ -116,12 +116,13 @@ export function LevyNotice({ levy, apartments, onAmount }: { levy: LevyLine; apa
   )
 }
 
-export function EvNotice({ ev, include, onInclude }: { ev: EvInfo; include: boolean; onInclude: (v: boolean) => void }) {
+export function EvNotice({ ev, include, managed, onInclude }: { ev: EvInfo; include: boolean; managed?: boolean; onInclude: (v: boolean) => void }) {
   if (ev.apartments.length === 0) return null
   return (
     <Paper withBorder radius={12} p="sm">
       <Text fw={600}>{he.import.evTitle}</Text>
       <Text size="sm" className="bm-num">{he.import.evNotice(ev.apartments.join(', '), formatILS(ev.total))}</Text>
+      {managed && <Text size="sm" c="signal.9" mt={4}>{he.import.evManaged}</Text>}
       <Toggle label={he.import.evInclude} checked={include} onChange={onInclude} />
     </Paper>
   )

@@ -516,6 +516,7 @@ export const he = {
     levyLabel: 'היטל מיוחד',
     evLabel: 'טעינת רכב חשמלי',
     evNote: 'טעינת רכב חשמלי · יובא מאקסל',
+    evManaged: 'יש במערכת עמדות טעינה, והטעינה מחושבת ממוני הטעינה (כספים › טעינת רכב). לכן ברירת המחדל היא לא לייבא את בלוק הטעינה מהקובץ הזה.',
     warnCell: (where: string, header: string, value: string) => `${where}, עמודה ${header}: לא הצלחנו לקרוא "${value}"`,
     warnDuplicateRow: (n: number) => `דירה ${n} מופיעה ביותר משורה אחת. התשלומים מכל השורות ייזקפו לדירה.`,
     evColumn: (month: string) => `טעינה ${month}`,

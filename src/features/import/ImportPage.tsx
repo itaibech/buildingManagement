@@ -52,7 +52,7 @@ function PreviewBody({ st, d, ctx, save, back, confirm }: PreviewBodyProps) {
       <PreviewStep summary={summarize(d.payload, ctx.categories)} warnings={st.read.warnings} year={st.year} budgetYear={st.budgetYear}
         onYear={st.setYear} onBudgetYear={st.setBudgetYear} error={save.isError ? he.import.errors.failed : ''}>
         {d.levies.map((l) => <LevyNotice key={l.col} levy={l} apartments={d.payload?.apartments.length ?? 0} onAmount={(a) => setLevy(l.col, a)} />)}
-        <EvNotice ev={d.ev} include={st.includeEv} onInclude={st.setIncludeEv} />
+        <EvNotice ev={d.ev} include={d.includeEv} managed={ctx.hasChargers} onInclude={st.setIncludeEv} />
         <OverlapNotice overlaps={d.overlaps} include={st.importOverlaps} onInclude={st.setImportOverlaps} />
         <ReplaceNotes fees={d.feesReplaced} budgets={d.budgetsUpdated} />
       </PreviewStep>

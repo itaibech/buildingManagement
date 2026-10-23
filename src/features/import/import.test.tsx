@@ -174,4 +174,19 @@ describe('ImportPage', () => {
     expect(payload.fees).toEqual([{ amount: 400, effective_from: '2026-01-01' }, { amount: 350, effective_from: '2026-05-01' }])
     expect(payload.expenses.filter((e) => e.category === 'חברת ניהול').map((e) => e.spent_on)).toEqual(['2026-02-01', '2026-03-01'])
   })
+
+  it('defaults the EV block to excluded when EV chargers exist, with a hint that the meter module handles EV', async () => {
+    db.tables.ev_chargers = [{ id: 'ch1', apartment_id: 'a3', label: 'עמדת טעינה', initial_reading: 0, active: true, apartments: { number: 3 } }]
+    await upload(renderPage())
+    await pick(he.import.monthFor('אוקטובר'), 'אוקטובר')
+    next()
+    await screen.findByText(he.import.feesIntro)
+    next()
+    next()
+    expect(await screen.findByText(he.import.evManaged)).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: he.import.evInclude })).not.toBeChecked()
+    fireEvent.click(screen.getByRole('button', { name: he.import.confirm }))
+    await screen.findByText(he.import.doneTitle)
+    expect(sentPayload().charges.filter((c) => c.kind === 'extra')).toEqual([])
+  })
 })
