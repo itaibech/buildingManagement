@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import type { ImportPayload } from './buildImport'
 
-const COUNT_KEYS = ['apartments', 'residents', 'fees', 'payments', 'charges', 'categories', 'expenses', 'budgets'] as const
+const COUNT_KEYS = ['apartments', 'residents', 'fees', 'payments', 'charges', 'categories', 'expenses', 'budgets', 'ev_skipped'] as const
 export type ImportCounts = Partial<Record<(typeof COUNT_KEYS)[number], number>>
 
 function toCounts(data: unknown): ImportCounts {

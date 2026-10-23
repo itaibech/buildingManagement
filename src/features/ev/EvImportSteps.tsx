@@ -7,11 +7,16 @@ import { AptPlate } from '../../ui'
 import { DeleteButton, MonthField } from '../finance/fields'
 import { Warnings } from '../import/PreviewStep'
 import type { EvImportCounts } from './api'
+import type { MainReplacement } from './buildEvImport'
 import type { Rate } from './evMath'
 import { money } from './evMath'
 import type { EvDerived, EvImportContext } from './useEvImportFlow'
 
 const T = he.ev.import
+const mmYYYY = (month: string | null): string => (month ? `${month.slice(5, 7)}/${month.slice(0, 4)}` : '')
+
+const replaceBody = (r: MainReplacement): string =>
+  T.replaceMainBody(r.charges, formatILS(r.chargesAmount), mmYYYY(r.from), mmYYYY(r.to), r.meterCount, formatILS(r.meterAmount), r.paymentsRemoved, r.paymentsKept)
 
 export const Toggle = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) => (
   <Checkbox size="md" mt="xs" mih={44} styles={{ body: { alignItems: 'center', minHeight: 44 } }}
@@ -117,9 +122,9 @@ export function EvPreviewStep({ d, error, replaceMain, onReplaceMain }: { d: EvD
       <Text fw={600} className="bm-num">{T.totals(formatKwh(kwh), formatILS(amount))}</Text>
       <Text size="sm" className="bm-num">{he.import.paymentsTotal(formatILS(money(d.payload.payments.reduce((t, p) => t + p.amount, 0))))}</Text>
       <Alert color="enamel">{T.replaceNote}</Alert>
-      {d.mainCharges > 0 && (
-        <Alert color="signal" title={replaceMain ? T.replaceMain(d.mainCharges) : undefined}>
-          <Text size="sm">{T.replaceMainBody}</Text>
+      {(d.replacement.charges > 0 || d.replacement.paymentsRemoved > 0) && (
+        <Alert color="signal" title={T.replaceMain(d.replacement.charges)}>
+          <Text size="sm" className="bm-num">{replaceBody(d.replacement)}</Text>
           <Toggle label={T.replaceMainToggle} checked={replaceMain} onChange={onReplaceMain} />
         </Alert>
       )}

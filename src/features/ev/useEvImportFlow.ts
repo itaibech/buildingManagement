@@ -5,7 +5,7 @@ import { monthOf } from '../finance/ledger'
 import { useApartments } from '../tenants/api'
 import { useChargers, useEvPayments, useMainEvCharges } from './api'
 import {
-  buildEvPayload, coveredKeys, derivePayments, deriveRates, deriveReadings, paymentKey, summarizeEv, type ChargerPlan, type EvPaymentRow,
+  buildEvPayload, derivePayments, deriveRates, deriveReadings, mainReplacement, paymentKey, summarizeEv, type ChargerPlan, type EvPaymentRow, type MainRow,
 } from './buildEvImport'
 import { formatKwh } from '../../lib/format'
 import { he } from '../../lib/he'
@@ -49,7 +49,9 @@ export function useEvImportContext() {
       apartmentNumbers: new Set(numberOf.values()),
       existing: new Set(pays.filter((p) => p.source !== 'ev-import' && p.source !== 'import').map((p) => key(p.apartment_id, p.paid_on))),
       mainPayments: new Set(pays.filter((p) => p.source === 'import').map((p) => key(p.apartment_id, p.paid_on))),
-      mainCharges: (mainCharges.data ?? []).map((c) => key(c.apartment_id, c.month)),
+      mainPaymentRows: pays.filter((p) => p.source === 'import')
+        .map((p): MainRow => ({ apartment: numberOf.get(p.apartment_id) ?? 0, month: `${p.paid_on.slice(0, 7)}-01`, amount: p.amount })),
+      mainChargeRows: (mainCharges.data ?? []).map((c): MainRow => ({ apartment: numberOf.get(c.apartment_id) ?? 0, month: c.month, amount: c.amount })),
       loading: chargers.isLoading || apartments.isLoading || (ids.length > 0 && (payments.isLoading || mainCharges.isLoading)),
     }
   }, [chargers.data, apartments.data, payments.data, mainCharges.data, ids.length, chargers.isLoading, apartments.isLoading, payments.isLoading, mainCharges.isLoading])
@@ -80,11 +82,10 @@ export function useEvDerived(st: EvImportState, ctx: EvImportContext) {
     const readings = deriveReadings(st.sheet, now)
     const rates = st.ratesEdit ?? deriveRates(st.sheet, readings.chargers, now)
     const payments = derivePayments(st.sheet)
-    // Same rule as the server: main EV charges by apartment-year of the readings, main EV payments by the months paid.
-    const years = new Set(readings.chargers.flatMap((c) => c.readings.map((r) => `${c.apartment}|${r.month.slice(0, 4)}`)))
-    const mainCharges = ctx.mainCharges.filter((k) => years.has(k.slice(0, k.indexOf('|') + 5))).length
-    const paidKeys = coveredKeys([], payments)
-    const replaceMain = st.replaceMain && (mainCharges > 0 || [...ctx.mainPayments].some((k) => paidKeys.has(k)))
+    // What replacing would remove, given the EV payments that would be sent (manual overlaps skipped unless forced).
+    const sendable = !st.includePayments ? [] : st.importOverlaps ? payments : payments.filter((p) => !ctx.existing.has(paymentKey(p.apartment, p.paid_on)))
+    const replacement = mainReplacement(readings.chargers, rates, sendable, ctx.mainChargeRows, ctx.mainPaymentRows)
+    const replaceMain = st.replaceMain && (replacement.charges > 0 || replacement.paymentsRemoved > 0)
     // Main-import EV payments are deleted when replacing, so those months are no longer overlaps.
     const taken = (k: string) => ctx.existing.has(k) || (!replaceMain && ctx.mainPayments.has(k))
     const overlaps: EvPaymentRow[] = payments.filter((p) => taken(paymentKey(p.apartment, p.paid_on)))
@@ -92,7 +93,7 @@ export function useEvDerived(st: EvImportState, ctx: EvImportContext) {
     const payload = buildEvPayload(readings.chargers, rates, payments, { includePayments: st.includePayments, skipPayments: skip, replaceMain })
     const missing = uncoveredMonth(rates, readings.chargers.flatMap((c) => c.readings.map((r) => r.month)))
     const warnings = [...initialWarnings(readings.chargers, ctx.initial), ...readings.warnings]
-    return { ...readings, warnings, rates, payments, overlaps, payload, missing, mainCharges, summary: summarizeEv(readings.chargers, rates) }
+    return { ...readings, warnings, rates, payments, overlaps, payload, missing, replacement, summary: summarizeEv(readings.chargers, rates) }
   }, [st.sheet, st.ratesEdit, st.includePayments, st.importOverlaps, st.replaceMain, ctx])
 }
 export type EvDerived = NonNullable<ReturnType<typeof useEvDerived>>

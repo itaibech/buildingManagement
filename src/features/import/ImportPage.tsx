@@ -52,7 +52,7 @@ function PreviewBody({ st, d, ctx, save, back, confirm }: PreviewBodyProps) {
       <PreviewStep summary={summarize(d.payload, ctx.categories)} warnings={st.read.warnings} year={st.year} budgetYear={st.budgetYear}
         onYear={st.setYear} onBudgetYear={st.setBudgetYear} error={save.isError ? he.import.errors.failed : ''}>
         {d.levies.map((l) => <LevyNotice key={l.col} levy={l} apartments={d.payload?.apartments.length ?? 0} onAmount={(a) => setLevy(l.col, a)} />)}
-        <EvNotice ev={d.ev} include={d.includeEv} managed={ctx.hasChargers} onInclude={st.setIncludeEv} />
+        <EvNotice ev={d.ev} include={d.includeEv} managed={ctx.hasChargers} skipped={d.evSkipped} onInclude={st.setIncludeEv} />
         <OverlapNotice overlaps={d.overlaps} include={st.importOverlaps} onInclude={st.setImportOverlaps} />
         <ReplaceNotes fees={d.feesReplaced} budgets={d.budgetsUpdated} />
       </PreviewStep>
@@ -83,7 +83,7 @@ function stepBodies({ st, d, ctx, go, upload, save, confirm, counts, again }: Bo
       <StepNav onBack={go(2)} onNext={go(4)} nextLabel={he.import.next} disabled={ctx.loading} />
     </>,
     preview: <PreviewBody st={st} d={d} ctx={ctx} save={save} back={go(3)} confirm={confirm} />,
-    done: <DoneStep counts={counts} year={st.year} onAgain={again} />,
+    done: <DoneStep counts={counts} year={st.year} evSkipped={(counts.ev_skipped ?? 0) + (d.includeEv ? 0 : d.evSkipped)} onAgain={again} />,
   }
 }
 

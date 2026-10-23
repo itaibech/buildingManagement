@@ -211,13 +211,13 @@ describe('import guards', () => {
     ])
   })
 
-  it('skips overlapping cells and can leave out the EV block', () => {
+  it('skips overlapping cells and can leave out the EV charges (EV payments are always kept)', () => {
     const p = buildImport(parsed(), withLevyMonth(income.columns), FEES, {
       skipExpenses: [overlapKey('חברת ניהול', '2026-01')], includeEv: false,
     })
     expect(p.expenses.filter((e) => e.category === 'חברת ניהול').map((e) => e.spent_on)).toEqual(['2026-02-01', '2026-03-01'])
     expect(p.charges.some((c) => c.kind === 'extra')).toBe(false)
-    expect(p.payments.some((x) => x.note === he.import.evNote)).toBe(false)
+    expect(p.payments.some((x) => x.note === he.import.evNote)).toBe(true)
   })
 
   it('counts budget lines the import will overwrite', () => {

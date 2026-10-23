@@ -3,7 +3,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(59);
+select plan(62);
 
 -- ---------------------------------------------------------------- fixtures (as postgres)
 insert into auth.users (id, email, aud, role) values
@@ -168,28 +168,44 @@ select throws_ok($$ insert into public.ev_rates (rate, effective_from) values (1
 
 -- ---------------------------------------------------------------- main workbook EV block vs the meter import
 create temp table main as select $json$
-{"year": 2020, "budget_year": 2020, "apartments": [{"number": 946}], "residents": [], "fees": [],
- "payments": [{"apartment": 946, "paid_on": "2020-01-01", "amount": 100, "note": "טעינת רכב חשמלי · יובא מאקסל"},
-   {"apartment": 946, "paid_on": "2020-02-01", "amount": 100, "note": "טעינת רכב חשמלי · יובא מאקסל"}],
- "charges": [{"apartment": 946, "month": "2020-01-01", "amount": 100, "kind": "extra", "label": "טעינת רכב חשמלי"},
-   {"apartment": 946, "month": "2020-02-01", "amount": 100, "kind": "extra", "label": "טעינת רכב חשמלי"}],
+{"year": 2020, "budget_year": 2020, "apartments": [{"number": 946}, {"number": 941}], "residents": [], "fees": [],
+ "payments": [
+   {"apartment": 946, "paid_on": "2020-02-01", "amount": 100, "note": "טעינת רכב חשמלי · יובא מאקסל"},
+   {"apartment": 946, "paid_on": "2020-03-01", "amount": 100, "note": "טעינת רכב חשמלי · יובא מאקסל"},
+   {"apartment": 941, "paid_on": "2020-04-01", "amount": 100, "note": "טעינת רכב חשמלי · יובא מאקסל"}],
+ "charges": [
+   {"apartment": 946, "month": "2020-01-01", "amount": 100, "kind": "extra", "label": "טעינת רכב חשמלי"},
+   {"apartment": 946, "month": "2020-02-01", "amount": 100, "kind": "extra", "label": "טעינת רכב חשמלי"},
+   {"apartment": 946, "month": "2020-03-01", "amount": 100, "kind": "extra", "label": "טעינת רכב חשמלי"},
+   {"apartment": 946, "month": "2020-06-01", "amount": 100, "kind": "extra", "label": "טעינת רכב חשמלי"},
+   {"apartment": 941, "month": "2020-04-01", "amount": 100, "kind": "extra", "label": "טעינת רכב חשמלי"}],
  "categories": [], "expenses": [], "budgets": []}
 $json$::jsonb as j;
-create temp view apt946 as
-select (select coalesce(sum(c.amount), 0) from public.charges c join public.apartments a on a.id = c.apartment_id where a.number = 946) as charged,
-  (select coalesce(sum(x.amount), 0) from public.payments x join public.apartments a on a.id = x.apartment_id where a.number = 946) as paid;
-grant select on main, apt946 to authenticated;
-select public.import_year((select j from main));
-select is((select row(charged, paid)::text from apt946), '(200.00,200.00)', 'the main import wrote its EV charges and payments');
+create temp view ev_money as
+select a.number,
+  (select coalesce(sum(c.amount), 0) from public.charges c where c.apartment_id = a.id) as charged,
+  (select coalesce(sum(x.amount), 0) from public.payments x where x.apartment_id = a.id) as paid,
+  (select count(*) from public.charges c where c.apartment_id = a.id and c.source = 'import' and c.label = 'טעינת רכב חשמלי') as main_charges,
+  (select count(*) from public.payments x where x.apartment_id = a.id and x.source = 'import' and x.note like 'טעינת רכב חשמלי%') as main_payments
+from public.apartments a;
+grant select on main, ev_money to authenticated;
+select is(public.import_year((select j from main)) ->> 'ev_skipped', '1', 'the main import skips the EV charge of an apartment with a charger');
+select is((select row(main_charges, main_payments)::text from ev_money where number = 941), '(0,1)',
+  'apartment with a charger: its EV payment is imported, its EV charge is not');
+select is((select row(charged, paid)::text from ev_money where number = 946), '(400.00,200.00)', 'no charger yet: the main import writes the EV block');
 select is(public.import_ev($json$
-{"chargers": [{"apartment": 946, "initial_reading": 0, "readings": [{"month": "2020-01-01", "reading": 50}]}],
- "rates": [], "payments": [{"apartment": 946, "paid_on": "2020-01-01", "amount": 25}], "replace_main_ev": true}
-$json$) ->> 'main_charges', '2', 'replace_main_ev removes the main import''s EV charges for the covered apartment-year');
-select is((select row(charged, paid)::text from apt946), '(25.00,125.00)',
-  'no double charge: only the meter charge; the main EV payment is replaced only in the month the EV file has one');
-select lives_ok($$ select public.import_year((select j from main)) $$, 'the main import runs again');
-select is((select row(charged, paid)::text from apt946), '(25.00,125.00)',
-  're-running the main import neither re-adds its EV block nor removes the EV payments');
+{"chargers": [{"apartment": 946, "initial_reading": 0, "readings": [
+   {"month": "2019-12-01", "reading": 10}, {"month": "2020-01-01", "reading": 50}, {"month": "2020-02-01", "reading": 80}]}],
+ "rates": [{"effective_from": "2019-12-01", "rate": 0.5}], "payments": [{"apartment": 946, "paid_on": "2020-02-01", "amount": 15}],
+ "replace_main_ev": true}
+$json$) - array['chargers', 'readings', 'kept_manual', 'rates', 'payments'], '{"main_charges": 3, "main_payments": 1}'::jsonb,
+  'lag-aware window: main EV charges Jan–Mar go (Dec–Feb readings, a December reading''s January charge too); one main payment goes');
+select is((select row(charged, paid, main_charges, main_payments)::text from ev_money where number = 946), '(140.00,115.00,1,1)',
+  'meter charges 40 + the June main charge outside the window; paid 15 (EV) + the March main payment (no EV payment that month)');
+select is(public.import_year((select j from main)) ->> 'ev_skipped', '5', 're-running the main import skips every EV charge of charger apartments');
+select is((select row(charged, paid, main_charges, main_payments)::text from ev_money where number = 946), '(140.00,115.00,1,1)',
+  're-running the main import keeps the EV payments, does not re-add EV charges, and does not double the replaced payment');
+select is((select row(main_charges, main_payments)::text from ev_money where number = 941), '(0,1)', 'and still imports the EV payment');
 
 select * from finish();
 rollback;

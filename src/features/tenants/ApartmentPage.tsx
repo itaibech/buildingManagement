@@ -5,7 +5,7 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { he } from '../../lib/he'
 import { AptPlate, EmptyState, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
 import { ApartmentForm } from './ApartmentForm'
-import { useApartments, useDeleteApartment, useDeleteResident, useResidents, type Apartment, type Resident } from './api'
+import { isMoneyHistoryError, useApartments, useDeleteApartment, useDeleteResident, useResidents, type Apartment, type Resident } from './api'
 import { ConfirmDialog, FormModal } from './dialogs'
 import { ResidentForm } from './ResidentForm'
 
@@ -93,6 +93,7 @@ function Dialogs({ apartment, residents, dialog, close }: { apartment: Apartment
       <ConfirmDialog opened={dialog?.kind === 'deleteApartment'} title={he.tenants.deleteApartmentConfirm(apartment.number)}
         body={he.tenants.deleteApartmentCascade(residents.length)} confirmLabel={he.tenants.deleteApartment}
         loading={deleteApartment.isPending} failed={deleteApartment.isError} onClose={close}
+        failedMessage={isMoneyHistoryError(deleteApartment.error) ? he.tenants.errors.hasMoney : undefined}
         onConfirm={() => deleteApartment.mutate(apartment.id, { onSuccess: () => { notifySuccess(he.toast.apartmentDeleted); void navigate('/apartments', { replace: true }) } })} />
       <ConfirmDialog opened={Boolean(target)} title={he.tenants.deleteResidentConfirm(target?.full_name ?? '')}
         body={he.tenants.deleteApartmentCascade(0)} confirmLabel={he.tenants.deleteResident}

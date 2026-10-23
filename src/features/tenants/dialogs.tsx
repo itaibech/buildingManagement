@@ -21,18 +21,20 @@ export interface ConfirmDialogProps {
   confirmLabel: string
   loading: boolean
   failed: boolean
+  /** Shown instead of the generic failure when the reason is known. */
+  failedMessage?: string
   onConfirm: () => void
   onClose: () => void
 }
 
 /** Destructive confirmation: plain question, what else is affected, cancel + red confirm. */
-export function ConfirmDialog({ opened, title, body, confirmLabel, loading, failed, onConfirm, onClose }: ConfirmDialogProps) {
+export function ConfirmDialog({ opened, title, body, confirmLabel, loading, failed, failedMessage, onConfirm, onClose }: ConfirmDialogProps) {
   return (
     <Modal opened={opened} onClose={onClose} title={title} centered radius="lg"
       styles={{ title: { fontWeight: 600, fontSize: '1.125rem' } }}>
       <Stack>
         <Text>{body}</Text>
-        {failed && <Alert color="debt">{he.tenants.errors.delete}</Alert>}
+        {failed && <Alert color="debt">{failedMessage ?? he.tenants.errors.delete}</Alert>}
         <Group justify="flex-end" gap="sm">
           <Button variant="default" onClick={onClose}>{he.tenants.cancel}</Button>
           <Button color="debt" loading={loading} onClick={onConfirm}>{confirmLabel}</Button>

@@ -11,7 +11,7 @@ export interface ImportOptions {
   categoryMap?: Record<string, string>
   /** overlapKey(category, month) of imported expense cells to leave out. */
   skipExpenses?: string[]
-  /** Import the EV charging block (default true). */
+  /** Import the EV block's charges (default true). Its payments are real money and are always imported. */
   includeEv?: boolean
 }
 export type PaymentRow = { apartment: number; paid_on: string; amount: number; note: string }
@@ -98,7 +98,8 @@ export function buildImport(parsed: ParsedWorkbook, columns: ColumnMap[], fees: 
   const year = opts.year ?? parsed.income.year
   const cat = (name: string): string => opts.categoryMap?.[name] ?? name
   const numbers = unique(parsed.income.apartments.map((a) => a.number))
-  const ev = opts.includeEv === false ? { charges: [], payments: [] } : evFrom(parsed.income, year)
+  const evAll = evFrom(parsed.income, year)
+  const ev = opts.includeEv === false ? { charges: [], payments: evAll.payments } : evAll
   const skip = new Set(opts.skipExpenses ?? [])
   const expenses = parsed.expenses.flatMap((r) =>
     Object.entries(r.byMonth).map(([m, amount]) => ({ category: cat(r.category), spent_on: rebase(m, year), amount, note: he.import.expenseNote })))

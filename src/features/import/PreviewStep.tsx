@@ -83,7 +83,7 @@ export function PreviewStep({ summary, warnings, year, budgetYear, onYear, onBud
 
 const DONE = ['apartments', 'residents', 'payments', 'expenses'] as const
 
-export function DoneStep({ counts, year, onAgain }: { counts: ImportCounts; year: number; onAgain: () => void }) {
+export function DoneStep({ counts, year, evSkipped, onAgain }: { counts: ImportCounts; year: number; evSkipped: number; onAgain: () => void }) {
   return (
     <Stack gap="md">
       <Title order={2}>{he.import.doneTitle}</Title>
@@ -91,6 +91,7 @@ export function DoneStep({ counts, year, onAgain }: { counts: ImportCounts; year
       <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm">
         {DONE.map((k) => <Count key={k} label={he.import.doneCounts[k]} value={counts[k] ?? 0} />)}
       </SimpleGrid>
+      {evSkipped > 0 && <Text fw={600} className="bm-num">{he.import.evSkipped(evSkipped)}</Text>}
       <Button component={Link} to="/finance" fullWidth>{he.import.toFinance}</Button>
       <Button variant="default" fullWidth onClick={onAgain}>{he.import.again}</Button>
     </Stack>
@@ -116,13 +117,15 @@ export function LevyNotice({ levy, apartments, onAmount }: { levy: LevyLine; apa
   )
 }
 
-export function EvNotice({ ev, include, managed, onInclude }: { ev: EvInfo; include: boolean; managed?: boolean; onInclude: (v: boolean) => void }) {
+export function EvNotice({ ev, include, managed, skipped, onInclude }: { ev: EvInfo; include: boolean; managed?: boolean; skipped: number; onInclude: (v: boolean) => void }) {
   if (ev.apartments.length === 0) return null
   return (
     <Paper withBorder radius={12} p="sm">
       <Text fw={600}>{he.import.evTitle}</Text>
       <Text size="sm" className="bm-num">{he.import.evNotice(ev.apartments.join(', '), formatILS(ev.total))}</Text>
       {managed && <Text size="sm" c="signal.9" mt={4}>{he.import.evManaged}</Text>}
+      {skipped > 0 && <Text size="sm" fw={600} mt={4}>{he.import.evSkipped(skipped)}</Text>}
+      <Text size="sm" c="dimmed" mt={4}>{he.import.evPaymentsKept}</Text>
       <Toggle label={he.import.evInclude} checked={include} onChange={onInclude} />
     </Paper>
   )

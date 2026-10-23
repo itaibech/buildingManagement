@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildEvPayload, coveredKeys, derivePayments, deriveRates, deriveReadings, paymentKey, summarizeEv } from './buildEvImport'
+import { buildEvPayload, coveredKeys, derivePayments, mainReplacement, deriveRates, deriveReadings, paymentKey, summarizeEv } from './buildEvImport'
 import { evFixtureRows } from './fixture'
 import { parseEvSheet } from './parseEvWorkbook'
 
@@ -81,5 +81,17 @@ describe('payments and summary', () => {
     expect(rows.map((r) => `${r.apartment}:${r.year}:${r.readings}`)).toEqual(['7:2022:11', '7:2023:12', '7:2026:9', '9:2023:1'])
     expect(rows[0]?.kwh).toBe(1400)
     expect(rows[3]).toMatchObject({ kwh: 69.23, amount: 43.27 })
+  })
+})
+
+describe('mainReplacement', () => {
+  it('removes main EV charges in [first reading + 1 .. last reading + 1] and main payments only where the EV file has one', () => {
+    const chargers = [{ apartment: 46, initial_reading: 0, readings: [
+      { month: '2019-12-01', reading: 10 }, { month: '2020-01-01', reading: 50 }, { month: '2020-02-01', reading: 80 }] }]
+    const rates = [{ effective_from: '2019-12-01', rate: 0.5 }]
+    const main = (month: string) => ({ apartment: 46, month, amount: 100 })
+    const r = mainReplacement(chargers, rates, [{ apartment: 46, paid_on: '2020-02-01', amount: 15 }],
+      ['2020-01-01', '2020-02-01', '2020-03-01', '2020-06-01'].map(main), [main('2020-02-01'), main('2020-03-01')])
+    expect(r).toEqual({ charges: 3, chargesAmount: 300, from: '2020-01-01', to: '2020-03-01', meterCount: 3, meterAmount: 40, paymentsRemoved: 1, paymentsKept: 1 })
   })
 })

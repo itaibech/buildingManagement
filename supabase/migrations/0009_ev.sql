@@ -390,8 +390,9 @@ $$;
 
 -- replace_main_ev: the main workbook's EV block (import_year: source 'import' extras labelled EV, and payments
 -- noted EV) gives way to the meter import:
---   * its EV charges go for every apartment-YEAR the payload has readings in. By year, not month: the committee's
---     main workbook books EV a month after the reading (observed), so a month match would leave one month doubled.
+--   * its EV charges go per apartment in the lag-aware window [first reading month + 1 .. last reading month + 1]:
+--     the main workbook books EV one month after the reading (observed), so a December reading's charge is the
+--     January main charge. Charges outside the window are kept.
 --   * its EV payments go only for the apartment-months the payload has a payment in (payments are real money;
 --     a month the EV file has no "שולם" for keeps the main workbook's payment).
 -- The meter import is then the one source of EV charges for those apartments and years.
@@ -403,11 +404,12 @@ declare
   n_pay int := 0;
 begin
   if coalesce((p ->> 'replace_main_ev')::boolean, false) then
-    delete from public.charges x using public.apartments a
-    where a.id = x.apartment_id and a.building_id = b and x.source = 'import' and x.kind = 'extra'
-      and x.label = 'טעינת רכב חשמלי' and (a.number, extract(year from x.month)::int) in (
-        select (c ->> 'apartment')::int, left(r ->> 'month', 4)::int
-        from jsonb_array_elements(p -> 'chargers') c, jsonb_array_elements(c -> 'readings') r);
+    delete from public.charges x using public.apartments a, (
+        select (c ->> 'apartment')::int as number, (min((r ->> 'month')::date) + interval '1 month')::date as lo,
+          (max((r ->> 'month')::date) + interval '1 month')::date as hi
+        from jsonb_array_elements(p -> 'chargers') c, jsonb_array_elements(c -> 'readings') r group by 1) w
+    where a.id = x.apartment_id and a.building_id = b and a.number = w.number and x.source = 'import'
+      and x.kind = 'extra' and x.label = 'טעינת רכב חשמלי' and x.month between w.lo and w.hi;
     get diagnostics n_chg = row_count;
     delete from public.payments x using public.apartments a
     where a.id = x.apartment_id and a.building_id = b and x.source = 'import' and x.note like 'טעינת רכב חשמלי%'
@@ -499,14 +501,25 @@ grant execute on function public.import_ev(jsonb) to authenticated;
 
 -- ---------------------------------------------------------------- main workbook import (0008) vs EV
 -- Once an apartment has a charger its EV is billed from meter readings: import_year neither deletes nor inserts
--- the workbook's EV block rows (extras labelled EV, payments noted EV) for that apartment.
-create function public.import_is_ev_row(p_apartment uuid, p_kind text, p_label text, p_note text) returns boolean
+-- the workbook's EV charges (extras labelled EV) for that apartment; it reports how many it skipped (ev_skipped).
+-- EV-noted payments are real money and are always imported, except a month that already holds the same money as
+-- an 'ev-import' payment (the EV import replaced the main payment there), so a re-import never doubles it.
+create function public.import_is_ev_charge(p_apartment uuid, p_kind text, p_label text) returns boolean
 language sql stable set search_path = ''
 as $$
-  select exists (select 1 from public.ev_chargers c where c.apartment_id = p_apartment)
-    and ((p_kind = 'extra' and p_label = 'טעינת רכב חשמלי') or coalesce(p_note, '') like 'טעינת רכב חשמלי%');
+  select p_kind = 'extra' and p_label = 'טעינת רכב חשמלי'
+    and exists (select 1 from public.ev_chargers c where c.apartment_id = p_apartment);
 $$;
-revoke execute on function public.import_is_ev_row(uuid, text, text, text) from public, anon, authenticated;
+revoke execute on function public.import_is_ev_charge(uuid, text, text) from public, anon, authenticated;
+
+create function public.import_ev_paid(p_apartment uuid, p_paid_on date, p_note text) returns boolean
+language sql stable set search_path = ''
+as $$
+  select coalesce(p_note, '') like 'טעינת רכב חשמלי%' and exists (select 1 from public.payments x
+    where x.apartment_id = p_apartment and x.source = 'ev-import'
+      and date_trunc('month', x.paid_on::timestamp) = date_trunc('month', p_paid_on::timestamp));
+$$;
+revoke execute on function public.import_ev_paid(uuid, date, text) from public, anon, authenticated;
 
 create or replace function public.import_money(p jsonb, b uuid) returns jsonb
 language plpgsql set search_path = ''
@@ -514,20 +527,24 @@ as $$
 declare
   n_pay int;
   n_chg int;
+  n_skip int;
 begin
   insert into public.payments (building_id, apartment_id, paid_on, amount, method, note, source)
   select b, a.id, (e ->> 'paid_on')::date, (e ->> 'amount')::numeric, 'other', e ->> 'note', 'import'
   from jsonb_array_elements(p -> 'payments') e
   join public.apartments a on a.building_id = b and a.number = (e ->> 'apartment')::int
-  where not public.import_is_ev_row(a.id, null, null, e ->> 'note');
+  where not public.import_ev_paid(a.id, (e ->> 'paid_on')::date, e ->> 'note');
   get diagnostics n_pay = row_count;
+  select count(*) into n_skip from jsonb_array_elements(p -> 'charges') e
+  join public.apartments a on a.building_id = b and a.number = (e ->> 'apartment')::int
+  where public.import_is_ev_charge(a.id, e ->> 'kind', e ->> 'label');
   insert into public.charges (building_id, apartment_id, month, amount, kind, label, source)
   select b, a.id, (e ->> 'month')::date, (e ->> 'amount')::numeric, e ->> 'kind', e ->> 'label', 'import'
   from jsonb_array_elements(p -> 'charges') e
   join public.apartments a on a.building_id = b and a.number = (e ->> 'apartment')::int
-  where not public.import_is_ev_row(a.id, e ->> 'kind', e ->> 'label', null);
+  where not public.import_is_ev_charge(a.id, e ->> 'kind', e ->> 'label');
   get diagnostics n_chg = row_count;
-  return jsonb_build_object('payments', n_pay, 'charges', n_chg);
+  return jsonb_build_object('payments', n_pay, 'charges', n_chg, 'ev_skipped', n_skip);
 end;
 $$;
 
@@ -549,10 +566,9 @@ begin
   perform pg_advisory_xact_lock(hashtext('public.import_year'));
   y0 := make_date((payload ->> 'year')::int, 1, 1);
   y1 := (y0 + interval '1 year')::date;
-  delete from public.payments where building_id = b and source = 'import' and paid_on >= y0 and paid_on < y1
-    and not public.import_is_ev_row(apartment_id, null, null, note);
+  delete from public.payments where building_id = b and source = 'import' and paid_on >= y0 and paid_on < y1;
   delete from public.charges where building_id = b and source = 'import' and month >= y0 and month < y1
-    and not public.import_is_ev_row(apartment_id, kind, label, null);
+    and not public.import_is_ev_charge(apartment_id, kind, label);
   delete from public.expenses where building_id = b and source = 'import' and spent_on >= y0 and spent_on < y1;
   return public.import_people(payload, b) || public.import_fees(payload, b, y0, y1)
     || public.import_money(payload, b) || public.import_spending(payload, b);

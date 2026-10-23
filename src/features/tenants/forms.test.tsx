@@ -8,6 +8,8 @@ import { he } from '../../lib/he'
 import { theme } from '../../ui/theme'
 import { ApartmentForm } from './ApartmentForm'
 import { ResidentForm } from './ResidentForm'
+import { DbFailure, isMoneyHistoryError } from './api'
+import { ConfirmDialog } from './dialogs'
 
 const db = vi.hoisted(() => ({ inserts: [] as { table: string; values: unknown }[] }))
 
@@ -68,5 +70,15 @@ describe('ApartmentForm', () => {
     fireEvent.click(screen.getByRole('button', { name: he.tenants.save }))
     expect(await screen.findByText(he.tenants.errors.number)).toBeInTheDocument()
     expect(db.inserts).toHaveLength(0)
+  })
+})
+
+describe('apartment delete with money history', () => {
+  it('maps the FK / EV-guard refusal to a clear message', () => {
+    expect(isMoneyHistoryError(new DbFailure({ message: 'fk', code: '23503' }))).toBe(true)
+    expect(isMoneyHistoryError(new DbFailure({ message: 'x', code: '500' }))).toBe(false)
+    wrap(<ConfirmDialog opened title="t" body="b" confirmLabel="מחיקה" loading={false} failed failedMessage={he.tenants.errors.hasMoney}
+      onClose={() => undefined} onConfirm={() => undefined} />)
+    expect(screen.getByText('לא ניתן למחוק דירה עם היסטוריה כספית')).toBeInTheDocument()
   })
 })

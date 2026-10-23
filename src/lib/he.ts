@@ -128,6 +128,7 @@ export const he = {
       duplicateNumber: 'כבר יש דירה עם המספר הזה',
       save: 'השמירה נכשלה. נסו שוב.',
       delete: 'המחיקה נכשלה. נסו שוב.',
+      hasMoney: 'לא ניתן למחוק דירה עם היסטוריה כספית',
     },
   },
   users: {
@@ -476,7 +477,9 @@ export const he = {
     evTitle: 'טעינת רכב חשמלי',
     evNotice: (apartments: string, total: string) =>
       `זוהתה טעינה בדירות ${apartments}, בסך ${total}. לכל חודש ייווצרו חיוב ותשלום באותו סכום.`,
-    evInclude: 'לייבא את נתוני הטעינה',
+    evInclude: 'לייבא את חיובי הטעינה',
+    evSkipped: (n: number) => `${n} חיובי טעינה דולגו (מנוהלים במודול הטעינה)`,
+    evPaymentsKept: 'תשלומי הטעינה מהקובץ מיובאים תמיד (כסף שהתקבל).',
     overlapTitle: (n: number) => (n === 1 ? 'תא הוצאה אחד כבר רשום במערכת' : `${n} תאי הוצאה כבר רשומים במערכת`),
     overlapBody: 'באותה קטגוריה ובאותו חודש כבר יש הוצאה שלא יובאה מאקסל. כדי לא לספור פעמיים, התאים האלה לא ייובאו.',
     overlapItem: (category: string, month: string, amount: string) => `${category} · ${month} · ${amount}`,
@@ -517,7 +520,7 @@ export const he = {
     levyLabel: 'היטל מיוחד',
     evLabel: 'טעינת רכב חשמלי',
     evNote: 'טעינת רכב חשמלי · יובא מאקסל',
-    evManaged: 'יש במערכת עמדות טעינה, והטעינה מחושבת ממוני הטעינה (כספים › טעינת רכב). לכן ברירת המחדל היא לא לייבא את בלוק הטעינה מהקובץ הזה.',
+    evManaged: 'יש במערכת עמדות טעינה, והטעינה מחושבת ממוני הטעינה (כספים › טעינת רכב). לכן ברירת המחדל היא לא לייבא את חיובי הטעינה מהקובץ הזה, ובכל מקרה חיובי הטעינה של דירות עם עמדה לא ייובאו.',
     warnCell: (where: string, header: string, value: string) => `${where}, עמודה ${header}: לא הצלחנו לקרוא "${value}"`,
     warnDuplicateRow: (n: number) => `דירה ${n} מופיעה ביותר משורה אחת. התשלומים מכל השורות ייזקפו לדירה.`,
     evColumn: (month: string) => `טעינה ${month}`,
@@ -654,7 +657,8 @@ export const he = {
       overlapItem: (apt: number, month: string, amount: string) => `דירה ${apt} · ${month} · ${amount}`,
       overlapInclude: 'לייבא אותם בכל זאת',
       replaceMain: (n: number) => `יוחלפו ${n} חיובי טעינה מהייבוא הראשי`,
-      replaceMainBody: 'בחודשים האלה כבר יובאו חיובי ותשלומי טעינה מקובץ הוועד הראשי. הם יימחקו, וקריאות המונה יהיו המקור היחיד לחיובי הטעינה.',
+      replaceMainBody: (n: number, x: string, from: string, to: string, m: number, y: string, k: number, l: number) =>
+        `יוסרו ${n} חיובי טעינה מהייבוא הראשי (${x}) בחודשים ${from}–${to} ויוחלפו ב-${m} חיובים לפי מונה (${y}). ${k} תשלומי טעינה מהייבוא הראשי יוסרו (בחודשים שבהם קיים תשלום בקובץ הטעינה), ${l} יישמרו.`,
       replaceMainToggle: 'להחליף את נתוני הטעינה מהייבוא הראשי',
       warnInitial: (apt: number, from: string, to: string) => `דירה ${apt}: קריאת הפתיחה של העמדה הקיימת תשתנה מ-${from} ל-${to}.`,
       summaryTitle: 'קריאות לפי דירה ושנה',

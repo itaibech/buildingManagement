@@ -873,14 +873,17 @@ isOneToOne: false
 "import_ev":
 { Args: { "payload": Json }; Returns: Json
                            },
+"import_ev_paid":
+{ Args: { "p_apartment": string,"p_note": string,"p_paid_on": string }; Returns: boolean
+                           },
 "import_fees":
 { Args: { "b": string,"p": Json,"y0": string,"y1": string }; Returns: Json
                            },
 "import_is_amount":
 { Args: { "j": Json }; Returns: boolean
                            },
-"import_is_ev_row":
-{ Args: { "p_apartment": string,"p_kind": string,"p_label": string,"p_note": string }; Returns: boolean
+"import_is_ev_charge":
+{ Args: { "p_apartment": string,"p_kind": string,"p_label": string }; Returns: boolean
                            },
 "import_is_int":
 { Args: { "hi": number,"j": Json,"lo": number }; Returns: boolean

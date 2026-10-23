@@ -119,9 +119,9 @@ export function useMainEvCharges(apartmentIds: readonly string[]) {
   return useQuery({
     queryKey: [...KEY, 'main-charges', [...apartmentIds].sort().join(',')],
     enabled: apartmentIds.length > 0,
-    queryFn: async (): Promise<{ apartment_id: string; month: string }[]> =>
-      must(await supabase.from('charges').select('apartment_id, month').in('apartment_id', [...apartmentIds])
-        .eq('source', 'import').eq('kind', 'extra').eq('label', he.ev.chargeLabel)),
+    queryFn: async (): Promise<{ apartment_id: string; month: string; amount: number }[]> =>
+      must(await supabase.from('charges').select('apartment_id, month, amount').in('apartment_id', [...apartmentIds])
+        .eq('source', 'import').eq('kind', 'extra').eq('label', he.ev.chargeLabel)).map((c) => ({ ...c, amount: num(c.amount) })),
   })
 }
 

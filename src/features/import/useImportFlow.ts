@@ -16,6 +16,8 @@ export interface ImportContext {
   fees: ExistingFee[]; budgets: string[]; expenses: ExistingExpense[]; categories: string[]
   /** EV chargers exist: EV is billed from meter readings, so the workbook's EV block defaults to excluded. */
   hasChargers: boolean
+  /** Apartment numbers that have an EV charger: the server skips their EV charges. */
+  chargerNumbers: number[]
   loading: boolean
 }
 
@@ -31,6 +33,7 @@ export function useImportContext(year: number, budgetYear: number): ImportContex
     expenses: (expenses.data ?? []).map((e) => ({ category: e.category, spent_on: e.spent_on, source: e.source })),
     categories: (categories.data ?? []).map((c) => c.name),
     hasChargers: (chargers.data ?? []).length > 0,
+    chargerNumbers: (chargers.data ?? []).map((c) => c.number),
     loading: fees.isLoading || budgets.isLoading || expenses.isLoading || categories.isLoading || chargers.isLoading,
   }), [fees.data, budgets.data, expenses.data, categories.data, chargers.data, fees.isLoading, budgets.isLoading, expenses.isLoading, categories.isLoading, chargers.isLoading])
 }
@@ -74,11 +77,16 @@ function categoryChoices(st: ImportState, existing: string[]) {
 const levyLines = (columns: ColumnMap[]): LevyLine[] => columns.flatMap((c) =>
   c.proposal.kind === 'levy' && c.proposal.month ? [{ col: c.col, month: c.proposal.month, amount: c.proposal.amount ?? 0 }] : [])
 
+/** EV charges that won't be imported: all of them when excluded, else those of apartments with a charger. */
+function evSkipped(ev: { apartment: number; byMonth: Record<string, number> }[], include: boolean, chargers: number[]): number {
+  return ev.filter((e) => !include || chargers.includes(e.apartment)).reduce((n, e) => n + Object.keys(e.byMonth).length, 0)
+}
+
 /** Everything computed from the state: fees prefill, category mapping, the payload and the guard notices. */
 export function useDerived(st: ImportState, ctx: ImportContext) {
   return useMemo(() => {
     const { names, resolved, categoryMap } = categoryChoices(st, ctx.categories)
-    if (!st.read) return { names, resolved, fees: [], fromSystem: false, payload: null, overlaps: [], levies: [], ev: { apartments: [], total: 0 }, includeEv: false, feesReplaced: 0, budgetsUpdated: 0 }
+    if (!st.read) return { names, resolved, fees: [], fromSystem: false, payload: null, overlaps: [], levies: [], ev: { apartments: [], total: 0 }, includeEv: false, evSkipped: 0, feesReplaced: 0, budgetsUpdated: 0 }
     const { income } = st.read.parsed
     const init = initialFees(ctx.fees, income, income.columns, st.year)
     const fees = st.feesEdit ?? init.fees
@@ -94,6 +102,7 @@ export function useDerived(st: ImportState, ctx: ImportContext) {
     }
     return {
       names, resolved, fees, fromSystem: init.fromSystem, payload, overlaps, levies: levyLines(st.columns), ev, includeEv,
+      evSkipped: evSkipped(income.ev, includeEv, ctx.chargerNumbers),
       feesReplaced: payload.fees.length > 0 ? feesToReplace(ctx.fees, st.year) : 0,
       budgetsUpdated: budgetUpdates(payload.budgets, ctx.budgets),
     }

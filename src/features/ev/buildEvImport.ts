@@ -2,6 +2,7 @@
 // and (optionally) the "שולם" payments. Rates come from the sheet's own numbers (price ÷ kWh), not its rate cells.
 import { formatKwh, monthLabel } from '../../lib/format'
 import { he } from '../../lib/he'
+import { shiftMonth } from '../finance/ledger'
 import { mode } from '../import/parseWorkbook'
 import { chargeAmount, money, rateFor, type Rate } from './evMath'
 import type { EvSheet } from './parseEvWorkbook'
@@ -121,5 +122,38 @@ export function buildEvPayload(chargers: ChargerPlan[], rates: readonly Rate[], 
     rates: rates.map((r) => ({ effective_from: r.effective_from, rate: r.rate })),
     payments: opts.includePayments ? payments.filter((p) => !opts.skipPayments.has(paymentKey(p.apartment, p.paid_on))) : [],
     replace_main_ev: opts.replaceMain ?? false,
+  }
+}
+
+export interface MainRow { apartment: number; month: string; amount: number }
+export interface MainReplacement {
+  charges: number; chargesAmount: number; from: string | null; to: string | null
+  meterCount: number; meterAmount: number; paymentsRemoved: number; paymentsKept: number
+}
+
+/**
+ * What replace_main_ev removes (same rules as public.ev_replace_main): per apartment the main import's EV charges in
+ * [first reading + 1 month .. last reading + 1 month], and its EV payments in the months `payments` has a payment.
+ * The meter side is the readings of the apartments losing a main charge.
+ */
+export function mainReplacement(chargers: ChargerPlan[], rates: readonly Rate[], payments: EvPaymentRow[], mainCharges: MainRow[], mainPayments: MainRow[]): MainReplacement {
+  const windows = new Map(chargers.filter((c) => c.readings.length > 0).map((c) => {
+    const months = c.readings.map((r) => r.month).sort()
+    return [c.apartment, [shiftMonth(months[0] ?? '', 1), shiftMonth(months.at(-1) ?? '', 1)]] as const
+  }))
+  const removed = mainCharges.filter((m) => {
+    const w = windows.get(m.apartment)
+    return !!w && m.month >= w[0] && m.month <= w[1]
+  }).sort((a, b) => a.month.localeCompare(b.month))
+  const losing = new Set(removed.map((m) => m.apartment))
+  const meter = summarizeEv(chargers.filter((c) => losing.has(c.apartment)), rates)
+  const paid = new Set(payments.map((p) => paymentKey(p.apartment, p.paid_on)))
+  const ofPayload = mainPayments.filter((m) => chargers.some((c) => c.apartment === m.apartment))
+  const paymentsRemoved = ofPayload.filter((m) => paid.has(paymentKey(m.apartment, m.month))).length
+  return {
+    charges: removed.length, chargesAmount: money(removed.reduce((t, m) => t + m.amount, 0)),
+    from: removed[0]?.month ?? null, to: removed.at(-1)?.month ?? null,
+    meterCount: meter.reduce((n, s) => n + s.readings, 0), meterAmount: money(meter.reduce((t, s) => t + s.amount, 0)),
+    paymentsRemoved, paymentsKept: ofPayload.length - paymentsRemoved,
   }
 }
