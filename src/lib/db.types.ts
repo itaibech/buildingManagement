@@ -83,14 +83,14 @@ isOneToOne: false
                   ]
                 },"apartment_fee_overrides": {
                   Row: {
-                    "amount": number,"apartment_id": string,"building_id": string,"created_at": string,"effective_from": string,"id": string
+                    "amount": number | null,"apartment_id": string,"building_id": string,"created_at": string,"effective_from": string,"id": string,"mode": string,"source": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount": number,"apartment_id": string,"building_id"?: string,"created_at"?: string,"effective_from": string,"id"?: string
+                    "amount"?: number | null,"apartment_id": string,"building_id"?: string,"created_at"?: string,"effective_from": string,"id"?: string,"mode"?: string,"source"?: string
                   }
                   Update: {
-                    "amount"?: number,"apartment_id"?: string,"building_id"?: string,"created_at"?: string,"effective_from"?: string,"id"?: string
+                    "amount"?: number | null,"apartment_id"?: string,"building_id"?: string,"created_at"?: string,"effective_from"?: string,"id"?: string,"mode"?: string,"source"?: string
                   }
                   Relationships: [
                     {
@@ -199,14 +199,14 @@ isOneToOne: false
                   ]
                 },"buildings": {
                   Row: {
-                    "address": string | null,"billing_start": string | null,"created_at": string,"id": string,"name": string,"opening_cash": number,"opening_cash_date": string | null
+                    "address": string | null,"billing_start": string | null,"committee_contact": string | null,"created_at": string,"id": string,"name": string,"opening_cash": number,"opening_cash_date": string | null,"payment_instructions": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "address"?: string | null,"billing_start"?: string | null,"created_at"?: string,"id"?: string,"name": string,"opening_cash"?: number,"opening_cash_date"?: string | null
+                    "address"?: string | null,"billing_start"?: string | null,"committee_contact"?: string | null,"created_at"?: string,"id"?: string,"name": string,"opening_cash"?: number,"opening_cash_date"?: string | null,"payment_instructions"?: string | null
                   }
                   Update: {
-                    "address"?: string | null,"billing_start"?: string | null,"created_at"?: string,"id"?: string,"name"?: string,"opening_cash"?: number,"opening_cash_date"?: string | null
+                    "address"?: string | null,"billing_start"?: string | null,"committee_contact"?: string | null,"created_at"?: string,"id"?: string,"name"?: string,"opening_cash"?: number,"opening_cash_date"?: string | null,"payment_instructions"?: string | null
                   }
                   Relationships: [
                     
@@ -764,7 +764,7 @@ isOneToOne: false
           Views: {
             "apartment_balances": {
                   Row: {
-                    "apartment_id": string,"balance": number | null,"charged": number | null,"paid": number | null,"scheduled_charges": number | null
+                    "apartment_id": string,"balance": number | null,"charged": number | null,"current_fee": number | null,"current_fee_mode": string | null,"paid": number | null,"scheduled_charges": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -794,7 +794,7 @@ isOneToOne: false
                   ]
                 },"monthly_fees": {
                   Row: {
-                    "amount": number | null,"apartment_id": string,"month": string | null
+                    "amount": number | null,"apartment_id": string,"fee_mode": string | null,"month": string | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -803,7 +803,12 @@ isOneToOne: false
                 }
           }
           Functions: {
-            "building_cash_balance":
+            "apartment_fee_at":
+{ Args: { "p_apartment_id": string,"p_month": string }; Returns: {
+              "amount": number,"fee_mode": string
+            }[]
+                           },
+"building_cash_balance":
 { Args: { "p_building_id": string }; Returns: number
                            },
 "can_manage_ticket":
@@ -876,6 +881,9 @@ isOneToOne: false
 "import_ev_paid":
 { Args: { "p_apartment": string,"p_note": string,"p_paid_on": string }; Returns: boolean
                            },
+"import_exempt":
+{ Args: { "b": string,"p": Json,"y0": string }; Returns: Json
+                           },
 "import_fees":
 { Args: { "b": string,"p": Json,"y0": string,"y1": string }; Returns: Json
                            },
@@ -900,8 +908,17 @@ isOneToOne: false
 "import_people":
 { Args: { "b": string,"p": Json }; Returns: Json
                            },
+"import_replaced_kinds":
+{ Args: { "p": Json }; Returns: (string)[]
+                           },
 "import_spending":
 { Args: { "b": string,"p": Json }; Returns: Json
+                           },
+"import_validate_exempt":
+{ Args: { "p": Json }; Returns: undefined
+                           },
+"import_validate_keep":
+{ Args: { "p": Json }; Returns: undefined
                            },
 "import_validate_refs":
 { Args: { "p": Json }; Returns: undefined
@@ -932,6 +949,9 @@ isOneToOne: false
                            },
 "save_ev_rate":
 { Args: { "p_effective_from": string,"p_rate": number }; Returns: number
+                           },
+"set_apartment_fee":
+{ Args: { "p_amount"?: number,"p_apartment_id": string,"p_effective_from": string,"p_mode": string }; Returns: boolean
                            },
 "user_names":
 { Args: { "ids": (string)[] }; Returns: {

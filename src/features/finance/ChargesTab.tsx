@@ -1,36 +1,34 @@
-import { ActionIcon, Button, Card, Divider, Group, Stack, Title } from '@mantine/core'
-import { IconArrowBackUp } from '@tabler/icons-react'
+import { Card, Divider, Group, Paper, Stack, Switch, Text, Title, Tooltip, UnstyledButton } from '@mantine/core'
+import { IconLock } from '@tabler/icons-react'
 import { Fragment, useState, type ReactNode } from 'react'
 import { todayISO } from '../../lib/dates'
 import { formatILS, monthLabel } from '../../lib/format'
 import { he } from '../../lib/he'
 import { EmptyState, ListSkeleton, Money, notifySuccess } from '../../ui'
 import { ConfirmDialog, FormModal } from '../tenants/dialogs'
-import { useCharges, useDeleteCharge, useDeleteOverride, useFeeSchedule, useOverrides, type Charge, type FeeOverride } from './api'
+import { ApartmentFeesSection } from './ApartmentFees'
+import { useCharges, useDeleteCharge, useFeeSchedule, type Charge } from './api'
 import { LoadFailed } from './cards'
-import { ChargeForm, FeeForm, LevyForm, OverrideForm } from './ChargeForms'
+import { ChargeForm, FeeForm, LevyForm } from './ChargeForms'
 import { DeleteButton, Row, YearStepper } from './fields'
 import { useApartmentInfo } from './hooks'
 
-type Sheet = 'fee' | 'override' | 'levy' | 'charge' | null
-type Removing = { kind: 'override'; row: FeeOverride } | { kind: 'charge'; row: Charge } | null
+type Sheet = 'choose' | 'levy' | 'charge' | null
 
-function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <Card padding={0}>
-      <Group justify="space-between" px="md" pt="md" pb="xs" gap="xs">
-        <Title order={2} size="h4">{title}</Title>
-        {action}
-      </Group>
+      <Title order={2} size="h4" px="md" pt="md" pb="xs">{title}</Title>
       {children}
     </Card>
   )
 }
 
-function FeeList({ onAdd }: { onAdd: () => void }) {
+function FeeList() {
   const q = useFeeSchedule()
   return (
-    <Section title={he.finance.feeSchedule} action={<Button variant="light" onClick={onAdd}>{he.finance.setFee}</Button>}>
+    <Section title={he.finance.feeSchedule}>
+      <Text size="sm" c="dimmed" px="md" pb="xs">{he.finance.feeHint}</Text>
       {q.isLoading && <Stack p="md"><ListSkeleton rows={2} /></Stack>}
       {q.isError && <Stack p="md"><LoadFailed onRetry={() => void q.refetch()} /></Stack>}
       {q.data?.length === 0 && <EmptyState title={he.finance.noFees} body={he.finance.noFeesBody} />}
@@ -45,89 +43,98 @@ function FeeList({ onAdd }: { onAdd: () => void }) {
   )
 }
 
-function OverrideList({ onAdd, onRevert }: { onAdd: () => void; onRevert: (o: FeeOverride) => void }) {
-  const q = useOverrides()
-  const info = useApartmentInfo()
-  const revert = (o: FeeOverride) => (
-    <ActionIcon variant="subtle" color="stone.7" size={44} aria-label={he.finance.revertOverride(info.get(o.apartment_id)?.number ?? 0)} onClick={() => onRevert(o)}>
-      <IconArrowBackUp size={20} stroke={1.75} aria-hidden="true" />
-    </ActionIcon>
-  )
-  return (
-    <Section title={he.finance.overrides} action={<Button variant="light" onClick={onAdd}>{he.finance.addOverride}</Button>}>
-      {q.isError && <Stack p="md"><LoadFailed onRetry={() => void q.refetch()} /></Stack>}
-      {q.data?.length === 0 && <EmptyState title={he.finance.noOverrides} />}
-      {q.data?.map((o) => (
-        <Fragment key={o.id}>
-          <Divider color="stone.1" />
-          <Row plate={info.get(o.apartment_id)?.number} title={info.get(o.apartment_id)?.names || he.finance.noResidents}
-            meta={he.finance.fromMonth(monthLabel(o.effective_from))} end={<Money amount={o.amount} tone="neutral" />} trailing={revert(o)} />
-        </Fragment>
-      ))}
-    </Section>
-  )
-}
+const Locked = () => (
+  <Tooltip label={he.finance.evChargeLocked} events={{ hover: true, focus: true, touch: true }}>
+    <Group w={44} h={44} justify="center" tabIndex={0} aria-label={he.finance.evChargeLocked} role="img">
+      <IconLock size={18} stroke={1.75} color="var(--mantine-color-stone-6)" aria-hidden="true" />
+    </Group>
+  </Tooltip>
+)
 
-function ChargeList({ onLevy, onCharge, onDelete }: { onLevy: () => void; onCharge: () => void; onDelete: (c: Charge) => void }) {
+function ChargeList({ onDelete }: { onDelete: (c: Charge) => void }) {
   const [year, setYear] = useState(() => Number(todayISO().slice(0, 4)))
+  const [showEv, setShowEv] = useState(false)
   const q = useCharges(year)
   const info = useApartmentInfo()
-  const actions = <Group gap="xs"><Button variant="light" onClick={onLevy}>{he.finance.newLevy}</Button><Button variant="default" onClick={onCharge}>{he.finance.newCharge}</Button></Group>
+  const evCount = (q.data ?? []).filter((c) => c.ev_reading_id).length
+  const rows = (q.data ?? []).filter((c) => showEv || !c.ev_reading_id)
   return (
-    <Section title={he.finance.charges} action={actions}>
+    <Section title={he.finance.charges}>
       <YearStepper value={year} onChange={setYear} />
+      {evCount > 0 && (
+        <Switch px="md" py="xs" label={he.finance.showEvCharges(evCount)} checked={showEv} onChange={(e) => setShowEv(e.currentTarget.checked)}
+          styles={{ body: { alignItems: 'center', minHeight: 44 } }} />
+      )}
       {q.isLoading && <Stack p="md"><ListSkeleton rows={3} /></Stack>}
       {q.isError && <Stack p="md"><LoadFailed onRetry={() => void q.refetch()} /></Stack>}
-      {q.data?.length === 0 && <EmptyState title={he.finance.noCharges} body={he.finance.noChargesBody} />}
-      {q.data?.map((c) => (
+      {q.data && rows.length === 0 && <EmptyState title={he.finance.noCharges} body={he.finance.noChargesBody} />}
+      {rows.map((c) => (
         <Fragment key={c.id}>
           <Divider color="stone.1" />
           <Row plate={info.get(c.apartment_id)?.number} title={c.label || he.finance.kinds[c.kind]}
-            meta={[he.finance.kinds[c.kind], monthLabel(c.month), c.ev_reading_id ? he.finance.evChargeLocked : ''].filter(Boolean).join(' · ')} end={<Money amount={c.amount} />}
-            trailing={c.ev_reading_id ? undefined : <DeleteButton label={he.finance.deleteCharge} onClick={() => onDelete(c)} />} />
+            meta={`${he.finance.kinds[c.kind]} · ${monthLabel(c.month)}`} end={<Money amount={c.amount} />}
+            trailing={c.ev_reading_id ? <Locked /> : <DeleteButton label={he.finance.deleteCharge} onClick={() => onDelete(c)} />} />
         </Fragment>
       ))}
     </Section>
   )
 }
 
-const SHEET_TITLE: Record<NonNullable<Sheet>, string> = { fee: he.finance.setFee, override: he.finance.addOverride, levy: he.finance.newLevy, charge: he.finance.newCharge }
-
-function RemoveDialog({ removing, onClose }: { removing: Removing; onClose: () => void }) {
-  const delOverride = useDeleteOverride()
-  const delCharge = useDeleteCharge()
-  const busy = removing?.kind === 'override' ? delOverride : delCharge
-  const done = (msg: string) => ({ onSuccess: () => { notifySuccess(msg); onClose() } })
-  const confirm = () => {
-    if (removing?.kind === 'override') delOverride.mutate(removing.row.id, done(he.finance.overrideReverted))
-    else if (removing) delCharge.mutate(removing.row.id, done(he.finance.chargeDeleted))
-  }
-  const isOverride = removing?.kind === 'override'
+function Choice({ title, body, onClick }: { title: string; body: string; onClick: () => void }) {
   return (
-    <ConfirmDialog opened={!!removing} title={isOverride ? he.finance.revertConfirm : he.finance.deleteChargeConfirm(formatILS(removing?.row.amount ?? 0))}
-      body={isOverride ? he.finance.revertBody : he.finance.deleteChargeBody} confirmLabel={isOverride ? he.finance.revert : he.finance.delete}
-      loading={busy.isPending} failed={busy.isError} onClose={onClose} onConfirm={confirm} />
+    <UnstyledButton onClick={onClick} w="100%">
+      <Paper withBorder radius={12} p="md" className="bm-row">
+        <Text fw={600}>{title}</Text>
+        <Text size="sm" c="dimmed">{body}</Text>
+      </Paper>
+    </UnstyledButton>
   )
 }
 
-/** Admin "חיובים": fee schedule, per-apartment fees, levies and one-off/opening charges. The page FAB adds a levy. */
-export function ChargesTab({ levying, onLevyingClose }: { levying: boolean; onLevyingClose: () => void }) {
+function RemoveDialog({ removing, onClose }: { removing: Charge | null; onClose: () => void }) {
+  const del = useDeleteCharge()
+  return (
+    <ConfirmDialog opened={!!removing} title={he.finance.deleteChargeConfirm(formatILS(removing?.amount ?? 0))}
+      body={he.finance.deleteChargeBody} confirmLabel={he.finance.delete} loading={del.isPending} failed={del.isError} onClose={onClose}
+      onConfirm={() => removing && del.mutate(removing.id, { onSuccess: () => { notifySuccess(he.finance.chargeDeleted); onClose() } })} />
+  )
+}
+
+const SHEET_TITLE: Record<NonNullable<Sheet>, string> = { choose: he.finance.newChargeChooser, levy: he.finance.newLevy, charge: he.finance.newCharge }
+
+/** Admin "חיובים": levies and one-off/opening charges. The page action ("חיוב חדש") asks which kind first. */
+export function ChargesTab({ adding, onAddingClose }: { adding: boolean; onAddingClose: () => void }) {
   const [sheet, setSheet] = useState<Sheet>(null)
-  const [removing, setRemoving] = useState<Removing>(null)
-  const active: Sheet = levying ? 'levy' : sheet
-  const close = () => { setSheet(null); onLevyingClose() }
+  const [removing, setRemoving] = useState<Charge | null>(null)
+  const active: Sheet = sheet ?? (adding ? 'choose' : null)
+  const close = () => { setSheet(null); onAddingClose() }
   return (
     <Stack gap="md">
-      <ChargeList onLevy={() => setSheet('levy')} onCharge={() => setSheet('charge')} onDelete={(row) => setRemoving({ kind: 'charge', row })} />
-      <FeeList onAdd={() => setSheet('fee')} />
-      <OverrideList onAdd={() => setSheet('override')} onRevert={(row) => setRemoving({ kind: 'override', row })} />
-      <FormModal opened={!!active} title={active ? SHEET_TITLE[active] : ''} onClose={close}>
-        {active === 'fee' && <FeeForm onDone={close} />}
-        {active === 'override' && <OverrideForm onDone={close} />}
+      <ChargeList onDelete={setRemoving} />
+      <FormModal opened={!!active} title={active ? SHEET_TITLE[active] : ''} onClose={close} compact={active === 'choose'}>
+        {active === 'choose' && (
+          <Stack gap="sm">
+            <Choice title={he.finance.chooseLevy} body={he.finance.chooseLevyBody} onClick={() => setSheet('levy')} />
+            <Choice title={he.finance.chooseCharge} body={he.finance.chooseChargeBody} onClick={() => setSheet('charge')} />
+          </Stack>
+        )}
         {active === 'levy' && <LevyForm onDone={close} />}
         {active === 'charge' && <ChargeForm onDone={close} />}
       </FormModal>
       <RemoveDialog removing={removing} onClose={() => setRemoving(null)} />
+    </Stack>
+  )
+}
+
+/** Admin "דמי ועד": each apartment's fee (its own timeline) and the building's fee. The page action changes it for all. */
+export function FeesTab({ adding, onAddingClose }: { adding: boolean; onAddingClose: () => void }) {
+  return (
+    <Stack gap="md">
+      <ApartmentFeesSection />
+      <FeeList />
+      <FormModal opened={adding} title={he.finance.setFee} onClose={onAddingClose}>
+        {adding && <FeeForm onDone={onAddingClose} />}
+      </FormModal>
     </Stack>
   )
 }

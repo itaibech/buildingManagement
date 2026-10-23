@@ -1,11 +1,11 @@
 import { Button, Card, Group, Stack, Text } from '@mantine/core'
-import { IconArrowRight, IconCash, IconGauge } from '@tabler/icons-react'
+import { IconCash, IconGauge } from '@tabler/icons-react'
 import { useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { useParams } from 'react-router'
 import { todayISO } from '../../lib/dates'
 import { formatILS, formatKwh, monthLabel } from '../../lib/format'
 import { he } from '../../lib/he'
-import { AptPlate, EmptyState, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
+import { AptPlate, BackLink, EmptyState, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
 import { LoadFailed } from '../finance/cards'
 import { YearStepper } from '../finance/fields'
 import { useApartmentInfo } from '../finance/hooks'
@@ -83,7 +83,7 @@ export default function ChargerPage() {
   return (
     <>
       <PageHeader title={he.ev.title} action={charger ? { label: he.ev.recordReading, icon: <IconGauge size={22} stroke={1.75} />, onClick: () => setSheet({ kind: 'record' }) } : undefined} />
-      <Button variant="subtle" component={Link} to="/ev" mb="sm" px={0} leftSection={<IconArrowRight size={18} stroke={1.75} aria-hidden="true" />}>{he.ev.back}</Button>
+      <BackLink to="/ev" label={he.ev.back} />
       {chargers.isLoading && <ListSkeleton rows={3} />}
       {chargers.isError && <LoadFailed onRetry={() => void chargers.refetch()} />}
       {chargers.isSuccess && !charger && <EmptyState title={he.ev.notFound} />}

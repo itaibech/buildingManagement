@@ -1,8 +1,8 @@
-import { Button, Group, Stepper } from '@mantine/core'
+import { Button, Group } from '@mantine/core'
 import { useEffect, useState, type ReactNode } from 'react'
 import { he } from '../../lib/he'
+import { WizardSteps } from '../import/WizardSteps'
 import { ListSkeleton, notifyError, notifySuccess, PageHeader } from '../../ui'
-import { useDesktop } from '../finance/hooks'
 import { ImportError } from '../import/parseWorkbook'
 import { UploadStep } from '../import/PreviewStep'
 import { useImportEv, type EvImportCounts } from './api'
@@ -10,7 +10,6 @@ import { ChargersStep, EvDoneStep, EvPreviewStep, PaymentsStep, RatesStep } from
 import { readEvWorkbook } from './readEvWorkbook'
 import { ratesValid, useEvDerived, useEvImportContext, useEvImportState, type EvDerived, type EvImportContext, type EvImportState } from './useEvImportFlow'
 
-const COMPACT = { step: { minHeight: 44, alignItems: 'center' }, stepBody: { marginTop: 0 }, verticalSeparator: { top: 36, bottom: -10 } } as const
 const STEPS = ['upload', 'chargers', 'rates', 'payments', 'preview', 'done'] as const
 const T = he.ev.import
 
@@ -69,7 +68,6 @@ function stepBodies({ st, d, ctx, go, upload, save, confirm, counts, again }: Bo
 
 /** "ייבוא מאקסל" for EV (/ev/import): upload → chargers → rates → payments → preview → done. */
 export default function EvImportPage() {
-  const desktop = useDesktop()
   const st = useEvImportState()
   const ctx = useEvImportContext()
   const d = useEvDerived(st, ctx)
@@ -91,10 +89,7 @@ export default function EvImportPage() {
   return (
     <>
       <PageHeader title={T.title} />
-      <Stepper active={active} onStepClick={(i) => i < active && active < 5 && setActive(i)} allowNextStepsSelect={false}
-        orientation={desktop ? 'horizontal' : 'vertical'} size="sm" iconSize={32} wrap={false} styles={desktop ? undefined : COMPACT}>
-        {STEPS.map((s) => <Stepper.Step key={s} label={T.steps[s]}>{body[s]}</Stepper.Step>)}
-      </Stepper>
+      <WizardSteps steps={STEPS} labels={T.steps} bodies={body} active={active} onStep={setActive} />
     </>
   )
 }

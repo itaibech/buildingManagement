@@ -29,7 +29,7 @@ function builder(table: string) {
     ? { data: null, error: { message: 'boom' } }
     : { data: db.tables[table] ?? [], error: null })
   const chain: Record<string, unknown> = {}
-  for (const op of ['select', 'eq', 'lt', 'gte', 'order', 'in', 'insert', 'upsert', 'update', 'delete']) {
+  for (const op of ['select', 'eq', 'lt', 'gte', 'order', 'in', 'insert', 'upsert', 'update', 'delete', 'limit']) {
     chain[op] = (...args: unknown[]) => { db.calls.push({ table, op, args }); ops.push(op); return chain }
   }
   chain.single = () => Promise.resolve({ data: { id: 'new' }, error: null })
@@ -53,11 +53,11 @@ vi.mock('../../auth/AuthProvider', () => ({ useAuth: () => ({ isAdmin: db.admin,
 vi.mock('../../ui/notify', () => ({ notifySuccess: toast.success, notifyError: toast.error }))
 vi.mock('../../ui', async (orig) => ({ ...(await orig<typeof import('../../ui')>()), notifySuccess: toast.success, notifyError: toast.error }))
 
-const wrap = (node: ReactNode) =>
+const wrap = (node: ReactNode, at = '/') =>
   render(
     <MantineProvider theme={theme}>
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-        <MemoryRouter>{node}</MemoryRouter>
+        <MemoryRouter initialEntries={[at]}>{node}</MemoryRouter>
       </QueryClientProvider>
     </MantineProvider>,
   )
@@ -88,9 +88,9 @@ describe('resident finance page', () => {
     db.tables.apartment_balances = [{ apartment_id: 'a1', balance: 0, scheduled_charges: 0 }]
     wrap(<FinancePage />)
     expect(await screen.findByText(he.finance.myLedger)).toBeInTheDocument()
-    await waitFor(() => expect(screen.getAllByLabelText(/^דירה \d+$/).length).toBeGreaterThan(0))
-    const plates = screen.getAllByLabelText(/^דירה \d+$/).map((el) => el.getAttribute('aria-label'))
-    expect(new Set(plates)).toEqual(new Set([he.apartment(1)]))
+    await waitFor(() => expect(db.calls.some((c) => c.table === 'apartment_ledger' && c.op === 'eq')).toBe(true))
+    // The header shows the resident's own plate; the page itself shows none (and never another apartment's).
+    expect(screen.queryAllByLabelText(/^דירה \d+$/)).toHaveLength(0)
     expect(screen.queryByText('יוסי')).toBeNull()
     const ledgerFilter = db.calls.find((c) => c.table === 'apartment_ledger' && c.op === 'eq')
     expect(ledgerFilter?.args).toEqual(['apartment_id', 'a1'])
@@ -200,5 +200,26 @@ describe('receipt cleanup', () => {
     expect(out.receiptFailed).toBe(true)
     expect(db.removed).toHaveLength(1)
     expect(db.removed[0]?.[0]).toMatch(/^new\/[0-9a-f-]+\.pdf$/)
+  })
+})
+
+describe('finance UX', () => {
+  it('resident finance shows how to pay with the committee details', async () => {
+    db.tables.apartment_balances = [{ apartment_id: 'a1', number: 1, names: ['דנה'], balance: 330, scheduled: 0, fee: 330, fee_mode: 'building' }]
+    db.tables.buildings = [{ id: 'b1', name: 'בניין', address: null, payment_instructions: 'ביט לגזבר', committee_contact: '050-0000009' }]
+    wrap(<FinancePage />)
+    expect(await screen.findByRole('heading', { name: he.pay.title })).toBeInTheDocument()
+    expect(screen.getByText('ביט לגזבר')).toBeInTheDocument()
+  })
+
+  it('admin charges: one "new charge" action asks levy or single charge, and EV lives at /ev', async () => {
+    db.admin = true
+    wrap(<FinancePage />, '/?tab=charges')
+    expect(screen.getByRole('link', { name: he.nav.ev })).toHaveAttribute('href', '/ev')
+    expect(screen.queryByRole('tab', { name: 'טעינת רכב' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: he.finance.newLevy })).not.toBeInTheDocument()
+    fireEvent.click(screen.getAllByRole('button', { name: he.finance.newChargeChooser })[0] as HTMLElement)
+    fireEvent.click(await screen.findByRole('button', { name: new RegExp(he.finance.chooseLevy) }))
+    expect(await screen.findByRole('dialog', { name: he.finance.newLevy })).toBeInTheDocument()
   })
 })

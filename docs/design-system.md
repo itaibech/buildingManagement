@@ -31,6 +31,7 @@ Status mapping (never deviate):
 - calls: פתוחה = `signal`, בטיפול = `enamel`, סגורה = `stone`
 - maintenance: overdue = `debt`, soon = `signal`, later = `stone`
 - balance: > 0 is owed (`debt`), 0 is settled (`paid`), < 0 is credit (`paid` with the label "זיכוי")
+- fee source: building = `stone`, custom amount = `enamel`, exempt = `stone` (a neutral state)
 - `paid` and `debt` may also be used for success progress (e.g. the collection bar) and for destructive actions / error alerts.
 
 ## Type
@@ -67,13 +68,16 @@ Mobile (<768)                        Desktop (≥768)
   the side nav. It signs out and lands on `#/login`, with no confirm dialog.
 - RTL throughout. Text is start-aligned (right). Amounts in tables are
   end-aligned so the digits line up.
+- Navigation: the tab bar has the five main items; secondary pages keep "עוד" active. The desktop side
+  nav adds the secondary pages directly: a "כללי" group and, for admins, a "ניהול" group.
 - Home has a hierarchy, not a grid of equal cards:
   - **Resident:** the hero is their own balance as a large Secular One
     amount, with the state in words ("הכול שולם" or "יתרה לתשלום ₪660"), then
-    the latest announcement, then their open calls.
+    "איך משלמים" while they owe, then the latest announcement, then their open calls (with the
+    `signal` "דיווח על תקלה" button; no FAB on home).
   - **Admin:** the hero is the month's collection rate ("נגבו 14 מתוך 17
-    דירות", plus a progress bar), then debtors, open calls, and maintenance
-    due.
+    דירות", plus a progress bar), then debtors and open calls beside maintenance due and the latest
+    announcement (two columns from `md`).
 - Cards: `radius 12`, `1px` border `stone/15%`, no shadow. Elevated surfaces
   (modals, menus) use one shadow. Inputs and buttons use `radius 10`. The plate
   uses `radius 6`.
@@ -96,7 +100,16 @@ Mobile (<768)                        Desktop (≥768)
 - `EmptyState({ title, body, action? })`: plain direction, such as "אין עדיין
   הודעות. מנהלי הוועד יפרסמו כאן עדכונים לבניין." Admins get the action
   button.
-- `ListSkeleton`: loading uses skeleton rows, not spinners.
+- `ListSkeleton`: loading uses skeleton rows, not spinners. A page's first load renders it inside the
+  shell, so the header and nav never disappear.
+- `DateInput`: the native date field with a Hebrew "יום/חודש/שנה" hint while empty (the OS-locale mask
+  is hidden).
+- `BackLink({ to, label })`: the chevron link above a detail page.
+- `focusFirstError`: pass as `form.onSubmit(handler, focusFirstError)`.
+- Sheets: every Modal close is named "סגירה" and is 44px (theme). Short sheets use
+  `FormModal compact` (centred, not full screen).
+- Pages with a FAB reserve room for it at scroll end on mobile (`.bm-main:has(.bm-fab)`).
+- Header secondary actions (export) show icon + short text on mobile ("ייצוא"), never an icon alone.
 
 ## Motion and quality floor
 

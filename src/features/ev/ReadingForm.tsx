@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { todayISO } from '../../lib/dates'
 import { formatILS, formatKwh, formatRate } from '../../lib/format'
 import { he } from '../../lib/he'
-import { ListSkeleton, Money, notifySuccess } from '../../ui'
+import { DateInput, focusFirstError, ListSkeleton, Money, notifySuccess } from '../../ui'
 import { MonthField } from '../finance/fields'
 import { monthOf } from '../finance/ledger'
 import { useEvReadings, useEvRates, useRecordReading, type Charger, type Reading } from './api'
@@ -67,7 +67,7 @@ export function ReadingForm({ charger, edit, onDone }: { charger: Charger; edit?
     save.mutate({ charger_id: charger.id, month: x.month, reading: x.reading, read_on: x.readOn || null, note: x.note.trim() }, {
       onSuccess: (r) => { notifySuccess(he.ev.saved(formatILS(r.amount))); onDone() },
     })
-  })
+  }, focusFirstError)
   if (readings.isLoading || rates.isLoading) return <ListSkeleton rows={4} />
   return (
     <form onSubmit={submit} noValidate>
@@ -76,7 +76,7 @@ export function ReadingForm({ charger, edit, onDone }: { charger: Charger; edit?
         <KwhInput label={he.ev.readingInput} withAsterisk data-autofocus {...form.getInputProps('reading')} error={errorText(preview)} />
         {existing !== null && <Alert color="signal">{he.ev.existing(formatKwh(existing))}</Alert>}
         {preview && <Preview p={preview} />}
-        <TextInput label={he.ev.readOn} type="date" dir="ltr" {...form.getInputProps('readOn')} />
+        <DateInput label={he.ev.readOn} {...form.getInputProps('readOn')} />
         <TextInput label={he.ev.note} maxLength={500} {...form.getInputProps('note')} />
         <Button type="submit" fullWidth loading={save.isPending} disabled={!ready}>{he.ev.save}</Button>
       </Stack>

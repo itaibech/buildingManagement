@@ -1,5 +1,5 @@
 /** Pure EV charging math (no I/O). Mirrors public.ev_charge_reading() so the live preview equals the charge. */
-import { formatDate, formatRate } from '../../lib/format'
+import { formatRate, monthLabel } from '../../lib/format'
 import { he } from '../../lib/he'
 
 export interface Rate { rate: number; effective_from: string }
@@ -85,5 +85,5 @@ export function readingPreview(
   return { ...p, ...(future ? { error: 'future' as const } : {}), previous, rate, next, existing }
 }
 
-/** "₪0.574 לקוט״ש מ-01/08/2022" */
-export const rateText = (r: Rate): string => he.ev.rateFrom(formatRate(r.rate), formatDate(r.effective_from))
+/** "₪0.574 לקוט״ש מאוגוסט 2022" */
+export const rateText = (r: Rate): string => he.ev.rateFrom(formatRate(r.rate), monthLabel(r.effective_from))

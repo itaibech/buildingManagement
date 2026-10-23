@@ -103,6 +103,8 @@ describe('UsersPage', () => {
     renderPage()
     const row = await screen.findByTestId('user-s1')
     expect(within(row).getByText(he.users.superAdmin)).toBeInTheDocument()
+    expect(within(row).queryByRole('radio')).toBeNull()
+    fireEvent.click(within(row).getByRole('button', { name: he.users.edit }))
     expect(within(row).getByRole('radio', { name: he.users.roleResident })).toBeDisabled()
     expect(within(row).getByRole('button', { name: he.users.block })).toBeDisabled()
   })
@@ -110,6 +112,7 @@ describe('UsersPage', () => {
   it('lets an admin demote another admin with the role toggle', async () => {
     renderPage()
     const row = await screen.findByTestId('user-a1')
+    fireEvent.click(within(row).getByRole('button', { name: he.users.edit }))
     const toResident = within(row).getByRole('radio', { name: he.users.roleResident })
     expect(toResident).toBeEnabled()
     fireEvent.click(toResident)

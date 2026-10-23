@@ -78,6 +78,8 @@ export function balancesRows(balances: ApartmentBalance[]): Rows {
     { header: H.residents, value: (b) => b.names.join(', ') },
     { header: H.balance, value: (b) => b.balance },
     { header: H.future, value: (b) => b.scheduled },
+    { header: he.fees.exportFee, value: (b) => b.fee },
+    { header: he.fees.exportMode, value: (b) => he.fees.modes[b.feeMode] },
   ])
 }
 

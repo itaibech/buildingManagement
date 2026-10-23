@@ -3,7 +3,7 @@ import { useForm } from '@mantine/form'
 import { todayISO } from '../../lib/dates'
 import { formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
-import { notifySuccess } from '../../ui'
+import { DateInput, focusFirstError, notifySuccess } from '../../ui'
 import { PAYMENT_METHODS, useBalances, useSavePayment, type PaymentMethod } from './api'
 import { MoneyInput } from './fields'
 import { useApartmentOptions } from './hooks'
@@ -39,7 +39,7 @@ export function PaymentForm({ apartmentId, note, onDone }: { apartmentId?: strin
     save.mutate({ apartment_id: v.apartmentId, paid_on: v.paidOn, amount: v.amount, method: v.method, note: v.note.trim() }, {
       onSuccess: () => { notifySuccess(he.finance.paymentRecorded); onDone() },
     })
-  })
+  }, focusFirstError)
   return (
     <form onSubmit={submit} noValidate>
       <Stack>
@@ -51,7 +51,7 @@ export function PaymentForm({ apartmentId, note, onDone }: { apartmentId?: strin
             {he.finance.payFull(formatILS(current))}
           </Button>
         )}
-        <TextInput label={he.finance.paidOn} withAsterisk type="date" dir="ltr" {...form.getInputProps('paidOn')} />
+        <DateInput label={he.finance.paidOn} withAsterisk {...form.getInputProps('paidOn')} />
         <Select label={he.finance.method} data={METHOD_DATA} allowDeselect={false} value={form.values.method}
           onChange={(v) => isMethod(v) && form.setFieldValue('method', v)} />
         <TextInput label={he.finance.note} {...form.getInputProps('note')} />

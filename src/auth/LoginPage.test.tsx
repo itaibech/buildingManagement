@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
 import { MantineProvider } from '@mantine/core'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { he } from '../lib/he'
 import LoginPage from './LoginPage'
 
 vi.mock('./AuthProvider', () => ({ useAuth: () => ({ session: null }) }))
-vi.mock('../lib/supabase', () => ({ supabase: { auth: {} } }))
+const reset = vi.hoisted(() => vi.fn(async (_email: string, _opts: unknown) => ({ error: null })))
+vi.mock('../lib/supabase', () => ({ supabase: { auth: { resetPasswordForEmail: reset } } }))
 
 function renderLogin() {
   return render(
@@ -46,5 +47,20 @@ describe('Google button', () => {
     renderLogin()
     await waitFor(() => expect(fetch).toHaveBeenCalled())
     expect(screen.queryByText(he.signInWithGoogle)).not.toBeInTheDocument()
+  })
+})
+
+describe('forgot password', () => {
+  it('sends a reset link and says what to do when no mail arrives', async () => {
+    mockSettings(async () => ({ json: async () => ({ external: { google: false } }) }))
+    renderLogin()
+    fireEvent.click(screen.getByRole('button', { name: he.reset.forgot }))
+    expect(screen.queryByLabelText(he.password)).not.toBeInTheDocument()
+    const email = screen.getByLabelText(new RegExp(he.email))
+    expect(email.closest('[dir="ltr"]')).not.toBeNull()
+    fireEvent.change(email, { target: { value: 'a@b.test' } })
+    fireEvent.click(screen.getByRole('button', { name: he.reset.send }))
+    expect(await screen.findByText(he.reset.noMail)).toBeInTheDocument()
+    expect(reset).toHaveBeenCalledWith('a@b.test', expect.objectContaining({ redirectTo: expect.any(String) }))
   })
 })

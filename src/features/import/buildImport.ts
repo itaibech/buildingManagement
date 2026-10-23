@@ -13,6 +13,10 @@ export interface ImportOptions {
   skipExpenses?: string[]
   /** Import the EV block's charges (default true). Its payments are real money and are always imported. */
   includeEv?: boolean
+  /** Apartment numbers the admin confirmed as exempt from the fee (from January of the import year). */
+  exempt?: number[]
+  /** Keep the previous import's levy / EV charges when the file has none of them (default true). */
+  keepPrior?: boolean
 }
 export type PaymentRow = { apartment: number; paid_on: string; amount: number; note: string }
 export type ChargeRow = { apartment: number; month: string; amount: number; kind: 'levy' | 'extra'; label: string }
@@ -27,6 +31,9 @@ export type ImportPayload = {
   categories: string[]
   expenses: { category: string; spent_on: string; amount: number; note: string }[]
   budgets: { category: string; amount: number }[]
+  exempt: number[]
+  /** Server: a charge kind the payload has no rows of keeps the previous import's rows (default true). */
+  keep_prior_levies: boolean
 }
 
 /** 'YYYY-MM' or 'YYYY-MM-DD' to the first of that month in the given year. */
@@ -116,7 +123,16 @@ export function buildImport(parsed: ParsedWorkbook, columns: ColumnMap[], fees: 
     categories: unique([...expenses.map((e) => e.category), ...budgets.map((b) => b.category)]),
     expenses,
     budgets,
+    exempt: unique(opts.exempt ?? []).filter((n) => numbers.includes(n)),
+    keep_prior_levies: opts.keepPrior ?? true,
   }
+}
+
+/** Apartments that paid nothing in any month or levy column all year (every row of theirs): maybe exempt. */
+export function likelyExempt(income: IncomeSheet, columns: ColumnMap[]): number[] {
+  const dated = columns.filter((c) => columnMonth(c) !== null).map((c) => c.col)
+  const paid = new Set(income.apartments.filter((a) => dated.some((col) => (a.cells[col] ?? 0) > 0)).map((a) => a.number))
+  return unique(income.apartments.map((a) => a.number)).filter((n) => !paid.has(n)).sort((a, b) => a - b)
 }
 
 /** Fee schedule guess: the most common amount in each month column, with an entry whenever it changes. */
@@ -195,4 +211,58 @@ export function findOverlaps(expenses: ImportPayload['expenses'], existing: Exis
   return expenses
     .filter((e) => taken.has(overlapKey(e.category, e.spent_on)))
     .map((e) => ({ category: e.category, month: e.spent_on.slice(0, 7), amount: e.amount }))
+}
+
+// ---------------------------------------------------------------- payments already recorded (re-importing an export)
+
+export type ExistingPayment = { apartment: number; paid_on: string; amount: number; source: string }
+export type ExistingCharge = { apartment: number; month: string; kind: string; source: string }
+export interface PaymentOverlap { apartment: number; month: string; amount: number; recorded: number }
+
+const payKey = (apartment: number, date: string): string => `${apartment}|${date.slice(0, 7)}`
+const cents = (n: number): number => Math.round(n * 100) / 100
+
+function sumBy<T>(rows: T[], key: (r: T) => string, amount: (r: T) => number): Map<string, number> {
+  const out = new Map<string, number>()
+  for (const r of rows) out.set(key(r), (out.get(key(r)) ?? 0) + amount(r))
+  return out
+}
+
+/**
+ * Apartment-months the file pays in that already hold non-import payments (manual, EV import). An exported
+ * year sums every source into one cell, so importing it whole would count that money twice.
+ */
+export function findPaymentOverlaps(payments: PaymentRow[], existing: ExistingPayment[]): PaymentOverlap[] {
+  const recorded = sumBy(existing.filter((e) => e.source !== 'import'), (e) => payKey(e.apartment, e.paid_on), (e) => e.amount)
+  const inFile = sumBy(payments, (p) => payKey(p.apartment, p.paid_on), (p) => p.amount)
+  return [...inFile].flatMap(([key, amount]) => {
+    const r = recorded.get(key)
+    if (r === undefined) return []
+    const [apartment, month] = key.split('|')
+    return [{ apartment: Number(apartment), month: month ?? '', amount: cents(amount), recorded: cents(r) }]
+  })
+}
+
+/** The default for overlaps: leave out what is already recorded, importing only the rest of each cell. */
+export function skipRecorded(payments: PaymentRow[], overlaps: PaymentOverlap[]): PaymentRow[] {
+  const left = new Map(overlaps.map((o) => [`${o.apartment}|${o.month}`, o.recorded]))
+  return payments.flatMap((p) => {
+    const key = payKey(p.apartment, p.paid_on)
+    const skip = Math.min(left.get(key) ?? 0, p.amount)
+    if (skip > 0) left.set(key, cents((left.get(key) ?? 0) - skip))
+    const amount = cents(p.amount - skip)
+    return amount > 0 ? [{ ...p, amount }] : []
+  })
+}
+
+/**
+ * The previous import's charges a re-import would remove because the file has none of that kind
+ * (`kinds` = the kinds the file brings). EV charges of apartments with a charger are never touched.
+ */
+export function priorCharges(existing: ExistingCharge[], kinds: string[], chargerNumbers: number[]): { levy: number; ev: number } {
+  const imported = existing.filter((c) => c.source === 'import' && !kinds.includes(c.kind))
+  return {
+    levy: imported.filter((c) => c.kind === 'levy').length,
+    ev: imported.filter((c) => c.kind === 'extra' && !chargerNumbers.includes(c.apartment)).length,
+  }
 }

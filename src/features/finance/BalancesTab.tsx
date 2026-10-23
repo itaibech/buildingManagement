@@ -2,7 +2,7 @@ import { Card, Divider, Group, Stack, Text } from '@mantine/core'
 import { Fragment, useState } from 'react'
 import { formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
-import { EmptyState, ListSkeleton, Money } from '../../ui'
+import { EmptyState, ExemptBadge, ListSkeleton, Money } from '../../ui'
 import { balancesRows } from '../export/buildWorkbook'
 import { FormModal } from '../tenants/dialogs'
 import { useBalances, type ApartmentBalance } from './api'
@@ -34,7 +34,7 @@ export function BalanceRow({ row, onOpen }: { row: ApartmentBalance; onOpen?: (i
   const meta = row.scheduled > 0 ? he.finance.scheduled(formatILS(row.scheduled)) : undefined
   return (
     <Row plate={row.number} title={row.names.join(', ') || he.finance.noResidents} meta={meta}
-      end={<Money amount={row.balance} />} onClick={onOpen ? () => onOpen(row.apartmentId) : undefined}
+      badge={row.feeMode === 'exempt' ? <ExemptBadge /> : undefined} end={<Money amount={row.balance} />} onClick={onOpen ? () => onOpen(row.apartmentId) : undefined}
       label={onOpen ? he.finance.openLedger(row.number) : undefined} />
   )
 }

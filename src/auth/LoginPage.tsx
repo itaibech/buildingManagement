@@ -1,4 +1,4 @@
-import { Alert, Button, Center, Divider, Paper, Stack } from '@mantine/core'
+import { Alert, Button, Center, Divider, Paper, Stack, Text } from '@mantine/core'
 import { useState } from 'react'
 import { Navigate } from 'react-router'
 import { he } from '../lib/he'
@@ -37,6 +37,7 @@ export default function LoginPage() {
             )}
             {error && <Alert color="debt" role="alert">{error}</Alert>}
             <CredentialsForm />
+            {googleEnabled && <Text size="sm" c="dimmed" ta="center">{he.preferGoogle}</Text>}
           </Stack>
         </Paper>
       </Stack>

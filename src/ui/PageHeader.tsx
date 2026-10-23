@@ -3,24 +3,31 @@ import { IconPlus } from '@tabler/icons-react'
 import type { ReactNode } from 'react'
 
 interface PrimaryAction { label: string; onClick: () => void; icon?: ReactNode }
-interface SecondaryAction { label: string; onClick: () => void; icon: ReactNode; loading?: boolean; disabled?: boolean; hint?: string }
+interface SecondaryAction {
+  label: string; onClick: () => void; icon: ReactNode; loading?: boolean; disabled?: boolean; hint?: string
+  /** Visible text on mobile, next to the icon (an icon alone is unclear on touch); defaults to `label`. */
+  shortLabel?: string
+}
 
 export interface PageHeaderProps {
   title: string
   action?: PrimaryAction
   /** Quieter second action (e.g. export): an icon button in the header row on mobile, a subtle button on desktop. */
   secondaryAction?: SecondaryAction
+  /** Extra header content before the actions, e.g. a link to a related page. */
+  extra?: ReactNode
 }
 
-function Secondary({ label, onClick, icon, loading, disabled, hint }: SecondaryAction) {
+function Secondary({ label, shortLabel, onClick, icon, loading, disabled, hint }: SecondaryAction) {
   return (
     <>
       <Button visibleFrom="sm" variant="subtle" title={hint} leftSection={icon} onClick={onClick} loading={loading} disabled={disabled}>
         {label}
       </Button>
-      <ActionIcon hiddenFrom="sm" variant="subtle" size={44} title={hint} aria-label={label} onClick={onClick} loading={loading} disabled={disabled}>
-        {icon}
-      </ActionIcon>
+      <Button hiddenFrom="sm" variant="subtle" px="xs" title={hint} aria-label={label} leftSection={icon} onClick={onClick}
+        loading={loading} disabled={disabled}>
+        {shortLabel ?? label}
+      </Button>
     </>
   )
 }
@@ -40,14 +47,15 @@ function Primary({ action }: { action: PrimaryAction }) {
 }
 
 /** Page title in Secular One; the optional primary action becomes a FAB above the tab bar on mobile. */
-export function PageHeader({ title, action, secondaryAction }: PageHeaderProps) {
+export function PageHeader({ title, action, secondaryAction, extra }: PageHeaderProps) {
   return (
     <Group justify="space-between" align="center" mb="lg" wrap="nowrap">
       <Title order={1} fz={{ base: 'h2', sm: 'h1' }}>
         {title}
       </Title>
-      {(secondaryAction || action) && (
-        <Group gap="xs" wrap="nowrap">
+      {(secondaryAction || action || extra) && (
+        <Group gap={4} wrap="nowrap">
+          {extra}
           {secondaryAction && <Secondary {...secondaryAction} />}
           {action && <Primary action={action} />}
         </Group>

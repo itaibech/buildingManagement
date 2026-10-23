@@ -2,7 +2,8 @@ import { useMediaQuery } from '@mantine/hooks'
 import { useMemo } from 'react'
 import { he } from '../../lib/he'
 import { useApartments, useResidents } from '../tenants/api'
-import { useBudgets, useExpenses } from './api'
+import { useBalances, useBudgets, useExpenses, useFeeTimeline, type ApartmentBalance } from './api'
+import { currentMonth, nextChange, type TimelineRow } from './feeTimeline'
 import { budgetVsActual } from './ledger'
 
 /** Desktop (≥768px) gets tables; mobile gets lists. */
@@ -46,4 +47,27 @@ export function useBudgetRows(year: number) {
 export function useAppliedTemplates(month: string): ReadonlySet<string> {
   const expenses = useExpenses(Number(month.slice(0, 4)))
   return useMemo(() => new Set((expenses.data ?? []).flatMap((e) => (e.template_id && e.spent_on === month ? [e.template_id] : []))), [expenses.data, month])
+}
+
+export interface ApartmentFeeRow extends ApartmentBalance {
+  /** This apartment's timeline, newest first. */
+  timeline: TimelineRow[]
+  /** The next scheduled change after this month, if any. */
+  next: TimelineRow | null
+}
+
+/** Every apartment's current fee, its source, its history and the next scheduled change (by apartment number). */
+export function useApartmentFees() {
+  const balances = useBalances()
+  const timeline = useFeeTimeline()
+  const data = useMemo((): ApartmentFeeRow[] | undefined => {
+    if (!balances.data || !timeline.data) return undefined
+    const month = currentMonth()
+    return [...balances.data].sort((a, b) => a.number - b.number).map((b) => {
+      const rows = timeline.data.filter((t) => t.apartment_id === b.apartmentId)
+      return { ...b, timeline: rows, next: nextChange(rows, month) }
+    })
+  }, [balances.data, timeline.data])
+  const refetch = () => { balances.refetch(); void timeline.refetch() }
+  return { data, isLoading: balances.isLoading || timeline.isLoading, isError: balances.isError || timeline.isError, refetch }
 }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { he } from '../../lib/he'
 import { parseBudgetSheet, parseExpensesSheet, parseIncomeSheet } from '../import/parseWorkbook'
 import { SHEETS } from '../import/readWorkbook'
-import { buildYearWorkbook, toSheetRows, type YearData } from './buildWorkbook'
+import { balancesRows, buildYearWorkbook, toSheetRows, type YearData } from './buildWorkbook'
 
 const apartments = [
   { id: 'a2', number: 2, floor: 1, notes: null, building_id: 'b', created_at: '' },
@@ -36,6 +36,15 @@ describe('toSheetRows', () => {
       { header: 'שם', value: (r) => r.s },
     ])
     expect(rows).toEqual([['מספר', 'שם'], [1, 'א'], [2, null]])
+  })
+
+  it('adds the current fee and its source to the balances export', () => {
+    const rows = balancesRows([
+      { apartmentId: 'a1', number: 1, names: ['דנה'], balance: 120, scheduled: 0, fee: 330, feeMode: 'building' },
+      { apartmentId: 'a2', number: 2, names: [], balance: 0, scheduled: 0, fee: 0, feeMode: 'exempt' },
+    ])
+    expect(rows[0].slice(-2)).toEqual([he.fees.exportFee, he.fees.exportMode])
+    expect(rows.slice(1).map((r) => r.slice(-2))).toEqual([[330, 'לפי תעריף הבניין'], [0, 'פטור']])
   })
 })
 
