@@ -105,3 +105,19 @@ values
    'הזמנו טכנאי, הוא יגיע ביום ראשון.', now() - interval '5 days'),
   ('40000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000002',
    'תודה! הבעיה חזרה גם היום בבוקר.', now() - interval '1 day');
+
+-- Maintenance: spread of due dates so overdue / soon / later / none all show locally.
+update public.maintenance_tasks set next_due = v.d, vendor = v.vendor
+from (values
+  ('בדיקת מעלית', (current_date - 20)::date, 'מעליות דוגמה בע"מ'),
+  ('מהנדס בודק מעלית', (current_date - 3)::date, 'מהנדס דוגמה'),
+  ('בדיקת מטפים ועמדות כיבוי אש', (current_date + 10)::date, 'בטיחות דוגמה'),
+  ('בדיקת מז"חים שנתית', (current_date + 25)::date, 'בטיחות דוגמה'),
+  ('חיטוי מאגר מים', (current_date + 90)::date, 'מים נקיים בע"מ'),
+  ('הדברה', (current_date + 45)::date, 'הדברה דוגמה'),
+  ('פוליש לובי', (current_date + 200)::date, '')
+) as v(title, d, vendor)
+where maintenance_tasks.title = v.title;
+
+insert into public.maintenance_log (task_id, done_on, note)
+select id, current_date - 365, 'בוצע, הכול תקין' from public.maintenance_tasks where title = 'בדיקת מעלית';
