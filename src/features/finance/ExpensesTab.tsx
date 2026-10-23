@@ -21,6 +21,8 @@ type Removing = { kind: 'expense'; row: Expense } | { kind: 'template'; row: Tem
 /** Opens the window first (inside the tap) so mobile Safari doesn't block it, then points it at the signed URL. */
 function openReceipt(path: string): void {
   const win = window.open('', '_blank')
+  // Cut the back-reference (noopener can't be used: it makes window.open return null).
+  if (win) win.opener = null
   receiptUrl(path).then((url) => { if (win) win.location.href = url }).catch(() => { win?.close(); notifyError(he.finance.receiptOpenFailed) })
 }
 

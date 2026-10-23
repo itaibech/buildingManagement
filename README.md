@@ -4,7 +4,7 @@ A Hebrew-first (RTL) web app for running a residential building's committee
 (ועד בית): tenants, announcements, service calls, maintenance and finances, all in
 one place, on phone and desktop. It's inspired by Hombi, Bllink and Darimpo.
 
-> Status: design approved, implementation in progress.
+> Status: phase 1 complete.
 > Design: [docs/superpowers/specs/2026-10-23-building-management-design.md](docs/superpowers/specs/2026-10-23-building-management-design.md)
 
 ## Features (phase 1)
@@ -35,7 +35,91 @@ All of it runs on free tiers.
 
 ## Live site
 
-https://itaibech.github.io/buildingManagement/ (once the first deploy runs)
+https://itaibech.github.io/buildingManagement/ (once the first deploy runs).
+On a phone, use the browser's "Add to Home Screen" (הוספה למסך הבית) to install it like an app.
+
+## Hosted setup (one time)
+
+The Supabase project (ref `kttyozquueaoacrwbnmx`) already exists. The remaining steps, in order:
+
+### 1. GitHub secrets and variables
+
+Repo → Settings → Secrets and variables → Actions.
+
+| Kind | Name | Value | Used by |
+|---|---|---|---|
+| Secret | `SUPABASE_ACCESS_TOKEN` | A personal access token (supabase.com → Account → Access Tokens) | `deploy.yml` (migrate) |
+| Secret | `SUPABASE_DB_PASSWORD` | The project's database password | `deploy.yml` (migrate) |
+| Secret | `SUPABASE_PROJECT_REF` | `kttyozquueaoacrwbnmx` | `deploy.yml` (migrate) |
+| Variable | `VITE_SUPABASE_URL` | `https://kttyozquueaoacrwbnmx.supabase.co` | `deploy.yml` (build), `keepalive.yml` |
+| Variable | `VITE_SUPABASE_ANON_KEY` | The project's **anon / publishable** key (Settings → API) | `deploy.yml` (build), `keepalive.yml` |
+
+Only the anon key ships to the browser; it's public by design, and RLS is the security boundary.
+**Never** put the `service_role` / secret key in a variable, in `.env*`, or anywhere in the app.
+
+### 2. GitHub Pages
+
+Repo → Settings → Pages → Build and deployment → Source: **GitHub Actions**. The `github-pages`
+environment (created by the first deploy) should only allow the `main` branch.
+
+### 3. First deploy (applies the migrations)
+
+Merge to `main` (see [Deploy flow](#deploy-flow)). `deploy.yml` builds the site, runs
+`supabase db push` against the hosted project, then publishes Pages.
+
+### 4. Bootstrap the super admin
+
+After the migrations are applied and **before** the admin signs in for the first time, run this once in
+Supabase → SQL Editor:
+
+```sql
+insert into public.app_settings (key, value)
+values ('bootstrap_admin_email', 'itai.bechor@gmail.com')
+on conflict (key) do update set value = excluded.value;
+```
+
+The first sign-up with that email (while no admin exists yet) becomes the approved **super admin**,
+whom nobody can demote, block or delete. Every other new user waits for an admin's approval.
+
+If that account had already signed in before the setting existed (so it's a pending resident), promote
+it once from the SQL Editor (it runs as `postgres`, which the profile guards allow):
+
+```sql
+update public.profiles set role = 'admin', status = 'approved', is_super_admin = true
+where lower(email) = 'itai.bechor@gmail.com';
+```
+
+### 5. Auth settings
+
+Supabase → Authentication:
+
+- **URL Configuration:** Site URL `https://itaibech.github.io/buildingManagement/`. Redirect URLs:
+  just that URL. Don't add `localhost` URLs to the hosted project; local development uses the local stack.
+- **Providers → Email:** keep **Confirm email** on. The bootstrap profile is created at sign-up, so the
+  bootstrap email must be one the admin controls and confirms (Google sign-in is verified already).
+  A minimum password length of 8 or more is recommended.
+
+### 6. Google sign-in
+
+1. Google Cloud Console → APIs & Services → OAuth consent screen: app name "ניהול בניין", user type
+   External, scopes `email`, `profile`, `openid` only.
+2. Credentials → Create credentials → OAuth client ID, type **Web application**.
+   - Authorized JavaScript origins: `https://itaibech.github.io`
+   - Authorized redirect URIs: `https://kttyozquueaoacrwbnmx.supabase.co/auth/v1/callback`, and for
+     local testing `http://127.0.0.1:54321/auth/v1/callback`
+3. Supabase → Authentication → Providers → Google: enable it and paste the client ID and secret.
+
+The Google button only shows when Google is enabled on the Supabase instance. It's off on the local
+stack by default. To enable it locally, put `SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID` and
+`SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET` in the git-ignored `supabase/.env` and set `enabled = true` under
+`[auth.external.google]` in `supabase/config.toml` (don't commit that change).
+
+### 7. Keep-alive
+
+Free-tier projects pause after a week without activity. `.github/workflows/keepalive.yml` runs every
+3 days (and on demand: Actions → Keep-alive → Run workflow) and makes one anon REST read, which RLS
+answers with `[]`. Scheduled workflows only run from the default branch, so it starts after the first
+merge to `main`. GitHub disables schedules after 60 days without repo activity; re-enable it there if so.
 
 ## Development
 
@@ -45,42 +129,46 @@ Requires Node 22 and Docker (for the local Supabase stack).
 npm install
 npm run db:start            # local Postgres, Auth, Storage; Studio at http://127.0.0.1:54323
 cp .env.example .env.local  # then paste the anon key from `npx supabase status`
-npm run db:reset            # re-applies migrations + supabase/seed.sql
+npm run db:reset            # re-applies migrations + supabase/seed.sql (+ seed.local.sql if present)
 npm run dev                 # http://localhost:5173/buildingManagement/
 ```
+
+`.env.local` holds `VITE_SUPABASE_URL=http://127.0.0.1:54321` and the **local** anon key. It's
+git-ignored, as are `supabase/.env` and `supabase/seed.local.sql`.
 
 Local test accounts (seeded, local only, password `password123`):
 `admin@example.test` (approved admin) and `resident@example.test`
 (approved resident of apartment 1). Email confirmation is off locally.
 
-Other scripts: `npm run db:test` (pgTAP tests in `supabase/tests`),
-`npm run db:types` (regenerate `src/lib/db.types.ts`), `npm run db:stop`.
+`supabase/seed.sql` has invented sample data only (the repo is public). For your own data, use the
+optional, git-ignored `supabase/seed.local.sql`; `db:reset` loads it after `seed.sql` when it exists.
+Never commit real names, phone numbers or the committee's workbook.
 
-Migrations live in `supabase/migrations` and are applied to the hosted
-project by the deploy workflow on push to `main`. The hosted bootstrap admin
-email is set once outside the repo:
-`insert into app_settings values ('bootstrap_admin_email', '<email>')`.
-Keep **Confirm email** on in the hosted project (Auth → Providers → Email):
-the bootstrap profile is created at sign-up, so the bootstrap email must be
-one the admin controls and confirms (Google sign-in is verified already).
+The Content-Security-Policy is injected at build time from `VITE_SUPABASE_URL` (`vite.plugins.ts`), so
+dev, preview and production each allow only their own Supabase origin. To check the production build
+locally against the local stack: `npm run build && npm run preview` (http://localhost:4173/buildingManagement/).
 
-## Google sign-in setup (hosted)
+### Tests
 
-1. Google Cloud Console → APIs & Services → Credentials → Create OAuth client ID,
-   type **Web application**. Add the authorized redirect URI
-   `https://kttyozquueaoacrwbnmx.supabase.co/auth/v1/callback`.
-2. Supabase → Authentication → Providers → Google: enable it and paste the
-   client ID and client secret.
-3. Supabase → Authentication → URL Configuration: set **Site URL** to
-   `https://itaibech.github.io/buildingManagement/` and add that URL plus
-   `http://localhost:5173/buildingManagement/` to **Redirect URLs**.
+```bash
+npm test                    # unit/component tests (Vitest)
+npm run lint                # oxlint
+npm run typecheck           # tsc -b
+npm run db:test             # pgTAP tests in supabase/tests (needs the local stack)
+```
 
-The Google button only shows when Google is enabled on the Supabase instance.
-It's off on the local stack by default. To enable it locally, put
-`SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID` and
-`SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET` in the git-ignored `supabase/.env`, set
-`enabled = true` under `[auth.external.google]` in `supabase/config.toml`, and add
-`http://127.0.0.1:54321/auth/v1/callback` as a redirect URI on the Google OAuth client.
+Before pushing: `npm test && npm run lint && npm run typecheck && npm run build && npm run db:reset && npm run db:test`.
+`npm run db:types` regenerates `src/lib/db.types.ts` after a migration.
+
+### Deploy flow
+
+1. Each feature is a branch stacked on the previous one, with a PR into its parent. CI (`ci.yml`: audit,
+   lint, types, tests, build, pgTAP) must pass.
+2. Merge the stack down into `main`. A push to `main` runs `deploy.yml`: it builds with the repo
+   variables, applies new migrations in `supabase/migrations` to the hosted project (`supabase db push`),
+   then publishes GitHub Pages.
+3. Migrations are forward-only: fix a bad one with a new migration, never by editing an applied one.
+   Protect `main` (Settings → Branches) so it only takes PRs with a green CI.
 
 ## License
 
