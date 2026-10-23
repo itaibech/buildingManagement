@@ -11,10 +11,11 @@ const MorePage = lazy(() => import('./features/more/MorePage'))
 const AnnouncementsPage = lazy(() => import('./features/announcements/AnnouncementsPage'))
 const TicketsPage = lazy(() => import('./features/tickets/TicketsPage'))
 const FinancePage = lazy(() => import('./features/finance/FinancePage'))
-const DirectoryPage = lazy(() => import('./features/directory/DirectoryPage'))
+const DirectoryPage = lazy(() => import('./features/tenants/DirectoryPage'))
 const MaintenancePage = lazy(() => import('./features/maintenance/MaintenancePage'))
-const ApartmentsPage = lazy(() => import('./features/apartments/ApartmentsPage'))
-const UsersPage = lazy(() => import('./features/users/UsersPage'))
+const ApartmentsPage = lazy(() => import('./features/tenants/ApartmentsPage'))
+const ApartmentPage = lazy(() => import('./features/tenants/ApartmentPage'))
+const UsersPage = lazy(() => import('./features/tenants/UsersPage'))
 const ImportPage = lazy(() => import('./features/import/ImportPage'))
 
 const fallback = (
@@ -40,6 +41,7 @@ export default function App() {
               <Route path="maintenance" element={<MaintenancePage />} />
               <Route element={<RequireAdmin />}>
                 <Route path="apartments" element={<ApartmentsPage />} />
+                <Route path="apartments/:id" element={<ApartmentPage />} />
                 <Route path="users" element={<UsersPage />} />
                 <Route path="import" element={<ImportPage />} />
               </Route>
