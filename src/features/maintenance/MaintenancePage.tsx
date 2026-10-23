@@ -5,7 +5,9 @@ import { he } from '../../lib/he'
 import { EmptyState, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
 import { ConfirmDialog, FormModal } from '../tenants/dialogs'
 import { todayISO } from '../../lib/dates'
-import { useDeleteTask, useTasks, type Task } from './api'
+import { tasksRows } from '../export/buildWorkbook'
+import { useExportAction } from '../export/useExport'
+import { fetchLastDone, useDeleteTask, useTasks, type Task } from './api'
 import { DoneForm } from './DoneForm'
 import { dueBucket, type DueBucket } from './nextDue'
 import { TaskDetail } from './TaskDetail'
@@ -62,9 +64,10 @@ export default function MaintenancePage() {
   const actions: TaskActions | undefined = isAdmin
     ? { onDone: (task) => setDialog({ kind: 'done', task }), onEdit: (task) => setDialog({ kind: 'edit', task }), onDelete: (task) => setDialog({ kind: 'delete', task }) }
     : undefined
+  const exportAction = useExportAction(he.export.files.maintenance, async () => tasksRows(list.data ?? [], await fetchLastDone()), !!list.data)
   return (
     <Stack gap="lg">
-      <PageHeader title={he.nav.maintenance} action={add} />
+      <PageHeader title={he.nav.maintenance} action={add} secondaryAction={exportAction} />
       {list.isError && <Text c="debt.7">{he.maintenance.errors.load}</Text>}
       {list.isLoading && <ListSkeleton rows={4} />}
       {list.data?.length === 0 && <EmptyState title={he.maintenance.empty} body={he.maintenance.emptyBody} action={add} />}

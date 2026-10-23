@@ -41,6 +41,15 @@ export function useTasks() {
   })
 }
 
+/** Task id to its most recent done date, read on demand for the export (same table the task detail reads). */
+export async function fetchLastDone(): Promise<Map<string, string>> {
+  const { data, error } = await supabase.from('maintenance_log').select('task_id, done_on').order('done_on', { ascending: false })
+  if (error) throw new Error(error.message)
+  const last = new Map<string, string>()
+  for (const row of data) if (!last.has(row.task_id)) last.set(row.task_id, row.done_on)
+  return last
+}
+
 /** Done log for one task, newest first. */
 export function useTaskLog(taskId: string | undefined) {
   return useQuery({

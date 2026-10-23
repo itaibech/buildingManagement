@@ -5,10 +5,12 @@ import { todayISO } from '../../lib/dates'
 import { formatDate, formatILS, monthLabel } from '../../lib/format'
 import { he } from '../../lib/he'
 import { EmptyState, ListSkeleton, Money, notifyError, notifySuccess } from '../../ui'
+import { expensesRows } from '../export/buildWorkbook'
 import { ConfirmDialog, FormModal } from '../tenants/dialogs'
 import { receiptUrl, useDeleteExpense, useDeleteTemplate, useExpenses, useTemplates, type Expense, type Template } from './api'
 import { LoadFailed } from './cards'
 import { ApplyTemplates, ExpenseForm, TemplateForm } from './ExpenseForms'
+import { useRegisterExport } from './exportSlot'
 import { DeleteButton, MonthStepper, Row } from './fields'
 import { useAppliedTemplates } from './hooks'
 import { monthOf } from './ledger'
@@ -122,6 +124,8 @@ export function ExpensesTab({ adding, onAddingClose }: { adding: boolean; onAddi
   const [removing, setRemoving] = useState<Removing>(null)
   const templates = useTemplates()
   const appliedIds = useAppliedTemplates(month)
+  const monthExpenses = useExpenses(Number(month.slice(0, 4)))
+  useRegisterExport(he.export.files.expenses, () => expensesRows((monthExpenses.data ?? []).filter((e) => monthOf(e.spent_on) === month)), !!monthExpenses.data)
   const close = () => setSheet(null)
   return (
     <Stack gap="md">

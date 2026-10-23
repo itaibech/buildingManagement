@@ -4,10 +4,12 @@ import { useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router'
 import { he } from '../../lib/he'
 import { PageHeader } from '../../ui'
+import { useExportAction } from '../export/useExport'
 import { BalancesTab } from './BalancesTab'
 import { BudgetTab } from './BudgetTab'
 import { ChargesTab } from './ChargesTab'
 import { ExpensesTab } from './ExpensesTab'
+import { ExportRegistration, type ExportSource } from './exportSlot'
 import { PaymentsTab } from './PaymentsTab'
 
 const TABS = ['balances', 'payments', 'charges', 'expenses', 'budget'] as const
@@ -35,11 +37,13 @@ export function AdminFinance() {
   const raw = params.get('tab')
   const tab: Tab = isTab(raw) ? raw : 'balances'
   const [primary, setPrimary] = useState(false)
+  const [source, setSource] = useState<ExportSource | null>(null)
+  const exportAction = useExportAction(source?.fileName ?? '', source?.getRows ?? (() => []), !!source?.ready, source?.hint)
   const close = () => setPrimary(false)
   const select = (v: string | null) => { if (isTab(v)) { setPrimary(false); setParams({ tab: v }, { replace: true }) } }
   return (
-    <>
-      <PageHeader title={he.nav.finance} action={{ ...ACTION[tab], onClick: () => setPrimary(true) }} />
+    <ExportRegistration.Provider value={setSource}>
+      <PageHeader title={he.nav.finance} action={{ ...ACTION[tab], onClick: () => setPrimary(true) }} secondaryAction={source ? exportAction : undefined} />
       <Tabs value={tab} onChange={select} keepMounted={false} styles={TAB_STYLES}>
         <Tabs.List aria-label={he.finance.tabsLabel} mb="md">
           {TABS.map((t) => <Tabs.Tab key={t} value={t}>{he.finance.tabs[t]}</Tabs.Tab>)}
@@ -50,6 +54,6 @@ export function AdminFinance() {
         <Tabs.Panel value="expenses"><ExpensesTab adding={primary} onAddingClose={close} /></Tabs.Panel>
         <Tabs.Panel value="budget"><BudgetTab adding={primary} onAddingClose={close} /></Tabs.Panel>
       </Tabs>
-    </>
+    </ExportRegistration.Provider>
   )
 }

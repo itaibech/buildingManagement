@@ -6,9 +6,11 @@ import { formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
 import { EmptyState, ListSkeleton, notifySuccess } from '../../ui'
 import { useExpenseCategories, type ExpenseCategory } from '../maintenance/api'
+import { budgetRows } from '../export/buildWorkbook'
 import { FormModal } from '../tenants/dialogs'
 import { useSaveBudget } from './api'
 import { CashCard, LoadFailed } from './cards'
+import { useRegisterExport } from './exportSlot'
 import { MoneyInput, Row, YearStepper } from './fields'
 import { useBudgetRows, useDesktop } from './hooks'
 import type { BudgetRow } from './ledger'
@@ -97,6 +99,7 @@ export function BudgetTab({ adding, onAddingClose }: { adding: boolean; onAdding
   const [year, setYear] = useState(() => Number(todayISO().slice(0, 4)))
   const q = useBudgetRows(year)
   const desktop = useDesktop()
+  useRegisterExport(he.export.files.budget, () => budgetRows(q.rows ?? []), !!q.rows)
   const [editing, setEditing] = useState<BudgetRow | null>(null)
   const open = adding || !!editing
   const close = () => { setEditing(null); onAddingClose() }
