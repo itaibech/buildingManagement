@@ -6,6 +6,8 @@ import { he } from '../../lib/he'
 import { AptPlate, EmptyState, ListSkeleton, PageHeader } from '../../ui'
 import { ApartmentForm } from './ApartmentForm'
 import { useApartments, useResidents, type Apartment, type Resident } from './api'
+import { apartmentsRows } from '../export/buildWorkbook'
+import { useExportAction } from '../export/useExport'
 import { FormModal } from './dialogs'
 
 function ApartmentRow({ apartment, residents }: { apartment: Apartment; residents: Resident[] }) {
@@ -42,9 +44,11 @@ export default function ApartmentsPage() {
   const [adding, setAdding] = useState(false)
   const add = { label: he.tenants.addApartment, onClick: () => setAdding(true) }
   const list = apartments.data ?? []
+  const residents = useResidents()
+  const exportAction = useExportAction(he.export.files.apartments, () => apartmentsRows(list, residents.data ?? []), !!apartments.data && !!residents.data)
   return (
     <Stack gap="md">
-      <PageHeader title={he.nav.apartments} action={add} />
+      <PageHeader title={he.nav.apartments} action={add} secondaryAction={exportAction} />
       <Card padding={0}>
         {apartments.isError && <Text c="debt.7" p="md">{he.tenants.loadError}</Text>}
         {apartments.isLoading && <Stack p="md"><ListSkeleton rows={5} /></Stack>}

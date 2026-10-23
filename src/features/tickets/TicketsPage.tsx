@@ -5,6 +5,8 @@ import { Link } from 'react-router'
 import { relativeDate } from '../../lib/format'
 import { he } from '../../lib/he'
 import { EmptyState, ListSkeleton, PageHeader, StatusBadge } from '../../ui'
+import { ticketsRows } from '../export/buildWorkbook'
+import { useExportAction } from '../export/useExport'
 import { FormModal } from '../tenants/dialogs'
 import { TICKET_STATUSES, useTickets, type TicketListItem, type TicketStatus } from './api'
 import { TicketForm } from './TicketForm'
@@ -59,9 +61,10 @@ export default function TicketsPage() {
   const [adding, setAdding] = useState(false)
   const list = useTickets(filter.length === TICKET_STATUSES.length ? undefined : filter)
   const add = { label: he.tickets.add, onClick: () => setAdding(true) }
+  const exportAction = useExportAction(he.export.files.tickets, () => ticketsRows(list.data ?? []), !!list.data)
   return (
     <Stack gap="md">
-      <PageHeader title={he.nav.tickets} action={add} />
+      <PageHeader title={he.nav.tickets} action={add} secondaryAction={exportAction} />
       <StatusFilter value={filter} onChange={setFilter} />
       {list.isError && <Text c="debt.7">{he.tickets.errors.load}</Text>}
       {list.isLoading && <ListSkeleton rows={4} />}

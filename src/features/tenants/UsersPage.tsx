@@ -3,6 +3,8 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { useAuth } from '../../auth/AuthProvider'
 import { he } from '../../lib/he'
 import { AptPlate, EmptyState, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
+import { usersRows } from '../export/buildWorkbook'
+import { useExportAction } from '../export/useExport'
 import {
   useApproveProfile,
   useDirectory,
@@ -131,10 +133,15 @@ export default function UsersPage() {
   const pending = profiles.data?.filter((p) => p.status === 'pending') ?? []
   const approved = profiles.data?.filter((p) => p.status === 'approved') ?? []
   const row = { residents, options }
+  const exportAction = useExportAction(
+    he.export.files.users,
+    () => usersRows(profiles.data ?? [], (id) => residents.find((r) => r.id === id)?.apartmentNumber ?? null),
+    !!profiles.data && !!directory.data,
+  )
   if (profiles.isError || directory.isError) return <Text c="debt.7">{he.tenants.loadError}</Text>
   return (
     <Stack gap="xl">
-      <PageHeader title={he.nav.users} />
+      <PageHeader title={he.nav.users} secondaryAction={exportAction} />
       {profiles.isLoading || directory.isLoading ? <ListSkeleton /> : (
         <>
           <Section title={he.users.pending}>

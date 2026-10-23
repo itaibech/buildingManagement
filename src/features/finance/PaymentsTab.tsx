@@ -4,9 +4,11 @@ import { todayISO } from '../../lib/dates'
 import { formatDate, formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
 import { EmptyState, ListSkeleton, Money, notifySuccess } from '../../ui'
+import { paymentsRows } from '../export/buildWorkbook'
 import { ConfirmDialog, FormModal } from '../tenants/dialogs'
 import { useDeletePayment, usePayments, type Payment } from './api'
 import { LoadFailed } from './cards'
+import { useRegisterExport } from './exportSlot'
 import { DeleteButton, MonthStepper, Row } from './fields'
 import { useApartmentInfo } from './hooks'
 import { monthOf } from './ledger'
@@ -23,6 +25,7 @@ export function PaymentsTab({ adding, onAddingClose }: { adding: boolean; onAddi
   const info = useApartmentInfo()
   const del = useDeletePayment()
   const [removing, setRemoving] = useState<Payment | null>(null)
+  useRegisterExport(he.export.files.payments, () => paymentsRows(q.data ?? [], info), !!q.data)
   const total = (q.data ?? []).reduce((t, p) => t + p.amount, 0)
   const confirm = () => removing && del.mutate(removing.id, { onSuccess: () => { notifySuccess(he.finance.paymentDeleted); setRemoving(null) } })
   return (

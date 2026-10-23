@@ -4,6 +4,7 @@ import { useAuth } from '../../auth/AuthProvider'
 import { useExit } from '../../auth/useExit'
 import { he } from '../../lib/he'
 import { PageHeader } from '../../ui'
+import { YearExport } from '../export/YearExport'
 
 const COMMON = [
   { to: '/directory', label: he.nav.directory },
@@ -25,6 +26,7 @@ export default function MorePage() {
       {items.map((i) => (
         <NavLink key={i.to} component={Link} to={i.to} label={i.label} />
       ))}
+      <YearExport />
       <Button variant="light" color="debt" onClick={() => void exit()}>
         {he.exit}
       </Button>

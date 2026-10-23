@@ -3,9 +3,11 @@ import { Fragment, useState } from 'react'
 import { formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
 import { EmptyState, ListSkeleton, Money } from '../../ui'
+import { balancesRows } from '../export/buildWorkbook'
 import { FormModal } from '../tenants/dialogs'
 import { useBalances, type ApartmentBalance } from './api'
 import { ApartmentLedger } from './ApartmentLedger'
+import { useRegisterExport } from './exportSlot'
 import { LoadFailed } from './cards'
 import { Row } from './fields'
 import { PaymentForm } from './PaymentForm'
@@ -42,6 +44,7 @@ export function BalancesTab({ paying, onPayingClose }: { paying: boolean; onPayi
   const q = useBalances()
   const [openId, setOpenId] = useState<string | null>(null)
   const open = q.data?.find((r) => r.apartmentId === openId)
+  useRegisterExport(he.export.files.balances, () => balancesRows(q.data ?? []), !!q.data)
   return (
     <Card padding={0}>
       {q.isLoading && <Stack p="md"><ListSkeleton rows={6} /></Stack>}
