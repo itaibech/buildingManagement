@@ -2,7 +2,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(16);
+select plan(24);
 
 -- ---------------------------------------------------------------- fixtures
 -- Start from "no admin yet" so the bootstrap trigger fires for our test user.
@@ -74,6 +74,39 @@ select throws_ok(
 select lives_ok(
   $$update public.profiles set full_name = 'שם' where user_id = 'd0000000-0000-0000-0000-000000000001'$$,
   'admin: can still edit non-protected columns of the super admin'
+);
+
+select throws_ok(
+  $$update public.profiles set email = 'x@test.local' where user_id = 'd0000000-0000-0000-0000-000000000001'$$,
+  '42501', null, 'admin: cannot change the super admin''s email'
+);
+select throws_ok(
+  $$update public.profiles set building_id = gen_random_uuid() where user_id = 'd0000000-0000-0000-0000-000000000001'$$,
+  '42501', null, 'admin: cannot change the super admin''s building_id'
+);
+select throws_ok(
+  $$update public.profiles set role = 'resident' where user_id = 'd0000000-0000-0000-0000-000000000002'$$,
+  '42501', null, 'admin: cannot change own role'
+);
+select throws_ok(
+  $$update public.profiles set status = 'pending' where user_id = 'd0000000-0000-0000-0000-000000000002'$$,
+  '42501', null, 'admin: cannot change own status'
+);
+select lives_ok(
+  $$update public.profiles set full_name = 'מנהל' where user_id = 'd0000000-0000-0000-0000-000000000002'$$,
+  'admin: can still change own full_name'
+);
+
+-- Buildings: update only. Deleting would cascade to profiles as the owner, bypassing the guards.
+with d as (delete from public.buildings returning 1)
+select is(count(*), 0::bigint, 'admin: delete from buildings affects 0 rows') from d;
+select throws_ok(
+  $$insert into public.buildings (name) values ('עוד בניין')$$,
+  '42501', null, 'admin: insert into buildings is rejected'
+);
+select lives_ok(
+  $$insert into public.apartments (number) values (950)$$,
+  'admin: apartment insert gets the default building_id'
 );
 
 -- ---------------------------------------------------------------- the super admin
