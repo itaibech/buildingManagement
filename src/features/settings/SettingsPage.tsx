@@ -1,7 +1,7 @@
 import { Alert, Button, Card, Stack, Text, Textarea, TextInput, Title } from '@mantine/core'
 import { useForm, type UseFormReturnType } from '@mantine/form'
 import { he } from '../../lib/he'
-import { ListSkeleton, notifySuccess, PageHeader } from '../../ui'
+import { focusFirstError, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
 import { LoadFailed } from '../finance/cards'
 import { useBuilding, useSaveBuilding, type Building } from './api'
 
@@ -46,10 +46,7 @@ function SettingsForm({ building }: { building: Building }) {
   const submit = form.onSubmit((v) => save.mutate({
     id: building.id, name: v.name.trim(), address: v.address.trim() || null,
     payment_instructions: v.instructions.trim() || null, committee_contact: v.contact.trim() || null,
-  }, { onSuccess: () => notifySuccess(he.settings.saved) }), (errors) => {
-    const first = Object.keys(errors)[0]
-    if (first) document.querySelector<HTMLElement>(`[name="${first}"]`)?.focus()
-  })
+  }, { onSuccess: () => notifySuccess(he.settings.saved) }), focusFirstError)
   return (
     <form onSubmit={submit} noValidate>
       <Stack gap="lg" maw={720}>

@@ -192,7 +192,7 @@ export function ExemptNotice({ hints, chosen, year, onChange }: { hints: number[
       <Text fw={600}>{he.import.exemptTitle}</Text>
       <Text size="sm" c="dimmed">{he.import.exemptBody}</Text>
       {hints.map((n) => (
-        <Toggle key={n} label={he.import.exemptToggle(n, `01/${year}`)} checked={chosen.includes(n)} onChange={(v) => toggle(n, v)} />
+        <Toggle key={n} label={he.import.exemptToggle(n, monthLabel(`${year}-01-01`))} checked={chosen.includes(n)} onChange={(v) => toggle(n, v)} />
       ))}
     </Paper>
   )

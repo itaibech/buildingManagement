@@ -101,3 +101,14 @@ describe('Shell', () => {
     expect(screen.queryByRole('img', { name: /שלא נקראו|שלא נקראה/ })).not.toBeInTheDocument()
   })
 })
+
+describe('activeTab', () => {
+  it('keeps "עוד" active on secondary and admin pages, and the tab itself on main pages', async () => {
+    const { activeTab } = await import('./nav')
+    expect(activeTab('/')).toBe('/')
+    expect(activeTab('/tickets/abc')).toBe('/tickets')
+    for (const p of ['/directory', '/maintenance', '/ev', '/ev/123', '/apartments/1', '/users', '/import', '/settings']) {
+      expect(activeTab(p)).toBe('/more')
+    }
+  })
+})

@@ -7,6 +7,7 @@ import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
+import { monthLabel } from '../../lib/format'
 import { theme } from '../../ui/theme'
 import type { ApartmentBalance } from './api'
 import { ApartmentFeesSection } from './ApartmentFees'
@@ -113,7 +114,7 @@ describe('ApartmentFeesSection', () => {
     wrap(<ApartmentFeesSection />)
     expect(await screen.findByText(he.fees.modes.custom)).toBeTruthy()
     expect(screen.getByText(he.fees.modes.exempt)).toBeTruthy()
-    expect(document.body.textContent).toContain(he.fees.nextChange(`${next.slice(5, 7)}/${next.slice(0, 4)}`, formatILS(350)))
+    expect(document.body.textContent).toContain(he.fees.nextChange(monthLabel(next), formatILS(350)))
   })
 })
 

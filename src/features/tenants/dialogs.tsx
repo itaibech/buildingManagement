@@ -3,11 +3,11 @@ import { useMediaQuery } from '@mantine/hooks'
 import type { ReactNode } from 'react'
 import { he } from '../../lib/he'
 
-/** A form sheet: full screen on mobile, a centered modal from 768px up. */
-export function FormModal({ opened, title, onClose, children }: { opened: boolean; title: string; onClose: () => void; children: ReactNode }) {
+/** A form sheet: full screen on mobile, a centered modal from 768px up. `compact`: a short sheet, never full screen. */
+export function FormModal({ opened, title, onClose, children, compact = false }: { opened: boolean; title: string; onClose: () => void; children: ReactNode; compact?: boolean }) {
   const mobile = useMediaQuery('(max-width: 767px)')
   return (
-    <Modal opened={opened} onClose={onClose} title={title} fullScreen={mobile} centered radius="lg"
+    <Modal opened={opened} onClose={onClose} title={title} fullScreen={mobile && !compact} centered radius="lg"
       styles={{ title: { fontFamily: 'var(--bm-heading-font)', fontSize: '1.375rem' } }}>
       {children}
     </Modal>

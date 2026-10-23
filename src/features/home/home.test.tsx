@@ -134,7 +134,8 @@ describe('HomePage', () => {
   it('resident hero states the balance in words', () => {
     m.balance = 660
     renderHome()
-    expect(screen.getByText(norm(he.home.balanceDue(formatILS(660))))).toBeTruthy()
+    expect(screen.getByText(he.home.owed)).toBeTruthy()
+    expect(screen.getByText(norm(formatILS(660)))).toBeTruthy()
   })
 
   it('resident with a balance to pay sees how to pay: instructions, copy and tap-to-call', () => {
@@ -157,7 +158,8 @@ describe('HomePage', () => {
     cleanup()
     m.balance = -330
     renderHome()
-    expect(screen.getByText(norm(he.finance.creditOf(formatILS(330))))).toBeTruthy()
+    expect(screen.getByText(norm(`${formatILS(330)} ${he.credit}`))).toBeTruthy()
+    expect(screen.getByText(he.home.allPaid)).toBeTruthy()
   })
 
   it('admin hero asks to set fees first when the fee schedule is empty', () => {

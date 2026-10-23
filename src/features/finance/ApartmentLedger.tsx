@@ -1,11 +1,12 @@
 import { Button, Group, Stack, Text } from '@mantine/core'
+import { FormModal } from '../tenants/dialogs'
 import { IconCash } from '@tabler/icons-react'
 import { useState } from 'react'
 import { todayISO } from '../../lib/dates'
 import { formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
 import { AptPlate, ExemptBadge, ListSkeleton, Money } from '../../ui'
-import { useLedger, type ApartmentBalance } from './api'
+import { useBalances, useLedger, type ApartmentBalance } from './api'
 import { LoadFailed } from './cards'
 import { YearStepper } from './fields'
 import { LedgerGrid } from './LedgerGrid'
@@ -47,5 +48,23 @@ export function ApartmentLedger({ apartment }: { apartment: ApartmentBalance }) 
       <Button fullWidth leftSection={<IconCash size={20} stroke={1.75} />} onClick={() => setPaying(true)}>{he.finance.recordPayment}</Button>
       <ApartmentYear apartmentId={apartment.apartmentId} />
     </Stack>
+  )
+}
+
+/** Apartment page (admin): the balance with a "לכרטסת" button that opens the apartment's ledger sheet. */
+export function ApartmentBalanceLine({ apartmentId }: { apartmentId: string }) {
+  const q = useBalances()
+  const [open, setOpen] = useState(false)
+  const row = q.data?.find((r) => r.apartmentId === apartmentId)
+  if (!row) return null
+  return (
+    <Group gap="sm" wrap="nowrap" mt={4}>
+      <Text size="sm" c="dimmed">{he.finance.balanceLabel}</Text>
+      <Money amount={row.balance} size="sm" />
+      <Button variant="subtle" px="xs" onClick={() => setOpen(true)}>{he.finance.toLedger}</Button>
+      <FormModal opened={open} title={he.apartment(row.number)} onClose={() => setOpen(false)}>
+        {open && <ApartmentLedger apartment={row} />}
+      </FormModal>
+    </Group>
   )
 }

@@ -1,11 +1,12 @@
-import { Button, NumberInput, Select, Stack, Text, Textarea, TextInput } from '@mantine/core'
+import { Button, Select, Stack, Text, Textarea } from '@mantine/core'
 import { useForm, type UseFormReturnType } from '@mantine/form'
 import { he } from '../../lib/he'
-import { notifySuccess } from '../../ui'
+import { DateInput, focusFirstError, notifySuccess } from '../../ui'
 import { todayISO } from '../../lib/dates'
 import { formatDate } from '../../lib/format'
 import { useExpenseCategories, useMarkDone, type Task } from './api'
 import { nextDue } from './nextDue'
+import { MoneyInput } from '../finance/fields'
 
 interface DoneValues {
   doneOn: string
@@ -22,8 +23,7 @@ function CostFields({ form }: { form: UseFormReturnType<DoneValues> }) {
   const data = (categories.data ?? []).map((c) => ({ value: c.id, label: c.name }))
   return (
     <>
-      <NumberInput label={he.maintenance.cost} description={he.maintenance.costHint} prefix="₪" min={0} decimalScale={2}
-        thousandSeparator="," dir="ltr" {...form.getInputProps('cost')} />
+      <MoneyInput label={he.maintenance.cost} description={he.maintenance.costHint} min={0} {...form.getInputProps('cost')} />
       <Select label={he.maintenance.category} data={data} searchable withAsterisk={costOf(form.values) !== null}
         {...form.getInputProps('categoryId')} />
     </>
@@ -50,11 +50,11 @@ export function DoneForm({ task, onDone }: { task: Task; onDone: () => void }) {
         onDone()
       },
     })
-  })
+  }, focusFirstError)
   return (
     <form onSubmit={submit} noValidate>
       <Stack>
-        <TextInput label={he.maintenance.doneOn} withAsterisk type="date" dir="ltr" data-autofocus {...form.getInputProps('doneOn')} />
+        <DateInput label={he.maintenance.doneOn} withAsterisk data-autofocus {...form.getInputProps('doneOn')} />
         {preview && <Text size="sm" c="dimmed" className="bm-num">{he.maintenance.nextDuePreview(formatDate(preview))}</Text>}
         <Textarea label={he.maintenance.note} autosize minRows={2} maxRows={6} {...form.getInputProps('note')} />
         <CostFields form={form} />

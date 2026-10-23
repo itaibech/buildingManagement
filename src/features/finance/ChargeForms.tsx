@@ -2,7 +2,7 @@ import { Button, MultiSelect, SegmentedControl, Select, Stack, Text, TextInput }
 import { useForm } from '@mantine/form'
 import { todayISO } from '../../lib/dates'
 import { he } from '../../lib/he'
-import { notifySuccess } from '../../ui'
+import { focusFirstError, notifySuccess } from '../../ui'
 import { useSaveCharge, useSaveFee } from './api'
 import { MonthField, MoneyInput } from './fields'
 import { useApartmentOptions } from './hooks'
@@ -20,7 +20,7 @@ export function FeeForm({ onDone }: { onDone: () => void }) {
   const submit = form.onSubmit((v) => {
     if (typeof v.amount !== 'number') return
     save.mutate({ effective_from: v.month, amount: v.amount }, { onSuccess: () => { notifySuccess(he.finance.feeSaved); onDone() } })
-  })
+  }, focusFirstError)
   return (
     <form onSubmit={submit} noValidate>
       <Stack>
@@ -49,7 +49,7 @@ export function LevyForm({ onDone }: { onDone: () => void }) {
     save.mutate({ apartment_ids: ids, month: v.month, amount: v.amount, kind: 'levy', label: v.label.trim() }, {
       onSuccess: () => { notifySuccess(he.finance.chargeAdded); onDone() },
     })
-  })
+  }, focusFirstError)
   return (
     <form onSubmit={submit} noValidate>
       <Stack>
@@ -83,7 +83,7 @@ export function ChargeForm({ onDone }: { onDone: () => void }) {
     save.mutate({ apartment_ids: [v.apartmentId], month: v.month, amount: v.amount, kind: v.kind, label: v.label.trim() || he.finance.kinds[v.kind] }, {
       onSuccess: () => { notifySuccess(he.finance.chargeAdded); onDone() },
     })
-  })
+  }, focusFirstError)
   return (
     <form onSubmit={submit} noValidate>
       <Stack>

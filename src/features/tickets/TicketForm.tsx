@@ -2,7 +2,7 @@ import { Alert, Autocomplete, Button, Stack, Textarea, TextInput } from '@mantin
 import { useForm } from '@mantine/form'
 import { useState } from 'react'
 import { he } from '../../lib/he'
-import { notifyError, notifySuccess } from '../../ui'
+import { focusFirstError, notifyError, notifySuccess } from '../../ui'
 import { useCreateTicket, useUpdateTicket, type Ticket, type TicketInput } from './api'
 import { PhotoPicker, type PickedPhoto } from './PhotoPicker'
 
@@ -37,7 +37,7 @@ export function TicketForm({ ticket, onDone }: { ticket?: Ticket; onDone: () => 
     validate: { title: (v) => (v.trim() ? null : he.tickets.errors.required) },
   })
   return (
-    <form onSubmit={form.onSubmit((v) => submit(trimmed(v), photos.map((p) => p.file)))} noValidate>
+    <form onSubmit={form.onSubmit((v) => submit(trimmed(v), photos.map((p) => p.file)), focusFirstError)} noValidate>
       <Stack>
         <TextInput label={he.tickets.title} placeholder={he.tickets.titlePlaceholder} withAsterisk data-autofocus {...form.getInputProps('title')} />
         <Autocomplete label={he.tickets.location} placeholder={he.tickets.locationPlaceholder} data={[...he.tickets.locations]} {...form.getInputProps('location')} />

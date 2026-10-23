@@ -78,3 +78,14 @@ describe('theme', () => {
     expect(close.style.getPropertyValue('--cb-size')).toBe('calc(2.75rem * var(--mantine-scale))')
   })
 })
+
+describe('focusFirstError', () => {
+  it('focuses the first invalid field of the submitted form', async () => {
+    const { focusFirstError } = await import('./forms')
+    wrap(<form data-testid="f"><input aria-label="ok" /><input aria-label="bad" aria-invalid="true" /></form>)
+    const form = screen.getByTestId('f') as HTMLFormElement
+    focusFirstError({}, {}, { currentTarget: form } as unknown as React.FormEvent<HTMLFormElement>)
+    await new Promise((r) => requestAnimationFrame(() => r(null)))
+    expect(document.activeElement).toBe(screen.getByLabelText('bad'))
+  })
+})

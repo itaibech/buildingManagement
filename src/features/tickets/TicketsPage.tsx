@@ -1,4 +1,4 @@
-import { Card, Chip, Group, Stack, Text } from '@mantine/core'
+import { Card, Group, SegmentedControl, Stack, Text } from '@mantine/core'
 import { IconPhoto } from '@tabler/icons-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
@@ -8,11 +8,13 @@ import { EmptyState, ListSkeleton, PageHeader, StatusBadge } from '../../ui'
 import { ticketsRows } from '../export/buildWorkbook'
 import { useExportAction } from '../export/useExport'
 import { FormModal } from '../tenants/dialogs'
-import { TICKET_STATUSES, useTickets, type TicketListItem, type TicketStatus } from './api'
+import { useTickets, type TicketListItem, type TicketStatus } from './api'
 import { TicketForm } from './TicketForm'
 
-const DEFAULT_FILTER: TicketStatus[] = ['open', 'in_progress']
-const CHIP_STYLES = { label: { height: 44, paddingInline: 16, fontWeight: 600 } }
+type Filter = 'active' | 'closed' | 'all'
+const STATUSES: Record<Filter, TicketStatus[] | undefined> = { active: ['open', 'in_progress'], closed: ['closed'], all: undefined }
+const FILTERS: Filter[] = ['active', 'closed', 'all']
+const isFilter = (v: string): v is Filter => FILTERS.some((f) => f === v)
 
 function PhotoCount({ n }: { n: number }) {
   return (
@@ -39,27 +41,18 @@ export function TicketRow({ ticket }: { ticket: TicketListItem }) {
   )
 }
 
-function StatusFilter({ value, onChange }: { value: TicketStatus[]; onChange: (v: TicketStatus[]) => void }) {
-  const all = value.length === TICKET_STATUSES.length
-  const pick = (next: string[]) => {
-    const statuses = TICKET_STATUSES.filter((s) => next.includes(s))
-    if (statuses.length > 0) onChange(statuses)
-  }
+function StatusFilter({ value, onChange }: { value: Filter; onChange: (v: Filter) => void }) {
   return (
-    <Group gap="xs" role="group" aria-label={he.tickets.filterLabel}>
-      <Chip checked={all} onChange={() => onChange([...TICKET_STATUSES])} styles={CHIP_STYLES}>{he.tickets.filters.all}</Chip>
-      <Chip.Group multiple value={value} onChange={pick}>
-        {TICKET_STATUSES.map((s) => <Chip key={s} value={s} styles={CHIP_STYLES}>{he.tickets.filters[s]}</Chip>)}
-      </Chip.Group>
-    </Group>
+    <SegmentedControl aria-label={he.tickets.filterLabel} maw={480} value={value} onChange={(v) => isFilter(v) && onChange(v)}
+      data={FILTERS.map((f) => ({ value: f, label: he.tickets.filters[f] }))} />
   )
 }
 
 /** Service calls: anyone approved can report; filter by status (open + in progress by default). */
 export default function TicketsPage() {
-  const [filter, setFilter] = useState<TicketStatus[]>(DEFAULT_FILTER)
+  const [filter, setFilter] = useState<Filter>('active')
   const [adding, setAdding] = useState(false)
-  const list = useTickets(filter.length === TICKET_STATUSES.length ? undefined : filter)
+  const list = useTickets(STATUSES[filter])
   const add = { label: he.tickets.add, onClick: () => setAdding(true) }
   const exportAction = useExportAction(he.export.files.tickets, () => ticketsRows(list.data ?? []), !!list.data)
   return (

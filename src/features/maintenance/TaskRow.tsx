@@ -39,17 +39,19 @@ export interface TaskRowProps {
   onOpen: (task: Task) => void
   /** Admin only: shows the done button and edit/delete menu. */
   actions?: TaskActions
+  /** False in the grouped list, where the section heading already names the status. */
+  showStatus?: boolean
 }
 
 /** One task: tap to open its done log; admins can mark it done, edit or delete it. */
-export function TaskRow({ task, bucket, onOpen, actions }: TaskRowProps) {
+export function TaskRow({ task, bucket, onOpen, actions, showStatus = true }: TaskRowProps) {
   return (
     <Card padding={0} data-testid={`task-${task.id}`}>
       <UnstyledButton onClick={() => onOpen(task)} aria-label={he.maintenance.openTask(task.title)} mih={44} p="md" className="bm-row" style={{ display: 'block', width: '100%' }}>
         <Stack gap={4}>
           <Group gap="sm" wrap="wrap">
             <Text fw={600}>{task.title}</Text>
-            <StatusBadge kind="due" value={bucket} />
+            {showStatus && <StatusBadge kind="due" value={bucket} />}
           </Group>
           <Meta task={task} />
         </Stack>

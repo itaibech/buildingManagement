@@ -1,6 +1,6 @@
-import { Card, Group, Stack, Text, Title } from '@mantine/core'
+import { Card, Stack, Text, Title } from '@mantine/core'
 import { he } from '../../lib/he'
-import { AptPlate, ListSkeleton, PageHeader } from '../../ui'
+import { ListSkeleton, PageHeader } from '../../ui'
 import { useMyApartment } from './api'
 import { ApartmentYear } from './ApartmentLedger'
 import { CategoryTotals } from './BudgetTab'
@@ -10,13 +10,10 @@ import { MyEvCard } from '../ev/MyEvCard'
 /** The resident's own month grid. Only their apartment's rows are requested and shown. */
 function MyLedger() {
   const mine = useMyApartment()
-  const number = mine.data?.number
   return (
     <Card>
-      <Group gap="sm" mb="sm">
-        {number !== undefined && <AptPlate number={number} size="md" />}
-        <Title order={2} size="h4">{he.finance.myLedger}</Title>
-      </Group>
+      {/* No plate here: the header already shows the resident's own apartment. */}
+      <Title order={2} size="h4" mb="sm">{he.finance.myLedger}</Title>
       {mine.isLoading && <ListSkeleton rows={3} />}
       {mine.isError && <LoadFailed onRetry={mine.refetch} />}
       {mine.isSuccess && !mine.data && <Text c="dimmed">{he.finance.notLinked}</Text>}

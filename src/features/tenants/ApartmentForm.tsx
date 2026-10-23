@@ -1,7 +1,7 @@
 import { Alert, Button, NumberInput, Stack, Textarea } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { he } from '../../lib/he'
-import { notifySuccess } from '../../ui'
+import { focusFirstError, notifySuccess } from '../../ui'
 import { DbFailure, useSaveApartment, type Apartment } from './api'
 
 interface Values {
@@ -40,13 +40,13 @@ export function ApartmentForm({ apartment, onDone }: ApartmentFormProps) {
       notes: v.notes.trim() || null,
     }
     save.mutate(apartment ? { id: apartment.id, ...values } : values, { onSuccess: () => { notifySuccess(he.toast.apartmentSaved); onDone() } })
-  })
+  }, focusFirstError)
   const error = errorText(save.error)
   return (
     <form onSubmit={submit} noValidate>
       <Stack>
-        <NumberInput label={he.tenants.number} withAsterisk allowDecimal={false} min={1} data-autofocus {...form.getInputProps('number')} />
-        <NumberInput label={he.tenants.floor} allowDecimal={false} {...form.getInputProps('floor')} />
+        <NumberInput label={he.tenants.number} withAsterisk allowDecimal={false} min={1} hideControls inputMode="numeric" dir="ltr" data-autofocus {...form.getInputProps('number')} />
+        <NumberInput label={he.tenants.floor} allowDecimal={false} hideControls inputMode="numeric" dir="ltr" {...form.getInputProps('floor')} />
         <Textarea label={he.tenants.notes} rows={2} {...form.getInputProps('notes')} />
         {error && <Alert color="debt">{error}</Alert>}
         <Button type="submit" fullWidth loading={save.isPending}>{he.tenants.save}</Button>

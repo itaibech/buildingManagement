@@ -162,6 +162,42 @@ body {
   }
 }
 
+/* DateInput: hide the OS-locale empty mask, show the Hebrew hint instead (see DateInput.tsx). */
+.bm-date {
+  position: relative;
+}
+.bm-date-hint {
+  display: none;
+  position: absolute;
+  inset-block: 0;
+  left: 14px;
+  align-items: center;
+  color: var(--mantine-color-dimmed);
+  pointer-events: none;
+}
+.bm-date[data-empty] .bm-date-hint {
+  display: flex;
+}
+.bm-date[data-empty] input:not(:focus) {
+  color: transparent;
+}
+.bm-date:focus-within .bm-date-hint {
+  display: none;
+}
+
+/* Sideways-scrolling tab list: fade the end edge (left in RTL) while more tabs are hidden there. */
+.bm-tabs-scroll[data-more] {
+  -webkit-mask-image: linear-gradient(to left, transparent 0, #000 40px);
+  mask-image: linear-gradient(to left, transparent 0, #000 40px);
+}
+
+/* Mobile toasts sit above the tab bar. */
+@media (max-width: 767px) {
+  .bm-toasts[data-position='bottom-center'] {
+    bottom: calc(var(--bm-tabbar-height) + var(--bm-safe-bottom) + 8px) !important;
+  }
+}
+
 /* Tappable list row (plate on the start side). */
 .bm-row {
   color: inherit;

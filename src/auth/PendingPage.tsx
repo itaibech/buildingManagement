@@ -1,5 +1,5 @@
 import { Button, Center, Paper, Stack, Text, Title } from '@mantine/core'
-import { IconLogout } from '@tabler/icons-react'
+import { IconLogout, IconRefresh } from '@tabler/icons-react'
 import { he } from '../lib/he'
 import { PlateMark } from '../ui'
 import { useAuth } from './AuthProvider'
@@ -16,7 +16,7 @@ export function AuthIdentity() {
 }
 
 export default function PendingPage() {
-  const { profile, session } = useAuth()
+  const { profile, session, retry, loading } = useAuth()
   const exit = useExit()
   const email = profile?.email ?? session?.user.email
   return (
@@ -28,6 +28,9 @@ export default function PendingPage() {
             <Title order={2} size="h3">{he.pendingApproval}</Title>
             <Text c="dimmed">{he.pendingHint}</Text>
             {email && <Text size="sm" c="dimmed">{he.signedInAs} <bdi dir="ltr">{email}</bdi></Text>}
+            <Button fullWidth size="lg" loading={loading} leftSection={<IconRefresh size={20} stroke={1.75} aria-hidden="true" />} onClick={retry}>
+              {he.pendingCheck}
+            </Button>
             <Button variant="default" fullWidth size="lg" leftSection={<IconLogout size={20} stroke={1.75} className="bm-mirror" />} onClick={() => void exit()}>
               {he.exit}
             </Button>

@@ -1,11 +1,13 @@
-import { ActionIcon, Anchor, Button, Card, Divider, Group, Stack, Text, Title } from '@mantine/core'
-import { IconChevronRight, IconPencil, IconTrash } from '@tabler/icons-react'
+import { ActionIcon, Anchor, Button, Card, Divider, Group, Menu, Stack, Text, Title } from '@mantine/core'
+import { IconDots, IconPencil, IconTrash } from '@tabler/icons-react'
 import { Fragment, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { useNavigate, useParams } from 'react-router'
 import { he } from '../../lib/he'
 import { formatILS } from '../../lib/format'
-import { AptPlate, EmptyState, ExemptBadge, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
+import { AptPlate, BackLink, EmptyState, ExemptBadge, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
 import { useApartmentFee } from '../finance/api'
+import { ApartmentBalanceLine } from '../finance/ApartmentLedger'
+import { telHref } from '../settings/api'
 import { ApartmentForm } from './ApartmentForm'
 import { isMoneyHistoryError, useApartments, useDeleteApartment, useDeleteResident, useResidents, type Apartment, type Resident } from './api'
 import { ConfirmDialog, FormModal } from './dialogs'
@@ -21,19 +23,27 @@ type Dialog =
 const ICON = { size: 20, stroke: 1.75 } as const
 
 function ResidentRow({ r, onEdit, onDelete }: { r: Resident; onEdit: () => void; onDelete: () => void }) {
-  const details = [r.is_owner ? he.tenants.owner : he.tenants.tenant, r.phone, r.email].filter(Boolean).join(' · ')
+  const details = [r.is_owner ? he.tenants.owner : he.tenants.tenant, r.email].filter(Boolean).join(' · ')
   return (
     <Group wrap="nowrap" gap="xs" py="xs" px="md" mih={56}>
       <Stack gap={0} style={{ flex: 1, minWidth: 0 }}>
         <Text fw={600} truncate>{r.full_name}</Text>
-        <Text size="sm" c="dimmed" truncate>{details}</Text>
+        <Text size="sm" c="dimmed" truncate>
+          {details}
+          {r.phone && <>{' · '}<Anchor href={telHref(r.phone)} size="sm" dir="ltr">{r.phone}</Anchor></>}
+        </Text>
       </Stack>
-      <ActionIcon variant="subtle" color="stone.7" size={44} aria-label={`${he.tenants.edit} ${r.full_name}`} onClick={onEdit}>
-        <IconPencil {...ICON} />
-      </ActionIcon>
-      <ActionIcon variant="subtle" color="debt" size={44} aria-label={`${he.tenants.delete} ${r.full_name}`} onClick={onDelete}>
-        <IconTrash {...ICON} />
-      </ActionIcon>
+      <Menu position="bottom-start" withinPortal>
+        <Menu.Target>
+          <ActionIcon variant="subtle" color="stone.7" size={44} aria-label={he.tenants.residentActions(r.full_name)}>
+            <IconDots {...ICON} aria-hidden="true" />
+          </ActionIcon>
+        </Menu.Target>
+        <Menu.Dropdown>
+          <Menu.Item leftSection={<IconPencil size={18} stroke={1.75} />} onClick={onEdit}>{he.tenants.edit}</Menu.Item>
+          <Menu.Item color="debt" leftSection={<IconTrash size={18} stroke={1.75} />} onClick={onDelete}>{he.tenants.delete}</Menu.Item>
+        </Menu.Dropdown>
+      </Menu>
     </Group>
   )
 }
@@ -56,6 +66,7 @@ function ApartmentSummary({ apartment, onEdit, onDelete }: { apartment: Apartmen
             {apartment.floor !== null && <Text fw={600}>{he.tenants.floorLabel(apartment.floor)}</Text>}
             {apartment.notes && <Text size="sm" c="dimmed">{apartment.notes}</Text>}
             <FeeLine apartmentId={apartment.id} />
+            <ApartmentBalanceLine apartmentId={apartment.id} />
           </Stack>
         </Group>
         <Group gap="xs">
@@ -77,15 +88,6 @@ function ResidentList({ residents, setDialog }: { residents: Resident[]; setDial
       <ResidentRow r={r} onEdit={() => setDialog({ kind: 'resident', resident: r })} onDelete={() => setDialog({ kind: 'deleteResident', resident: r })} />
     </Fragment>
   ))
-}
-
-function BackLink() {
-  return (
-    <Anchor component={Link} to="/apartments" fw={600} mih={44} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-      <IconChevronRight size={18} stroke={1.75} aria-hidden="true" />
-      {he.tenants.back}
-    </Anchor>
-  )
 }
 
 function Dialogs({ apartment, residents, dialog, close }: { apartment: Apartment; residents: Resident[]; dialog: Dialog; close: () => void }) {
@@ -122,11 +124,11 @@ export default function ApartmentPage() {
   const [dialog, setDialog] = useState<Dialog>(null)
   const apartment = apartments.data?.find((a) => a.id === id)
   if (apartments.isLoading) return <ListSkeleton />
-  if (!apartment) return <Stack align="flex-start"><BackLink /><Text>{apartments.isError ? he.tenants.loadError : he.tenants.notFound}</Text></Stack>
+  if (!apartment) return <Stack align="flex-start"><BackLink to="/apartments" label={he.tenants.back} /><Text>{apartments.isError ? he.tenants.loadError : he.tenants.notFound}</Text></Stack>
   const list = residents.data ?? []
   return (
     <Stack gap="md">
-      <BackLink />
+      <BackLink to="/apartments" label={he.tenants.back} />
       <PageHeader title={he.apartment(apartment.number)} action={{ label: he.tenants.addResident, onClick: () => setDialog({ kind: 'resident' }) }} />
       <ApartmentSummary apartment={apartment} onEdit={() => setDialog({ kind: 'editApartment' })} onDelete={() => setDialog({ kind: 'deleteApartment' })} />
       <Title order={2} size="h4">{he.tenants.residents}</Title>

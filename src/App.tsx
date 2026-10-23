@@ -1,9 +1,10 @@
 import { Box } from '@mantine/core'
 import { lazy, Suspense } from 'react'
-import { Navigate, Route, Routes } from 'react-router'
-import { AuthProvider } from './auth/AuthProvider'
+import { Navigate, Route, Routes, useLocation } from 'react-router'
+import { AuthProvider, useAuth } from './auth/AuthProvider'
 import { RequireAdmin, RequireApproved } from './auth/Guard'
 import LoginPage from './auth/LoginPage'
+import ResetPasswordPage from './auth/ResetPasswordPage'
 import Shell from './layout/Shell'
 import { ListSkeleton } from './ui'
 
@@ -31,12 +32,21 @@ const fallback = (
   </Box>
 )
 
+/** A password-reset link signs the user in with a recovery session: send them to choose a new password. */
+function RecoveryRedirect() {
+  const { recovery } = useAuth()
+  const { pathname } = useLocation()
+  return recovery && pathname !== '/reset-password' ? <Navigate to="/reset-password" replace /> : null
+}
+
 export default function App() {
   return (
     <AuthProvider>
+      <RecoveryRedirect />
       <Suspense fallback={fallback}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route element={<RequireApproved />}>
             <Route element={<Shell />}>
               <Route index element={<HomePage />} />

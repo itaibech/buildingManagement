@@ -5,7 +5,7 @@ import { he } from '../../lib/he'
 import { ExemptBadge, ListSkeleton, Money, notifyError, notifySuccess } from '../../ui'
 import { telHref, useBuilding } from '../settings/api'
 import { useBuildingCash, useMyBalance } from './api'
-import { balanceSentence } from './ledger'
+import { heroState } from './ledger'
 
 /** Dimmed failure line with a retry button. */
 export function LoadFailed({ onRetry }: { onRetry: () => void }) {
@@ -22,14 +22,14 @@ export function MyBalanceHero() {
   const q = useMyBalance()
   return (
     <Card>
-      <Text fw={600} c="dimmed" size="sm">{he.home.myBalance}</Text>
+      <Title order={2} size="h4">{he.home.myBalance}</Title>
       {q.isLoading && <ListSkeleton rows={1} />}
       {q.isError && <LoadFailed onRetry={() => void q.refetch()} />}
       {q.data === null && <Text c="dimmed" mt="xs">{he.finance.notLinked}</Text>}
       {q.data && (
         <Stack gap={4} mt="xs">
           <Money amount={q.data.balance} size="xl" />
-          <Text fw={600}>{balanceSentence(q.data.balance)}</Text>
+          <Text fw={600}>{heroState(q.data.balance)}</Text>
           {q.data.scheduled > 0 && (
             <Text size="sm" c="dimmed" className="bm-num">{he.finance.scheduled(formatILS(q.data.scheduled))}</Text>
           )}
@@ -44,7 +44,7 @@ export function CashCard() {
   const q = useBuildingCash()
   return (
     <Card>
-      <Text fw={600} c="dimmed" size="sm">{he.finance.cash}</Text>
+      <Title order={2} size="h4">{he.finance.cash}</Title>
       {q.isLoading && <ListSkeleton rows={1} />}
       {q.isError && <LoadFailed onRetry={() => void q.refetch()} />}
       {q.data !== undefined && (

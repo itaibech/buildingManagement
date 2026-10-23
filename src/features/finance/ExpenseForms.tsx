@@ -5,7 +5,7 @@ import { Fragment, useState } from 'react'
 import { todayISO } from '../../lib/dates'
 import { formatILS, monthLabel } from '../../lib/format'
 import { he } from '../../lib/he'
-import { notifyError, notifySuccess } from '../../ui'
+import { DateInput, focusFirstError, notifyError, notifySuccess } from '../../ui'
 import { useExpenseCategories } from '../maintenance/api'
 import { useApplyTemplates, useSaveExpense, useSaveTemplate, type Template } from './api'
 import { MoneyInput } from './fields'
@@ -62,13 +62,13 @@ export function ExpenseForm({ onDone }: { onDone: () => void }) {
     save.mutate({ values, file }, {
       onSuccess: ({ receiptFailed }) => { (receiptFailed ? notifyError : notifySuccess)(receiptFailed ? he.finance.receiptFailed : he.finance.expenseSaved); onDone() },
     })
-  })
+  }, focusFirstError)
   return (
     <form onSubmit={submit} noValidate>
       <Stack>
         <Select label={he.finance.category} withAsterisk searchable data={categories} data-autofocus {...form.getInputProps('categoryId')} />
         <MoneyInput label={he.finance.amount} withAsterisk min={0} {...form.getInputProps('amount')} />
-        <TextInput label={he.finance.spentOn} withAsterisk type="date" dir="ltr" {...form.getInputProps('spentOn')} />
+        <DateInput label={he.finance.spentOn} withAsterisk {...form.getInputProps('spentOn')} />
         <TextInput label={he.finance.vendor} {...form.getInputProps('vendor')} />
         <TextInput label={he.finance.note} {...form.getInputProps('note')} />
         <ReceiptField file={file} onChange={setFile} />
@@ -91,7 +91,7 @@ export function TemplateForm({ template, onDone }: { template?: Template; onDone
     save.mutate({ id: template?.id, label: v.label.trim(), category_id: v.categoryId, amount: v.amount, vendor: v.vendor.trim() }, {
       onSuccess: () => { notifySuccess(he.finance.templateSaved); onDone() },
     })
-  })
+  }, focusFirstError)
   return (
     <form onSubmit={submit} noValidate>
       <Stack>
