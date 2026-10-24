@@ -260,3 +260,57 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* Directory print view (portalled to <body>): hidden on screen, the only thing printed. */
+.bm-print {
+  display: none;
+}
+@media print {
+  body > *:not(.bm-print) {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
+  .bm-print {
+    display: block;
+    color: #000;
+    background: #fff;
+    font-family: Assistant, system-ui, sans-serif;
+    font-size: 12pt;
+  }
+  .bm-print-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    border-bottom: 2px solid #000;
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+    font-size: 14pt;
+  }
+  .bm-print-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .bm-print-table th,
+  .bm-print-table td {
+    text-align: start;
+    padding: 4px 8px;
+    border-bottom: 1px solid #bbb;
+  }
+  .bm-print-table thead {
+    display: table-header-group;
+  }
+  .bm-print-table tbody {
+    break-inside: avoid;
+  }
+  .bm-print-num {
+    display: inline-block;
+    min-width: 2em;
+    padding: 0 6px;
+    border: 1.5px solid #000;
+    border-radius: 3px;
+    text-align: center;
+    font-weight: 700;
+  }
+}

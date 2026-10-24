@@ -1,12 +1,15 @@
-import { ActionIcon, Button, Group, Title } from '@mantine/core'
+import { ActionIcon, Button, Group, Menu, Title } from '@mantine/core'
 import { IconPlus } from '@tabler/icons-react'
 import type { ReactNode } from 'react'
 
 interface PrimaryAction { label: string; onClick: () => void; icon?: ReactNode }
+interface SecondaryItem { label: string; onClick: () => void; icon?: ReactNode; disabled?: boolean }
 interface SecondaryAction {
-  label: string; onClick: () => void; icon: ReactNode; loading?: boolean; disabled?: boolean; hint?: string
+  label: string; onClick?: () => void; icon: ReactNode; loading?: boolean; disabled?: boolean; hint?: string
   /** Visible text on mobile, next to the icon (an icon alone is unclear on touch); defaults to `label`. */
   shortLabel?: string
+  /** When set, the button opens a menu of these choices instead of acting directly. */
+  items?: SecondaryItem[]
 }
 
 export interface PageHeaderProps {
@@ -18,17 +21,37 @@ export interface PageHeaderProps {
   extra?: ReactNode
 }
 
-function Secondary({ label, shortLabel, onClick, icon, loading, disabled, hint }: SecondaryAction) {
+function Secondary({ label, shortLabel, onClick, icon, loading, disabled, hint, items }: SecondaryAction) {
+  const desktop = (
+    <Button visibleFrom="sm" variant="subtle" title={hint} leftSection={icon} onClick={onClick} loading={loading} disabled={disabled}>
+      {label}
+    </Button>
+  )
+  const mobile = (
+    <Button hiddenFrom="sm" variant="subtle" px="xs" title={hint} aria-label={label} leftSection={icon} onClick={onClick}
+      loading={loading} disabled={disabled}>
+      {shortLabel ?? label}
+    </Button>
+  )
+  if (!items) return <>{desktop}{mobile}</>
   return (
     <>
-      <Button visibleFrom="sm" variant="subtle" title={hint} leftSection={icon} onClick={onClick} loading={loading} disabled={disabled}>
-        {label}
-      </Button>
-      <Button hiddenFrom="sm" variant="subtle" px="xs" title={hint} aria-label={label} leftSection={icon} onClick={onClick}
-        loading={loading} disabled={disabled}>
-        {shortLabel ?? label}
-      </Button>
+      <SecondaryMenu items={items}>{desktop}</SecondaryMenu>
+      <SecondaryMenu items={items}>{mobile}</SecondaryMenu>
     </>
+  )
+}
+
+function SecondaryMenu({ items, children }: { items: SecondaryItem[]; children: ReactNode }) {
+  return (
+    <Menu position="bottom-start" withinPortal>
+      <Menu.Target>{children}</Menu.Target>
+      <Menu.Dropdown>
+        {items.map((i) => (
+          <Menu.Item key={i.label} leftSection={i.icon} disabled={i.disabled} onClick={i.onClick} mih={44}>{i.label}</Menu.Item>
+        ))}
+      </Menu.Dropdown>
+    </Menu>
   )
 }
 
