@@ -18,7 +18,8 @@ from public.buildings b,
     ('10000000-0000-0000-0000-000000000003', 3, 2),
     ('10000000-0000-0000-0000-000000000004', 4, 2),
     ('10000000-0000-0000-0000-000000000005', 5, 3),
-    ('10000000-0000-0000-0000-000000000006', 6, 3)
+    ('10000000-0000-0000-0000-000000000006', 6, 3),
+    ('10000000-0000-0000-0000-000000000007', 7, 4)
   ) as v(id, number, floor);
 
 insert into public.residents (id, building_id, apartment_id, full_name, phone, email, is_owner)
@@ -36,7 +37,9 @@ from public.buildings b,
     ('20000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000004',
       'רונית דמה', '050-0000005', null, true),
     ('20000000-0000-0000-0000-000000000006', '10000000-0000-0000-0000-000000000005',
-      'עמית פיקטיבי', '050-0000006', null, true)
+      'עמית פיקטיבי', '050-0000006', null, true),
+    ('20000000-0000-0000-0000-000000000007', '10000000-0000-0000-0000-000000000007',
+      'שירה הוראה', '050-0000007', null, true)
   ) as v(id, apartment_id, full_name, phone, email, is_owner);
 
 -- Local auth users (standard Supabase local-seed pattern). The trigger creates their profiles.
@@ -208,3 +211,10 @@ insert into public.payments (apartment_id, paid_on, amount, method, note) values
   ('10000000-0000-0000-0000-000000000004', '2026-07-05', 99.62, 'transfer', 'טעינת רכב חשמלי'),
   ('10000000-0000-0000-0000-000000000004', '2026-08-04', 100, 'transfer', 'טעינת רכב חשמלי'),
   ('10000000-0000-0000-0000-000000000005', '2026-08-06', 93.1, 'app', 'טעינת רכב חשמלי');
+
+-- Apartment form (Task 16, invented): apartment 5 is a committee representative (its exemption is above);
+-- apartment 7 pays by standing order since January, so every month's fee is recorded as an automatic payment.
+update public.apartments set is_committee = true where id = '10000000-0000-0000-0000-000000000005';
+update public.apartments set payment_method = 'standing_order', standing_order_from = '2026-01-01'
+where id = '10000000-0000-0000-0000-000000000007';
+select public.apply_standing_orders();

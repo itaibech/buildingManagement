@@ -127,14 +127,14 @@ isOneToOne: false
                   ]
                 },"apartments": {
                   Row: {
-                    "building_id": string,"created_at": string,"floor": number | null,"id": string,"notes": string | null,"number": number
+                    "building_id": string,"created_at": string,"floor": number | null,"id": string,"is_committee": boolean,"notes": string | null,"number": number,"payment_method": string,"standing_order_from": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "building_id"?: string,"created_at"?: string,"floor"?: number | null,"id"?: string,"notes"?: string | null,"number": number
+                    "building_id"?: string,"created_at"?: string,"floor"?: number | null,"id"?: string,"is_committee"?: boolean,"notes"?: string | null,"number": number,"payment_method"?: string,"standing_order_from"?: string | null
                   }
                   Update: {
-                    "building_id"?: string,"created_at"?: string,"floor"?: number | null,"id"?: string,"notes"?: string | null,"number"?: number
+                    "building_id"?: string,"created_at"?: string,"floor"?: number | null,"id"?: string,"is_committee"?: boolean,"notes"?: string | null,"number"?: number,"payment_method"?: string,"standing_order_from"?: string | null
                   }
                   Relationships: [
                     {
@@ -808,6 +808,9 @@ isOneToOne: false
               "amount": number,"fee_mode": string
             }[]
                            },
+"apply_standing_orders":
+{ Args: { "p_apartment_id"?: string }; Returns: number
+                           },
 "building_cash_balance":
 { Args: { "p_building_id": string }; Returns: number
                            },
@@ -947,11 +950,25 @@ isOneToOne: false
 "record_ev_reading":
 { Args: { "p_charger_id": string,"p_month": string,"p_note"?: string,"p_read_on"?: string,"p_reading": number }; Returns: Json
                            },
+"save_apartment":
+{ Args: { "p_ev"?: boolean,"p_ev_initial"?: number,"p_fee"?: number,"p_floor"?: number,"p_id"?: string,"p_is_committee"?: boolean,"p_notes"?: string,"p_number"?: number,"p_payment_method"?: string,"p_standing_order_from"?: string }; Returns: string
+                           },
+"save_apartment_fee":
+{ Args: { "p_committee": boolean,"p_fee": number,"p_id": string,"p_month": string,"p_was_committee": boolean }; Returns: undefined
+                           },
+"save_apartment_validate":
+{ Args: { "p_ev_initial": number,"p_fee": number,"p_number": number,"p_payment_method": string,"p_standing_order_from": string }; Returns: undefined
+                           },
 "save_ev_rate":
 { Args: { "p_effective_from": string,"p_rate": number }; Returns: number
                            },
 "set_apartment_fee":
 { Args: { "p_amount"?: number,"p_apartment_id": string,"p_effective_from": string,"p_mode": string }; Returns: boolean
+                           },
+"standing_order_due":
+{ Args: { "p_apartment_id": string }; Returns: {
+              "amount": number,"apartment_id": string,"building_id": string,"month": string
+            }[]
                            },
 "user_names":
 { Args: { "ids": (string)[] }; Returns: {
