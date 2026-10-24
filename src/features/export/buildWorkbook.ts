@@ -106,15 +106,37 @@ export function paymentsRows(payments: Payment[], info: ReadonlyMap<string, { nu
   ])
 }
 
+const X = he.finance.expenseExport
+const SOURCES: Readonly<Record<string, string>> = X.sources
+const sourceOf = (e: Expense): string => (e.special_id ? X.sources.special : (SOURCES[e.source] ?? e.source))
+const receiptFile = (e: Expense): string => (e.receipt_path ? (e.receipt_name ?? e.receipt_path.split('/').pop() ?? '') : '')
+
+/** Expenses by date (oldest first), with where each came from and its receipt's name: no links, signed URLs expire. */
 export function expensesRows(expenses: Expense[]): Rows {
-  return toSheetRows(expenses, [
+  const sorted = [...expenses].sort((a, b) => a.spent_on.localeCompare(b.spent_on))
+  return toSheetRows(sorted, [
     { header: H.date, value: (e) => formatDate(e.spent_on) },
     { header: H.category, value: (e) => e.category },
     { header: H.vendor, value: (e) => e.vendor },
+    { header: X.headers.note, value: (e) => e.note },
     { header: H.amount, value: (e) => e.amount },
-    { header: H.notes, value: (e) => e.note },
-    { header: he.finance.special.exportColumn, value: (e) => (e.special_id ? e.note : '') },
+    { header: X.headers.source, value: sourceOf },
+    { header: X.headers.receipt, value: (e) => (e.receipt_path ? X.yes : X.no) },
+    { header: X.headers.receiptFile, value: receiptFile },
   ])
+}
+
+/** The expense export: a month is one sheet; a year adds "סיכום" (categories × months, the importer's expenses layout). */
+export function expenseExportSheets(expenses: Expense[], summary?: Pick<YearData, 'year' | 'categories'>): Record<string, Rows> {
+  const sheets = { [X.sheet]: expensesRows(expenses) }
+  return summary ? { ...sheets, [X.summarySheet]: expensesSheet({ ...summary, expenses }) } : sheets
+}
+
+export type ExpenseExportScope = 'month' | 'year'
+
+/** `הוצאות-2026-10` / `הוצאות-2026` (no export date: the period is the name). */
+export function expenseExportName(scope: ExpenseExportScope, month: string, year: number): string {
+  return `${he.export.files.expenses}-${scope === 'month' ? month.slice(0, 7) : year}`
 }
 
 export function budgetRows(lines: BudgetRow[]): Rows {
@@ -165,7 +187,7 @@ function incomeSheet({ year, apartments, residents, ledger }: YearData): Rows {
   return [...header, ...body, totals]
 }
 
-function expensesSheet({ year, categories, expenses }: YearData): Rows {
+function expensesSheet({ year, categories, expenses }: Pick<YearData, 'year' | 'categories' | 'expenses'>): Rows {
   const rows: Rows = [[H.category, ...HEBREW_MONTHS, H.total]]
   const columnTotals = MONTHS.map(() => 0)
   for (const c of categories) {

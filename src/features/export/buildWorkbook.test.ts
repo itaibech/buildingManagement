@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { he } from '../../lib/he'
 import { parseBudgetSheet, parseExpensesSheet, parseIncomeSheet } from '../import/parseWorkbook'
 import { SHEETS } from '../import/readWorkbook'
-import { apartmentsRows, balancesRows, buildYearWorkbook, expensesRows, paymentsRows, toSheetRows, type YearData } from './buildWorkbook'
+import { apartmentsRows, balancesRows, buildYearWorkbook, expenseExportSheets, expensesRows, paymentsRows, toSheetRows, type YearData } from './buildWorkbook'
 
 const apartments = [
   { id: 'a2', number: 2, floor: 1, notes: null, building_id: 'b', created_at: '', is_committee: false },
@@ -69,7 +69,8 @@ describe('special charges in exports', () => {
     expect(payments.slice(1).map((r) => r.at(-1))).toEqual(['תיקון נזק', ''])
     const expenses = expensesRows([{ id: 'e1', category_id: 'c', category: 'שונות', spent_on: '2026-09-01', amount: 2006, vendor: '', note: 'תיקון נזק',
       receipt_path: null, source: 'manual', template_id: null, special_id: 'sp1' }])
-    expect(expenses[1]?.at(-1)).toBe('תיקון נזק')
+    expect(expenses[1]?.[3]).toBe('תיקון נזק')
+    expect(expenses[1]?.[5]).toBe(he.finance.expenseExport.sources.special)
   })
 })
 
@@ -120,5 +121,44 @@ describe('buildYearWorkbook', () => {
   it('exports the planned budget with its year, re-importable', () => {
     expect(parseBudgetSheet(wb.sheets[SHEETS.budget] ?? [])).toEqual({ year: 2026, items: [{ category: 'ניקיון', amount: 4000 }] })
     expect(he.export.headers.total).toBe('סה"כ')
+  })
+})
+
+describe('expense export (Task 22)', () => {
+  const X = he.finance.expenseExport
+  const base = { category_id: 'c1', category: 'ניקיון', vendor: '', note: '', receipt_path: null, receipt_name: null, source: 'manual', template_id: null, special_id: null }
+  const rows = expensesRows([
+    { ...base, id: 'e2', spent_on: '2026-10-20', amount: 120.5, vendor: 'חברת ניקיון', note: 'חודשי', receipt_path: 'e2/u.pdf', receipt_name: 'חשבונית.pdf' },
+    { ...base, id: 'e1', spent_on: '2026-10-03', amount: 80, source: 'import' },
+    { ...base, id: 'e3', spent_on: '2026-10-11', amount: 40, source: 'maintenance', receipt_path: 'e3/u2.jpg' },
+  ])
+
+  it('has the agreed columns, oldest first, amounts as numbers', () => {
+    expect(rows[0]).toEqual([he.export.headers.date, he.export.headers.category, he.export.headers.vendor, X.headers.note,
+      he.export.headers.amount, X.headers.source, X.headers.receipt, X.headers.receiptFile])
+    expect(rows.slice(1).map((r) => r[4])).toEqual([80, 40, 120.5])
+    expect(rows[3]?.slice(1, 4)).toEqual(['ניקיון', 'חברת ניקיון', 'חודשי'])
+  })
+
+  it('says where each expense came from and whether it has a receipt (name, never a link)', () => {
+    expect(rows.slice(1).map((r) => r[5])).toEqual([X.sources.import, X.sources.maintenance, X.sources.manual])
+    expect(rows.slice(1).map((r) => r[6])).toEqual([X.no, X.yes, X.yes])
+    expect(rows.slice(1).map((r) => r[7])).toEqual(['', 'u2.jpg', 'חשבונית.pdf'])
+    expect(rows.flat().some((c) => typeof c === 'string' && c.includes('http'))).toBe(false)
+  })
+
+  it('a month is one sheet; a year adds "סיכום" with categories × months and totals', () => {
+    expect(Object.keys(expenseExportSheets(data.expenses))).toEqual([X.sheet])
+    const sheets = expenseExportSheets(data.expenses, { year: 2026, categories: data.categories })
+    expect(Object.keys(sheets)).toEqual([X.sheet, X.summarySheet])
+    const summary = sheets[X.summarySheet] ?? []
+    expect(summary[0]?.[0]).toBe(he.export.headers.category)
+    expect(summary[0]).toHaveLength(14)
+    // ניקיון: 300 + 50.25 in February; חשמל's 999 is in 2025, so not in this year's summary.
+    expect(summary[1]).toEqual(['ניקיון', null, 350.25, ...Array.from({ length: 10 }, () => null), 350.25])
+    expect(summary[2]?.at(-1)).toBe(0)
+    expect(summary.at(-1)).toEqual([he.export.headers.total, null, 350.25, ...Array.from({ length: 10 }, () => null), 350.25])
+    // Same layout the importer reads as its expenses sheet.
+    expect(parseExpensesSheet(summary, 2026).length).toBeGreaterThan(0)
   })
 })

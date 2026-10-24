@@ -13,17 +13,17 @@ export type GetRows = () => Exportable | Promise<Exportable>
 
 const asSheets = (data: Exportable): Record<string, Rows> => (Array.isArray(data) ? { [he.export.sheet]: data } : data)
 
-/** Runs one export with a loading flag, a success toast and an error toast. */
-export function useExporter(fileName: string, getRows: GetRows, formats?: CellFormats): { run: () => void; loading: boolean } {
+/** Runs one export with a loading flag, a success toast and an error toast. `dated`: add today's date to the file name. */
+export function useExporter(fileName: string, getRows: GetRows, formats?: CellFormats, dated = true): { run: () => void; loading: boolean } {
   const [loading, setLoading] = useState(false)
   const run = useCallback(() => {
     setLoading(true)
     Promise.resolve()
       .then(getRows)
-      .then((data) => exportXlsx(fileName, asSheets(data), formats))
+      .then((data) => exportXlsx(fileName, asSheets(data), formats, dated))
       .then(() => notifySuccess(he.export.downloaded), () => notifyError(he.export.failed))
       .finally(() => setLoading(false))
-  }, [fileName, getRows, formats])
+  }, [fileName, getRows, formats, dated])
   return { run, loading }
 }
 

@@ -1,44 +1,43 @@
 import { ActionIcon, Button, Card, Divider, Group, Menu, Stack, Text, Title } from '@mantine/core'
-import { IconDots, IconPencil, IconReceipt, IconTrash } from '@tabler/icons-react'
+import { IconDots, IconPaperclip, IconPencil, IconTrash } from '@tabler/icons-react'
 import { Fragment, useMemo, useState } from 'react'
 import { todayISO } from '../../lib/dates'
 import { formatDate, formatILS, monthLabel } from '../../lib/format'
 import { he } from '../../lib/he'
-import { EmptyState, ListSkeleton, Money, notifyError, notifySuccess } from '../../ui'
-import { expensesRows } from '../export/buildWorkbook'
+import { EmptyState, ListSkeleton, Money, notifySuccess } from '../../ui'
 import { ConfirmDialog, FormModal } from '../tenants/dialogs'
-import { receiptUrl, useDeleteExpense, useDeleteTemplate, useExpenses, useTemplates, type Expense, type Template } from './api'
+import { useDeleteExpense, useDeleteTemplate, useExpenses, useTemplates, type Expense, type Template } from './api'
 import { LoadFailed } from './cards'
+import { ExpenseExportDialog } from './ExpenseExport'
 import { ApplyTemplates, ExpenseForm, TemplateForm } from './ExpenseForms'
 import { useRegisterExport } from './exportSlot'
 import { DeleteButton, MonthStepper, Row } from './fields'
 import { useAppliedTemplates } from './hooks'
 import { monthOf } from './ledger'
+import { ReceiptControl } from './ReceiptControl'
 
 type Sheet = { kind: 'apply' } | { kind: 'template'; template?: Template } | null
 type Removing = { kind: 'expense'; row: Expense } | { kind: 'template'; row: Template } | null
-
-/** Opens the window first (inside the tap) so mobile Safari doesn't block it, then points it at the signed URL. */
-function openReceipt(path: string): void {
-  const win = window.open('', '_blank')
-  // Cut the back-reference (noopener can't be used: it makes window.open return null).
-  if (win) win.opener = null
-  receiptUrl(path).then((url) => { if (win) win.location.href = url }).catch(() => { win?.close(); notifyError(he.finance.receiptOpenFailed) })
-}
 
 function ExpenseRow({ e, onDelete }: { e: Expense; onDelete: () => void }) {
   const meta = [formatDate(e.spent_on), e.note, e.source === 'maintenance' ? he.finance.fromMaintenance : ''].filter(Boolean).join(' · ')
   const trailing = (
     <Group gap={0} wrap="nowrap">
-      {e.receipt_path && (
-        <ActionIcon variant="subtle" color="enamel" size={44} aria-label={he.finance.openReceipt} onClick={() => e.receipt_path && openReceipt(e.receipt_path)}>
-          <IconReceipt size={20} stroke={1.75} aria-hidden="true" />
-        </ActionIcon>
-      )}
+      <ReceiptControl expense={e} />
       <DeleteButton label={he.finance.deleteExpense} onClick={onDelete} />
     </Group>
   )
   return <Row title={e.vendor || e.category} meta={meta} end={<Money amount={e.amount} tone="neutral" />} trailing={trailing} />
+}
+
+/** "2/3 עם קבלה" under a category's name. */
+function ReceiptCount({ items }: { items: Expense[] }) {
+  return (
+    <Group gap={4} wrap="nowrap" c="dimmed">
+      <IconPaperclip size={14} stroke={1.75} aria-hidden="true" />
+      <Text size="xs" c="dimmed">{he.finance.receipts.count(items.filter((e) => e.receipt_path).length, items.length)}</Text>
+    </Group>
+  )
 }
 
 function byCategory(expenses: Expense[]): { category: string; total: number; items: Expense[] }[] {
@@ -59,8 +58,11 @@ function MonthExpenses({ month, onDelete, onAdd }: { month: string; onDelete: (e
       <Group justify="space-between" px="xs"><Text fw={600}>{he.finance.monthTotal}</Text><Text fw={600} className="bm-num">{formatILS(total)}</Text></Group>
       {byCategory(inMonth).map((g) => (
         <Card key={g.category} padding={0}>
-          <Group justify="space-between" px="md" pt="sm" pb={4}>
-            <Title order={3} size="h4">{g.category}</Title>
+          <Group justify="space-between" px="md" pt="sm" pb={4} wrap="nowrap">
+            <Stack gap={0}>
+              <Title order={3} size="h4">{g.category}</Title>
+              <ReceiptCount items={g.items} />
+            </Stack>
             <Text fw={600} className="bm-num">{formatILS(g.total)}</Text>
           </Group>
           {g.items.map((e) => <Fragment key={e.id}><Divider color="stone.1" /><ExpenseRow e={e} onDelete={() => onDelete(e)} /></Fragment>)}
@@ -124,10 +126,10 @@ export function ExpensesTab({ adding, onAdd, onAddingClose }: { adding: boolean;
   const [month, setMonth] = useState(() => monthOf(todayISO()))
   const [sheet, setSheet] = useState<Sheet>(null)
   const [removing, setRemoving] = useState<Removing>(null)
+  const [exporting, setExporting] = useState(false)
   const templates = useTemplates()
   const appliedIds = useAppliedTemplates(month)
-  const monthExpenses = useExpenses(Number(month.slice(0, 4)))
-  useRegisterExport(he.export.files.expenses, () => expensesRows((monthExpenses.data ?? []).filter((e) => monthOf(e.spent_on) === month)), !!monthExpenses.data)
+  useRegisterExport(he.export.files.expenses, () => [], true, undefined, () => setExporting(true))
   const close = () => setSheet(null)
   return (
     <Stack gap="md">
@@ -141,6 +143,7 @@ export function ExpensesTab({ adding, onAdd, onAddingClose }: { adding: boolean;
         {sheet?.kind === 'template' && <TemplateForm key={sheet.template?.id ?? 'new'} template={sheet.template} onDone={close} />}
       </FormModal>
       <RemoveDialog removing={removing} onClose={() => setRemoving(null)} />
+      <ExpenseExportDialog opened={exporting} month={month} onClose={() => setExporting(false)} />
     </Stack>
   )
 }

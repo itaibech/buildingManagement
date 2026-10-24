@@ -171,7 +171,7 @@ select throws_ok($$insert into public.charges (apartment_id, month, amount, kind
 select is((select row(apartments_total, apartments_paid_up, amount_due_total)::text
   from public.collection_summary((select m2 from tm))), '(2,1,870.00)',
   'resident with finance_reports: the building-wide collection totals (Task 18)');
-select throws_ok($$insert into storage.objects (bucket_id, name) values ('receipts', 'r1.pdf')$$,
+select throws_ok($$insert into storage.objects (bucket_id, name) values ('receipts', 'e9000000-0000-0000-0000-000000000001/0b9a54c4-3e1f-4b8e-9f0a-2c6d1e7f8a90.pdf')$$,
   '42501', null, 'resident: cannot upload receipts');
 select is((select count(*) from storage.objects where bucket_id = 'receipts'), 0::bigint, 'resident: cannot read receipts');
 
@@ -199,7 +199,7 @@ select is((select count(*) from public.expenses where source = 'maintenance'), 1
 select throws_ok($$select public.mark_task_done('d9000000-0000-0000-0000-000000000001', '2026-05-10', '', 10, null)$$,
   '22023', null, 'a cost needs a category');
 
-select lives_ok($$insert into storage.objects (bucket_id, name) values ('receipts', 'r1.pdf')$$, 'admin: uploads a receipt');
+select lives_ok($$insert into storage.objects (bucket_id, name) values ('receipts', 'e9000000-0000-0000-0000-000000000001/0b9a54c4-3e1f-4b8e-9f0a-2c6d1e7f8a90.pdf')$$, 'admin: uploads a receipt');
 select is((select count(*) from storage.objects where bucket_id = 'receipts'), 1::bigint, 'admin: reads receipts');
 
 select lives_ok($$delete from public.apartment_fee_overrides$$, 'admin: can delete (revert) an override');

@@ -6,7 +6,7 @@ import { isFeeMode, type FeeMode } from '../../ui/feeBadge'
 import { notifyError } from '../../ui/notify'
 import { billingOf, useApartmentBilling, useApartments, useResidents } from '../tenants/api'
 import type { TimelineRow } from './feeTimeline'
-import { RECEIPT_BUCKET, receiptPath, shiftMonth, sortBalances, type LedgerRow } from './ledger'
+import { RECEIPT_BUCKET, receiptMime, receiptPath, shiftMonth, sortBalances, type LedgerRow } from './ledger'
 
 // 'standing_order' is written only by apply_standing_orders (automatic payments); the payment form offers the rest.
 export type PaymentMethod = 'cash' | 'transfer' | 'cheque' | 'app' | 'other' | 'standing_order'
@@ -55,7 +55,7 @@ export interface Fee { id: string; effective_from: string; amount: number }
 export interface FeeChange { apartment_id: string; effective_from: string; mode: FeeMode; amount: number | null }
 export interface Expense {
   id: string; category_id: string; category: string; spent_on: string; amount: number
-  vendor: string; note: string; receipt_path: string | null; source: string; template_id: string | null; special_id?: string | null
+  vendor: string; note: string; receipt_path: string | null; receipt_name?: string | null; source: string; template_id: string | null; special_id?: string | null
 }
 export interface ExpenseInput { category_id: string; spent_on: string; amount: number; vendor: string; note: string }
 export interface Template { id: string; category_id: string; category: string; amount: number; vendor: string; label: string }
@@ -399,29 +399,71 @@ export function useDeleteFeeRow() {
 
 // ---------------------------------------------------------------- expenses
 
+const EXPENSE_COLUMNS = 'id, category_id, spent_on, amount, vendor, note, receipt_path, receipt_name, source, template_id, special_id, expense_categories(name)'
+
+/** The query behind useExpenses, also fetched on demand by the expense export. */
+export const expensesQuery = (year: number) => ({
+  queryKey: [...KEY, 'expenses', year],
+  queryFn: async (): Promise<Expense[]> =>
+    must(await supabase.from('expenses').select(EXPENSE_COLUMNS)
+      .gte('spent_on', `${year}-01-01`).lt('spent_on', `${year + 1}-01-01`)
+      .order('spent_on', { ascending: false }).order('created_at', { ascending: false }))
+      .map(({ expense_categories, ...e }) => ({ ...e, amount: num(e.amount), category: catName(expense_categories) })),
+})
+
 /** Every expense in `year` with its category name, newest first. */
 export function useExpenses(year: number) {
+  return useQuery(expensesQuery(year))
+}
+
+/** The year of the building's earliest expense (null when there are none), so exports can reach back to it. */
+export function useFirstExpenseYear() {
   return useQuery({
-    queryKey: [...KEY, 'expenses', year],
-    queryFn: async (): Promise<Expense[]> =>
-      must(await supabase.from('expenses')
-        .select('id, category_id, spent_on, amount, vendor, note, receipt_path, source, template_id, special_id, expense_categories(name)')
-        .gte('spent_on', `${year}-01-01`).lt('spent_on', `${year + 1}-01-01`)
-        .order('spent_on', { ascending: false }).order('created_at', { ascending: false }))
-        .map(({ expense_categories, ...e }) => ({ ...e, amount: num(e.amount), category: catName(expense_categories) })),
+    queryKey: [...KEY, 'expenses', 'first-year'],
+    queryFn: async (): Promise<number | null> => {
+      const rows = must(await supabase.from('expenses').select('spent_on').order('spent_on', { ascending: true }).limit(1))
+      return rows[0] ? Number(rows[0].spent_on.slice(0, 4)) : null
+    },
   })
 }
 
-/** Uploads the receipt and links it; returns false when either step fails (the expense itself is kept). */
+/** Uploads the receipt and links it with its file name; returns false when either step fails (the expense itself is kept). */
 async function attachReceipt(expenseId: string, file: File): Promise<boolean> {
-  const path = receiptPath(expenseId, file.type)
-  if (!path) return false
-  const up = await supabase.storage.from(RECEIPT_BUCKET).upload(path, file, { contentType: file.type })
+  const mime = receiptMime(file)
+  const path = mime ? receiptPath(expenseId, mime) : null
+  if (!mime || !path) return false
+  const up = await supabase.storage.from(RECEIPT_BUCKET).upload(path, file, { contentType: mime })
   if (up.error) return false
-  const { error } = await supabase.from('expenses').update({ receipt_path: path }).eq('id', expenseId)
+  const receipt = { receipt_path: path, receipt_name: file.name.slice(0, 255) || null }
+  const { error } = await supabase.from('expenses').update(receipt).eq('id', expenseId)
   // Don't leave an orphaned object behind when the link couldn't be saved.
   if (error) await supabase.storage.from(RECEIPT_BUCKET).remove([path])
   return !error
+}
+
+/** Removes receipt objects; true when they stayed behind (the caller tells the admin). */
+async function removeReceiptFile(path: string | null): Promise<boolean> {
+  if (!path) return false
+  const { error } = await supabase.storage.from(RECEIPT_BUCKET).remove([path])
+  return !!error
+}
+
+type ReceiptOwner = Pick<Expense, 'id' | 'receipt_path'>
+
+/** Attaches a receipt to an expense, or replaces it: the old file is removed only after the new one is linked. */
+export function useSetReceipt() {
+  return useFinanceMutation(async ({ expense, file }: { expense: ReceiptOwner; file: File }) => {
+    if (!(await attachReceipt(expense.id, file))) throw new Error('Receipt upload failed')
+    return { oldStayed: await removeReceiptFile(expense.receipt_path) }
+  })
+}
+
+/** Unlinks an expense's receipt, then removes the file. `fileStayed` is true when the file couldn't be removed. */
+export function useRemoveReceipt() {
+  return useFinanceMutation(async (expense: ReceiptOwner) => {
+    fail((await supabase.from('expenses').update({ receipt_path: null, receipt_name: null }).eq('id', expense.id)).error)
+    return { fileStayed: await removeReceiptFile(expense.receipt_path) }
+  })
 }
 
 /** Records an expense, then its optional receipt. `receiptFailed` is true when the receipt didn't make it. */

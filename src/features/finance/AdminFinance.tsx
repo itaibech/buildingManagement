@@ -68,13 +68,15 @@ export function AdminFinance() {
   const [source, setSource] = useState<ExportSource | null>(null)
   const exportAction = useExportAction(source?.fileName ?? '', source?.getRows ?? (() => []), !!source?.ready, source?.hint)
   const listRef = useTabScroll(tab)
+  const onOpen = source?.onOpen
+  const secondary = exportAction && onOpen ? { ...exportAction, onClick: onOpen } : exportAction
   if (raw === 'ev') return <Navigate to="/ev" replace />
   const open = () => setPrimary(true)
   const close = () => setPrimary(false)
   const select = (v: string | null) => { if (isTab(v)) { setPrimary(false); setParams({ tab: v }, { replace: true }) } }
   return (
     <ExportRegistration.Provider value={setSource}>
-      <PageHeader title={he.nav.finance} action={{ ...ACTION[tab], onClick: open }} secondaryAction={source ? exportAction : undefined} extra={evLink} />
+      <PageHeader title={he.nav.finance} action={{ ...ACTION[tab], onClick: open }} secondaryAction={source ? secondary : undefined} extra={evLink} />
       <Tabs value={tab} onChange={select} keepMounted={false} styles={TAB_STYLES}>
         <Tabs.List ref={listRef} aria-label={he.finance.tabsLabel} mb="md" className="bm-tabs-scroll">
           {TABS.map((t) => <Tabs.Tab key={t} value={t}>{he.finance.tabs[t]}</Tabs.Tab>)}
