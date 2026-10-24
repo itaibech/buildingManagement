@@ -16,7 +16,7 @@ const row: TicketActivity = {
 }
 
 function ctx(o: Partial<HandlerContext> = {}): HandlerContext {
-  return { viewer: { userId: 'admin', isAdmin: true }, client: new QueryClient(), navigate: vi.fn(), pathname: '/', ...o }
+  return { viewer: { userId: 'admin', isAdmin: true, can: () => true }, client: new QueryClient(), navigate: vi.fn(), pathname: '/', ...o }
 }
 
 beforeEach(() => {
@@ -37,7 +37,7 @@ describe('handleChange', () => {
   })
 
   it('an announcement: refreshes announcements without a call lookup', async () => {
-    const c = ctx({ viewer: { userId: 'res', isAdmin: false } })
+    const c = ctx({ viewer: { userId: 'res', isAdmin: false, can: () => true } })
     const invalidate = vi.spyOn(c.client, 'invalidateQueries')
     await handleChange({ table: 'announcements', row: { id: 'a1', title: 'מים', author_id: 'admin', expires_at: null } }, c)
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['announcements'] })
@@ -49,7 +49,7 @@ describe('handleChange', () => {
     m.fetch.mockRejectedValue(new Error('offline'))
     m.system.mockRejectedValue(new Error('no worker'))
     const ev = { table: 'announcements', row: { id: 'a1', title: 'מים', author_id: 'admin', expires_at: null } } as const
-    await expect(handleChange(ev, ctx({ viewer: { userId: 'res', isAdmin: false } }))).resolves.toBeUndefined()
+    await expect(handleChange(ev, ctx({ viewer: { userId: 'res', isAdmin: false, can: () => true } }))).resolves.toBeUndefined()
     m.show.mockImplementation(() => { throw new Error('boom') })
     await expect(handleChange({ table: 'tickets', type: 'INSERT', row: {
       id: 't9', title: 'x', status: 'open', opened_by: 'res', last_activity_by: 'res', last_activity_kind: 'created',
