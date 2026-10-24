@@ -53,8 +53,8 @@ const sumOf = (views: MonthView[], pick: (v: MonthView) => number): number => Ma
 
 function DesktopTable({ items, views, admin }: { items: Item[]; views: MonthView[]; admin: boolean }) {
   return (
-    <Table.ScrollContainer minWidth={420}>
-      <Table className="bm-num" verticalSpacing="sm">
+    <Table.ScrollContainer minWidth={340}>
+      <Table className="bm-num" verticalSpacing="sm" horizontalSpacing="xs">
         <Table.Thead>
           <Table.Tr>
             <Table.Th>{he.finance.month}</Table.Th>
