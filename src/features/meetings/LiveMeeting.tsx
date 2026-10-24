@@ -1,4 +1,4 @@
-import { Button, SegmentedControl, Stack, Text, Title } from '@mantine/core'
+import { Button, Group, SegmentedControl, Stack, Text, TextInput, Title } from '@mantine/core'
 import { IconPlus } from '@tabler/icons-react'
 import { useState } from 'react'
 import { he } from '../../lib/he'
@@ -28,16 +28,25 @@ function useApartmentLines(): ApartmentLine[] {
   }))
 }
 
-function Agenda({ live, meetingId }: { live: ReturnType<typeof useLiveMeeting>; meetingId: string }) {
+function AddOther({ meetingId, position }: { meetingId: string; position: number }) {
   const call = useMeetingCall()
+  const [title, setTitle] = useState('')
+  const add = () => call.mutate(() => addItem(meetingId, title.trim() || L.otherDefault, position), { onSuccess: () => setTitle('') })
+  return (
+    <Group gap="sm" align="flex-end" wrap="nowrap">
+      <TextInput label={L.otherTitle} placeholder={L.otherPlaceholder} value={title} onChange={(e) => setTitle(e.currentTarget.value)} style={{ flex: 1 }} />
+      <Button variant="light" leftSection={<IconPlus size={18} stroke={1.75} />} loading={call.isPending} onClick={add}>{L.addOther}</Button>
+    </Group>
+  )
+}
+
+function Agenda({ live, meetingId }: { live: ReturnType<typeof useLiveMeeting>; meetingId: string }) {
   const items = sortAgenda(live.items)
   const numbers = decisionNumbers(items)
-  const next = (items.at(-1)?.position ?? 0) + 1
   return (
     <Stack gap="sm">
       {items.map((i, n) => <LiveItem key={i.id} item={i} index={n + 1} number={numbers.get(i.id)} attending={live.attending} onChange={(p) => live.setItem(i.id, p)} />)}
-      <Button variant="light" leftSection={<IconPlus size={18} stroke={1.75} />} loading={call.isPending} style={{ alignSelf: 'flex-start' }}
-        onClick={() => call.mutate(() => addItem(meetingId, L.otherDefault, next))}>{L.addOther}</Button>
+      <AddOther meetingId={meetingId} position={(items.at(-1)?.position ?? 0) + 1} />
     </Stack>
   )
 }
@@ -56,7 +65,7 @@ export function LiveMeeting({ meeting }: { meeting: MeetingDetail }) {
   return (
     <Stack gap="md">
       <Title order={2} size="h3">{L.title}</Title>
-      {STATUS_TEXT[live.status] && <Text size="sm" c={live.status === 'saved' ? 'dimmed' : 'signal.9'} aria-live="polite">{STATUS_TEXT[live.status]}</Text>}
+      <Text size="sm" mih={22} c={live.status === 'offline' || live.status === 'error' ? 'signal.9' : 'dimmed'} aria-live="polite">{STATUS_TEXT[live.status] ?? ''}</Text>
       <QuorumMeter q={q} />
       {inProgress && meeting.opened_at && <Text size="sm" c="dimmed" className="bm-num">{L.openedAt(meetingTime(meeting.opened_at))}</Text>}
       {inProgress && (
@@ -67,7 +76,7 @@ export function LiveMeeting({ meeting }: { meeting: MeetingDetail }) {
       {(view === 'attendance' || !inProgress) && (
         <LiveAttendance meetingId={meeting.id} apartments={lines} values={live.attendance} absent={live.absent} onChange={live.setApartment} />
       )}
-      {!inProgress && <Opening meeting={meeting} q={q} names={names} busy={call.isPending} onOpen={open} />}
+      {!inProgress && <Opening key={meeting.postponed_to ?? 'now'} meeting={meeting} q={q} names={names} busy={call.isPending} onOpen={open} />}
       {inProgress && view === 'agenda' && <Agenda live={live} meetingId={meeting.id} />}
       {inProgress && <CloseMeeting busy={call.isPending} onClose={(at) => run(() => meetingRpc.close(meeting.id, at), L.closed)} />}
     </Stack>

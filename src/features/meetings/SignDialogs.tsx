@@ -11,24 +11,32 @@ const S = he.meetings.sign
 
 interface DrawProps { meeting: MeetingDetail; role: SignatureRole | null; onClose: () => void }
 
+function DrawBody({ meeting, role, onClose }: DrawProps & { role: SignatureRole }) {
+  const call = useMeetingCall()
+  const [name, setName] = useState(role === 'chair' ? meeting.chair_name : role === 'secretary' ? meeting.secretary_name : '')
+  const [tried, setTried] = useState(false)
+  const save = (png: Blob) => {
+    setTried(true)
+    if (!name.trim()) return
+    call.mutate(async () => {
+      const path = await uploadMeetingFile(meeting.id, png)
+      await meetingRpc.sign(meeting.id, role, name.trim(), path, 'drawn')
+    }, { onSuccess: () => { notifySuccess(S.signed); onClose() } })
+  }
+  return (
+    <Stack>
+      <TextInput label={S.signerName} withAsterisk value={name} onChange={(e) => setName(e.currentTarget.value)}
+        error={tried && !name.trim() ? he.meetings.errors.name : undefined} />
+      <SignaturePad onSave={save} saving={call.isPending} />
+    </Stack>
+  )
+}
+
 /** A drawn signature for a role: the signer's full name and the pad; stored as a PNG, then recorded by sign_meeting. */
 export function DrawSignatureDialog({ meeting, role, onClose }: DrawProps) {
-  const call = useMeetingCall()
-  const initial = role === 'chair' ? meeting.chair_name : role === 'secretary' ? meeting.secretary_name : ''
-  const [name, setName] = useState(initial)
-  const save = (png: Blob) => role && name.trim() && call.mutate(async () => {
-    const path = await uploadMeetingFile(meeting.id, png)
-    await meetingRpc.sign(meeting.id, role, name.trim(), path, 'drawn')
-  }, { onSuccess: () => { notifySuccess(S.signed); onClose() } })
   return (
     <FormModal opened={role !== null} title={role ? `${S.draw}: ${S.roles[role]}` : S.draw} onClose={onClose}>
-      {role && (
-        <Stack key={role}>
-          <TextInput label={S.signerName} withAsterisk value={name} onChange={(e) => setName(e.currentTarget.value)}
-            error={!name.trim() ? he.meetings.errors.name : undefined} />
-          <SignaturePad onSave={save} saving={call.isPending} />
-        </Stack>
-      )}
+      {role && <DrawBody key={role} meeting={meeting} role={role} onClose={onClose} />}
     </FormModal>
   )
 }

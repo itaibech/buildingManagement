@@ -24,7 +24,7 @@ function Header({ meeting, isAdmin }: { meeting: MeetingDetail; isAdmin: boolean
 
 function Body({ meeting, isAdmin }: { meeting: MeetingDetail; isAdmin: boolean }) {
   const [running, setRunning] = useState(false)
-  if (isAdmin && (meeting.status === 'in_progress' || (meeting.status === 'invited' && running))) return <LiveMeeting key={meeting.id} meeting={meeting} />
+  if (isAdmin && (meeting.status === 'in_progress' || (meeting.status === 'invited' && running))) return <LiveMeeting key={`${meeting.id}:${meeting.status}`} meeting={meeting} />
   if (meeting.status === 'closed' || meeting.status === 'published') return <ClosedMeeting meeting={meeting} isAdmin={isAdmin} />
   return <MeetingOverview meeting={meeting} isAdmin={isAdmin} onRun={() => setRunning(true)} />
 }

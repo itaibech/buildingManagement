@@ -1,7 +1,7 @@
-import { Alert, Autocomplete, Button, Card, Group, Stack, Text, TextInput, Title } from '@mantine/core'
+import { Alert, Autocomplete, Button, Card, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core'
 import { useState } from 'react'
 import { he } from '../../lib/he'
-import { fromInputs, meetingISODate, meetingTime, toInputs } from './fmt'
+import { fromInputs, meetingTime, toInputs } from './fmt'
 import type { QuorumState } from './quorum'
 import type { Meeting } from './types'
 
@@ -27,24 +27,25 @@ interface OpeningProps { meeting: Meeting; q: QuorumState; names: string[]; busy
 
 /** Opening time (default now, or the postponed time), chair and recorder from the attendees or typed. */
 export function Opening({ meeting, q, names, busy, onOpen }: OpeningProps) {
-  const [time, setTime] = useState(() => toInputs(meeting.postponed_to ?? new Date()).time)
+  const [start] = useState(() => toInputs(meeting.postponed_to ?? new Date()))
+  const [time, setTime] = useState(start.time)
   const [chair, setChair] = useState(meeting.chair_name)
   const [secretary, setSecretary] = useState(meeting.secretary_name)
   const [tried, setTried] = useState(false)
   const missing = !chair.trim() || !secretary.trim()
   const submit = () => {
     setTried(true)
-    if (!missing) onOpen({ openedAt: fromInputs(meetingISODate(new Date()), time), chair: chair.trim(), secretary: secretary.trim() })
+    if (!missing) onOpen({ openedAt: fromInputs(start.date, time), chair: chair.trim(), secretary: secretary.trim() })
   }
   return (
     <Card>
       <Stack gap="sm">
         <Title order={2} size="h4">{L.opening}</Title>
         <TextInput label={L.openingTime} type="time" dir="ltr" value={time} onChange={(e) => setTime(e.currentTarget.value)} maw={200} />
-        <Group grow align="flex-start" wrap="wrap">
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
           <Autocomplete label={L.chair} placeholder={L.roleHint} data={names} value={chair} onChange={setChair} />
           <Autocomplete label={L.secretary} placeholder={L.roleHint} data={names} value={secretary} onChange={setSecretary} />
-        </Group>
+        </SimpleGrid>
         {tried && missing && <Text c="debt.7" size="sm">{L.roleRequired}</Text>}
         <Button size="md" onClick={submit} loading={busy} disabled={!q.valid}>{L.open}</Button>
       </Stack>

@@ -16,7 +16,7 @@ export function AgendaEditor({ form }: { form: MeetingFormApi }) {
         {rows.map((row, i) => (
           <Group key={row.key} gap={4} wrap="nowrap" align="flex-start">
             <Text w={24} pt={10} c="dimmed" className="bm-num" aria-hidden="true">{i + 1}.</Text>
-            <TextInput style={{ flex: 1 }} aria-label={F.agendaItem(i + 1)} {...form.getInputProps(`agenda.${i}.title`)} />
+            <TextInput style={{ flex: 1 }} aria-label={F.agendaItem(i + 1)} autoFocus={i > 0 && !row.id && !row.title} {...form.getInputProps(`agenda.${i}.title`)} />
             <ActionIcon variant="subtle" color="stone.7" size={44} aria-label={F.moveUp(i + 1)} disabled={i === 0}
               onClick={() => form.reorderListItem('agenda', { from: i, to: i - 1 })}><IconArrowUp {...ICON} /></ActionIcon>
             <ActionIcon variant="subtle" color="stone.7" size={44} aria-label={F.moveDown(i + 1)} disabled={i === rows.length - 1}

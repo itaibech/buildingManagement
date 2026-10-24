@@ -1,4 +1,4 @@
-import { ActionIcon, Badge, Box, Card, Collapse, Group, Menu, Stack, Text, UnstyledButton } from '@mantine/core'
+import { ActionIcon, Badge, Box, Button, Card, Collapse, Group, Menu, Stack, Text, UnstyledButton } from '@mantine/core'
 import { IconChevronDown, IconDots, IconMail, IconPencil, IconPin, IconTrash } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
 import { formatDate } from '../../lib/format'
@@ -93,6 +93,8 @@ export function AnnouncementItem({ item, expired = false, onOpen, actions }: Ann
       )}
       <Collapse expanded={opened}>
         <Text px="md" pb="md" ps={44} style={{ whiteSpace: 'pre-wrap' }}>{item.body}</Text>
+        {/* An in-app page the notice points to (a meeting's invitation or protocol); HashRouter paths. */}
+        {item.link && <Button component="a" href={`#${item.link}`} variant="light" ms={44} mb="md">{he.announcements.openLink}</Button>}
       </Collapse>
     </Card>
   )

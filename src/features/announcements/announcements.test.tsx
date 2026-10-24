@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { MantineProvider } from '@mantine/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { he } from '../../lib/he'
@@ -53,6 +53,14 @@ const item = (o: Partial<Item> = {}): Item => ({
 })
 
 describe('AnnouncementItem', () => {
+  it('links to the in-app page it points to (a meeting), and shows no link otherwise', () => {
+    wrap(<AnnouncementItem item={item({ id: 'l1', pinned: true, link: '/meetings/m1' })} />)
+    expect(screen.getByRole('link', { name: he.announcements.openLink })).toHaveAttribute('href', '#/meetings/m1')
+    cleanup()
+    wrap(<AnnouncementItem item={item({ id: 'l2', pinned: true })} />)
+    expect(screen.queryByRole('link', { name: he.announcements.openLink })).not.toBeInTheDocument()
+  })
+
   it('shows an unread item expanded with its full body and marks it read once', () => {
     const onOpen = vi.fn()
     wrap(<AnnouncementItem item={item({ body: 'גוף מלא' })} onOpen={onOpen} />)
