@@ -39,9 +39,24 @@ export function useMeeting(id: string | undefined) {
         .select('*, meeting_agenda_items(*), meeting_attendance(*), meeting_signatures(*), meeting_addenda(*)')
         .eq('id', id ?? '').maybeSingle()
       fail(error)
-      return data ? toDetail(data satisfies DetailRow) : null
+      if (!data) return null
+      const detail = toDetail(data satisfies DetailRow)
+      return detail.status === 'invited' && detail.items.length === 0 ? { ...detail, items: await agendaTitles(detail.id) } : detail
     },
   })
+}
+
+/**
+ * Residents don't read agenda rows before publication (RLS); an invited meeting's agenda comes as order and titles
+ * only, from meeting_agenda_titles().
+ */
+async function agendaTitles(meetingId: string): Promise<AgendaItem[]> {
+  const { data, error } = await supabase.rpc('meeting_agenda_titles', { p_meeting: meetingId })
+  fail(error)
+  return (data ?? []).map((r) => ({
+    id: r.id, meeting_id: meetingId, position: r.item_position, title: r.title, discussion: '', votes_for: null, votes_against: null,
+    votes_abstain: null, decision: '', decision_number: null, item_status: 'open', added_during_meeting: false, created_at: '',
+  }))
 }
 
 export interface MeetingEvent { id: string; kind: string; created_at: string }

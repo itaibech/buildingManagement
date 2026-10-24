@@ -43,3 +43,7 @@ export const meetingYear = yearOf
 /** Both required signatures (chair and recorder) are in: the protocol may be published. */
 export const isSigned = (m: { signatures: readonly Pick<Signature, 'role'>[] }): boolean =>
   (['chair', 'secretary'] as const).every((r) => m.signatures.some((s) => s.role === r))
+
+/** After a postponement the meeting may not open before the postponed time (open_meeting refuses 'too_early'). */
+export const isTooEarly = (postponedTo: string | null, openedAt: string): boolean =>
+  postponedTo !== null && new Date(openedAt).getTime() < new Date(postponedTo).getTime()

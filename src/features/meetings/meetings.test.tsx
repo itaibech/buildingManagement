@@ -11,6 +11,7 @@ import { ClosedMeeting } from './ClosedMeeting'
 import { meetingFixture } from './fixture'
 import { InviteDialog } from './InviteDialog'
 import { LiveItem } from './LiveItem'
+import { Opening } from './LiveOpening'
 import { MeetingOverview } from './MeetingOverview'
 import type { MeetingDetail } from './types'
 
@@ -116,5 +117,20 @@ describe('"פה אחד"', () => {
     const item = { ...meetingFixture().items[0]!, votes_for: 5, votes_against: 3, votes_abstain: 0 }
     wrap(<LiveItem item={item} index={1} number={1} attending={7} onChange={vi.fn()} />)
     expect(screen.getByRole('alert')).toHaveTextContent(he.meetings.vote.tooMany(8, 7))
+    expect(screen.getByText(he.meetings.live.voteHeld)).toBeInTheDocument()
+  })
+})
+
+describe('opening after a postponement', () => {
+  const q = { total: 5, attending: 3, required: 3, met: true, postponed: true, valid: true }
+  it('shows the earliest time and refuses an earlier opening time', () => {
+    const onOpen = vi.fn()
+    wrap(<Opening meeting={withStatus('invited')} q={q} names={[]} busy={false} onOpen={onOpen} />)
+    expect(screen.getByText(he.meetings.live.earliest('20:00'))).toBeInTheDocument()
+    const open = screen.getByRole('button', { name: he.meetings.live.open })
+    expect(open).toBeEnabled()
+    fireEvent.change(screen.getByLabelText(he.meetings.live.openingTime), { target: { value: '19:30' } })
+    expect(screen.getByRole('alert')).toHaveTextContent(he.meetings.live.tooEarly('20:00'))
+    expect(open).toBeDisabled()
   })
 })

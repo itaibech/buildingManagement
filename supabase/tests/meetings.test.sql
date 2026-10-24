@@ -4,7 +4,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(106);
+select plan(116);
 
 -- ---------------------------------------------------------------- fixtures (as postgres)
 insert into auth.users (id, email, aud, role) values
@@ -29,7 +29,9 @@ insert into ids values
   ('sig', 'e2400000-0000-0000-0000-000000000001/0b9a54c4-3e1f-4b8e-9f0a-2c6d1e7f8a90.png'),
   ('sig2', 'e2400000-0000-0000-0000-000000000001/1b9a54c4-3e1f-4b8e-9f0a-2c6d1e7f8a90.png'),
   ('m3file', 'e2400000-0000-0000-0000-000000000003/2b9a54c4-3e1f-4b8e-9f0a-2c6d1e7f8a90.pdf'),
-  ('late', 'e2400000-0000-0000-0000-000000000001/3b9a54c4-3e1f-4b8e-9f0a-2c6d1e7f8a90.png');
+  ('late', 'e2400000-0000-0000-0000-000000000001/3b9a54c4-3e1f-4b8e-9f0a-2c6d1e7f8a90.png'),
+  ('pdf', 'e2400000-0000-0000-0000-000000000001/4b9a54c4-3e1f-4b8e-9f0a-2c6d1e7f8a90.pdf'),
+  ('ghost', 'e2400000-0000-0000-0000-000000000001/5b9a54c4-3e1f-4b8e-9f0a-2c6d1e7f8a90.png');
 grant select on ids to authenticated;
 
 -- ---------------------------------------------------------------- catalog
@@ -81,6 +83,8 @@ set local request.jwt.claims = '{"sub":"a2400000-0000-0000-0000-000000000002","r
 select is((select count(*) from public.meetings where building_id = 'b2400000-0000-0000-0000-000000000001'), 0::bigint, 'resident: drafts are hidden');
 select is((select count(*) from public.meeting_agenda_items where meeting_id = 'e2400000-0000-0000-0000-000000000001'), 0::bigint,
   'resident: a draft agenda is hidden');
+select is((select count(*) from public.meeting_agenda_titles('e2400000-0000-0000-0000-000000000001')), 0::bigint,
+  'resident: no agenda titles for a draft');
 select throws_ok($$insert into public.meetings (building_id, title, scheduled_at) values ('b2400000-0000-0000-0000-000000000001', 'x', now())$$,
   '42501', null, 'resident: cannot create a meeting');
 select throws_ok($$select public.invite_meeting('e2400000-0000-0000-0000-000000000001', true)$$, '42501', null, 'resident: cannot invite');
@@ -121,10 +125,15 @@ select ok((select a.title like 'עדכון זימון%' and a.body like '%3. ב�
 -- ---------------------------------------------------------------- residents: invited is visible
 set local request.jwt.claims = '{"sub":"a2400000-0000-0000-0000-000000000002","role":"authenticated"}';
 select is((select count(*) from public.meetings where building_id = 'b2400000-0000-0000-0000-000000000001'), 2::bigint, 'resident: sees invited meetings');
-select is((select count(*) from public.meeting_agenda_items where meeting_id = 'e2400000-0000-0000-0000-000000000001'), 3::bigint, 'resident: sees the agenda');
+select is((select count(*) from public.meeting_agenda_items where meeting_id = 'e2400000-0000-0000-0000-000000000001'), 0::bigint,
+  'resident: no agenda rows (discussion, votes, decisions) before publication');
+select is((select array_agg(title order by item_position) from public.meeting_agenda_titles('e2400000-0000-0000-0000-000000000001')),
+  array['אישור תקציב', 'צביעת חדר המדרגות', 'בחירת ועד'], 'resident: sees the invited agenda as order and titles');
 set local request.jwt.claims = '{"sub":"a2400000-0000-0000-0000-000000000003","role":"authenticated"}';
 select is((select count(*) from public.meetings where building_id = 'b2400000-0000-0000-0000-000000000001'), 0::bigint, 'no meetings permission: sees nothing');
 select is((select count(*) from public.meeting_agenda_items), 0::bigint, 'no meetings permission: no agenda');
+select is((select count(*) from public.meeting_agenda_titles('e2400000-0000-0000-0000-000000000001')), 0::bigint,
+  'no meetings permission: no agenda titles');
 
 -- ---------------------------------------------------------------- attendance, postponement, opening
 set local request.jwt.claims = '{"sub":"a2400000-0000-0000-0000-000000000001","role":"authenticated"}';
@@ -147,10 +156,14 @@ select lives_ok($$select public.postpone_meeting('e2400000-0000-0000-0000-000000
 select ok((select postponed_at is not null and postponed_to = greatest(scheduled_at, postponed_at) + interval '1 hour'
   from public.meetings where id = 'e2400000-0000-0000-0000-000000000001'), 'postpone: the new opening time is +1 hour');
 select throws_like($$select public.postpone_meeting('e2400000-0000-0000-0000-000000000001')$$, 'meeting:already_postponed%', 'postpone: once');
-select throws_like($$select public.open_meeting('e2400000-0000-0000-0000-000000000001', now(), ' ', 'מזכירה')$$,
+select throws_like($$select public.open_meeting('e2400000-0000-0000-0000-000000000001', now(), 'יו"ר', 'מזכירה')$$,
+  'meeting:too_early%', 'open: not before the postponed time');
+select throws_like($$select public.open_meeting('e2400000-0000-0000-0000-000000000001',
+  (select postponed_to from public.meetings where id = 'e2400000-0000-0000-0000-000000000001'), ' ', 'מזכירה')$$,
   'meeting:roles%', 'open: a chair and a recorder are required');
-select lives_ok($$select public.open_meeting('e2400000-0000-0000-0000-000000000001', now(), 'יו"ר האסיפה', 'רושמת הפרוטוקול')$$,
-  'open: after the postponement any attendance is valid');
+select lives_ok($$select public.open_meeting('e2400000-0000-0000-0000-000000000001',
+  (select postponed_to from public.meetings where id = 'e2400000-0000-0000-0000-000000000001'), 'יו"ר האסיפה', 'רושמת הפרוטוקול')$$,
+  'open: at the postponed time, any attendance is valid');
 select is((select row(status, chair_name, secretary_name)::text from public.meetings where id = 'e2400000-0000-0000-0000-000000000001'),
   '(in_progress,"יו""ר האסיפה","רושמת הפרוטוקול")', 'open: in progress, with the roles');
 
@@ -214,8 +227,12 @@ select throws_like($$select public.close_meeting('e2400000-0000-0000-0000-000000
 
 -- ---------------------------------------------------------------- storage
 set local storage.allow_delete_query = 'true';
-select lives_ok($$insert into storage.objects (bucket_id, name) select 'meeting-files', v from ids where k in ('sig', 'sig2', 'm3file')$$,
-  'storage: admin uploads signatures and a proxy form');
+select lives_ok($$insert into storage.objects (bucket_id, name) select 'meeting-files', v from ids where k in ('sig', 'sig2', 'm3file', 'pdf')$$,
+  'storage: admin uploads signatures, a scan and a proxy form');
+delete from storage.objects where bucket_id = 'meeting-files' and name like 'e2400000-0000-0000-0000-000000000001/%';
+select is((select count(*) from storage.objects where bucket_id = 'meeting-files' and name like 'e2400000-0000-0000-0000-000000000001/%'), 3::bigint,
+  'storage: a closed meeting''s files cannot be deleted');
+select is(public.meeting_file_status((select v from ids where k = 'm3file')), 'in_progress', 'file status: admins see the state');
 select throws_ok($$insert into storage.objects (bucket_id, name) values ('meeting-files', 'e2400000-0000-0000-0000-000000000001/x.exe')$$,
   '42501', null, 'storage: a path outside <meeting_id>/<uuid>.<ext> is refused');
 
@@ -225,6 +242,7 @@ select is((select count(*) from public.meetings where id = 'e2400000-0000-0000-0
 select is((select count(*) from storage.objects where bucket_id = 'meeting-files' and name like 'e2400000-%'), 0::bigint, 'resident: files of unpublished meetings are hidden');
 select throws_ok($$insert into storage.objects (bucket_id, name) select 'meeting-files', v from ids where k = 'late'$$,
   '42501', null, 'resident: cannot upload');
+select is(public.meeting_file_status((select v from ids where k = 'm3file')), null, 'file status: hidden from residents before publication');
 select throws_ok($$select public.sign_meeting('e2400000-0000-0000-0000-000000000001', 'chair', 'x', (select v from ids where k = 'sig'))$$,
   '42501', null, 'resident: cannot sign');
 
@@ -233,6 +251,10 @@ set local request.jwt.claims = '{"sub":"a2400000-0000-0000-0000-000000000001","r
 select throws_like($$select public.publish_meeting('e2400000-0000-0000-0000-000000000001')$$, 'meeting:signatures%', 'publish: needs signatures');
 select throws_like($$select public.sign_meeting('e2400000-0000-0000-0000-000000000001', 'chair', 'יו"ר', 'e2400000-0000-0000-0000-000000000003/0b9a54c4-3e1f-4b8e-9f0a-2c6d1e7f8a90.png')$$,
   'meeting:path%', 'sign: the file must be in the meeting''s folder');
+select throws_like($$select public.sign_meeting('e2400000-0000-0000-0000-000000000001', 'chair', 'יו"ר', (select v from ids where k = 'ghost'))$$,
+  'meeting:missing_file%', 'sign: the file must have been uploaded');
+select throws_like($$select public.sign_meeting('e2400000-0000-0000-0000-000000000001', 'chair', 'יו"ר', (select v from ids where k = 'pdf'), 'drawn')$$,
+  'meeting:png%', 'sign: a drawn signature is a PNG');
 select lives_ok($$select public.sign_meeting('e2400000-0000-0000-0000-000000000001', 'chair', 'יו"ר האסיפה', (select v from ids where k = 'sig'))$$, 'sign: chair');
 select throws_like($$select public.publish_meeting('e2400000-0000-0000-0000-000000000001')$$, 'meeting:signatures%', 'publish: needs the recorder too');
 select lives_ok($$select public.sign_meeting('e2400000-0000-0000-0000-000000000001', 'secretary', 'רושמת הפרוטוקול', (select v from ids where k = 'sig2'))$$, 'sign: recorder');
@@ -249,10 +271,10 @@ select is((select a.pinned from public.meetings m join public.announcements a on
   where m.id = 'e2400000-0000-0000-0000-000000000001'), false, 'publish: the invitation is no longer pinned');
 select throws_ok($$insert into storage.objects (bucket_id, name) select 'meeting-files', v from ids where k = 'late'$$,
   '42501', null, 'storage: a published meeting''s folder is read-only');
-select is((select count(*) from storage.objects where bucket_id = 'meeting-files' and name like 'e2400000-0000-0000-0000-000000000001/%'), 2::bigint,
+select is((select count(*) from storage.objects where bucket_id = 'meeting-files' and name like 'e2400000-0000-0000-0000-000000000001/%'), 3::bigint,
   'storage: admin reads the files');
 delete from storage.objects where bucket_id = 'meeting-files' and name like 'e2400000-0000-0000-0000-000000000001/%';
-select is((select count(*) from storage.objects where bucket_id = 'meeting-files' and name like 'e2400000-0000-0000-0000-000000000001/%'), 2::bigint,
+select is((select count(*) from storage.objects where bucket_id = 'meeting-files' and name like 'e2400000-0000-0000-0000-000000000001/%'), 3::bigint,
   'storage: a published meeting''s files are kept');
 select lives_ok($$select public.add_addendum('e2400000-0000-0000-0000-000000000001', 'תיקון: שם המזכירה')$$, 'addendum after publishing');
 select throws_ok($$insert into public.meeting_addenda (meeting_id, body) values ('e2400000-0000-0000-0000-000000000001', 'x')$$,
@@ -264,10 +286,12 @@ set local request.jwt.claims = '{"sub":"a2400000-0000-0000-0000-000000000002","r
 select is((select count(*) from public.meetings where id = 'e2400000-0000-0000-0000-000000000001'), 1::bigint, 'resident: sees the published meeting');
 select is((select count(*) from public.meeting_attendance where meeting_id = 'e2400000-0000-0000-0000-000000000001'), 5::bigint,
   'resident: sees the published attendance');
+select is((select count(*) from public.meeting_agenda_items where meeting_id = 'e2400000-0000-0000-0000-000000000001'), 4::bigint,
+  'resident: the full agenda once published');
 select is((select count(*) from public.meeting_signatures where meeting_id::text like 'e2400000-%'), 2::bigint, 'resident: sees the signatures');
 select is((select count(*) from public.meeting_addenda where meeting_id::text like 'e2400000-%'), 1::bigint, 'resident: sees the addenda');
 select is((select count(*) from public.meeting_events), 0::bigint, 'resident: never sees the audit log');
-select is((select count(*) from storage.objects where bucket_id = 'meeting-files' and name like 'e2400000-%'), 2::bigint, 'resident: reads files of the published meeting only');
+select is((select count(*) from storage.objects where bucket_id = 'meeting-files' and name like 'e2400000-%'), 3::bigint, 'resident: reads files of the published meeting only');
 set local request.jwt.claims = '{"sub":"a2400000-0000-0000-0000-000000000003","role":"authenticated"}';
 select is((select count(*) from public.meetings), 0::bigint, 'no meetings permission: no published meeting');
 select is((select count(*) from storage.objects where bucket_id = 'meeting-files'), 0::bigint, 'no meetings permission: no files');

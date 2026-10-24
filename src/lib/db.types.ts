@@ -1303,6 +1303,11 @@ isOneToOne: false
 "mark_tickets_seen":
 { Args: { "p_ids"?: (string)[] }; Returns: undefined
                            },
+"meeting_agenda_titles":
+{ Args: { "p_meeting": string }; Returns: {
+              "id": string,"item_position": number,"title": string
+            }[]
+                           },
 "meeting_announce":
 { Args: { "m": Omit<Database["public"]['Tables']["meetings"]['Row'], Database["public"]['Tables']["meetings"]['ComputedFields']>,"p_body": string,"p_pinned": boolean,"p_title": string }; Returns: string
                            },

@@ -8,7 +8,8 @@
 --   * Quorum: meeting_quorum() counts present + proxy apartments against the rule (majority floor(N/2)+1, a % rounded
 --     up, or a fixed number). Opening needs the quorum or a recorded one-hour postponement.
 --   * Visibility (RLS): admins see everything. Residents with the new 'meetings' permission (on for the default group,
---     since the law requires publishing to all members) see invited and published meetings and their agenda;
+--     since the law requires publishing to all members) see invited and published meetings, the agenda titles of an
+--     invited one (meeting_agenda_titles), the full agenda rows only once published;
 --     attendance, signatures and addenda only once published; never drafts, live or unpublished closed meetings.
 --   * Storage: private bucket 'meeting-files' (signatures, proxy forms, scanned protocols), `<meeting_id>/<uuid>.<ext>`.
 --   * announcements.link: an in-app path (the invitation and the publication link to the meeting page).
@@ -500,7 +501,8 @@ begin
 end;
 $$;
 
--- Invited → in_progress: needs the quorum (or a recorded postponement), a chair and a recorder.
+-- Invited → in_progress: needs the quorum (or a recorded postponement, and then not before the postponed time),
+-- a chair and a recorder.
 create function public.open_meeting(p_meeting uuid, p_opened_at timestamptz, p_chair text, p_secretary text) returns void
 language plpgsql security definer set search_path = ''
 as $$
@@ -509,6 +511,8 @@ declare
 begin
   perform public.meeting_require(m.status = 'invited', 'state');
   perform public.meeting_require(m.postponed_at is not null or (select q.met from public.meeting_quorum(p_meeting) q), 'no_quorum');
+  -- After a postponement the meeting opens no earlier than the postponed time.
+  perform public.meeting_require(m.postponed_at is null or coalesce(p_opened_at, now()) >= m.postponed_to, 'too_early');
   perform public.meeting_require(trim(coalesce(p_chair, '')) <> '' and trim(coalesce(p_secretary, '')) <> '', 'roles');
   update public.meetings set status = 'in_progress', opened_at = coalesce(p_opened_at, now()),
     chair_name = left(trim(p_chair), 120), secretary_name = left(trim(p_secretary), 120)
@@ -560,6 +564,9 @@ begin
   perform public.meeting_require(p_role in ('chair', 'secretary', 'attendee') and p_method in ('drawn', 'scan'), 'role');
   perform public.meeting_require(trim(coalesce(p_signer_name, '')) <> '', 'name');
   perform public.meeting_require(public.is_meeting_file_path(p_image_path, p_meeting), 'path');
+  perform public.meeting_require(p_method <> 'drawn' or p_image_path like '%.png', 'png');
+  perform public.meeting_require(exists (select 1 from storage.objects
+    where bucket_id = 'meeting-files' and name = p_image_path), 'missing_file');
   if p_role <> 'attendee' then
     delete from public.meeting_signatures where meeting_id = p_meeting and role = p_role;
   end if;
@@ -640,9 +647,22 @@ create policy meetings_select on public.meetings for select to authenticated
 
 create policy meeting_agenda_admin on public.meeting_agenda_items for all to authenticated
   using ((select public.is_admin())) with check ((select public.is_admin()));
+-- Residents read agenda rows (discussion, votes, decisions) only once published. While invited they get the order
+-- and titles only, through meeting_agenda_titles() (RLS hides rows, not columns).
 create policy meeting_agenda_select on public.meeting_agenda_items for select to authenticated
   using ((select public.has_permission('meetings')) and exists (
-    select 1 from public.meetings m where m.id = meeting_id and m.status in ('invited', 'published')));
+    select 1 from public.meetings m where m.id = meeting_id and m.status = 'published'));
+
+create function public.meeting_agenda_titles(p_meeting uuid) returns table (id uuid, item_position int, title text)
+language sql stable security definer set search_path = ''
+as $$
+  select i.id, i.position, i.title from public.meeting_agenda_items i join public.meetings m on m.id = i.meeting_id
+  where i.meeting_id = p_meeting and i.item_status = 'open'
+    and (public.is_admin() or (public.has_permission('meetings') and m.status in ('invited', 'published')))
+  order by i.position, i.created_at, i.id;
+$$;
+revoke execute on function public.meeting_agenda_titles(uuid) from public, anon;
+grant execute on function public.meeting_agenda_titles(uuid) to authenticated;
 
 create policy meeting_attendance_admin on public.meeting_attendance for all to authenticated
   using ((select public.is_admin())) with check ((select public.is_admin()));
@@ -668,26 +688,31 @@ values ('meeting-files', 'meeting-files', false, 10485760,
 on conflict (id) do update set
   public = excluded.public, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
 
--- The meeting a storage object belongs to (null for a malformed path); never casts a non-uuid.
+-- The state of the meeting a storage object belongs to: for admins always, for others only once published (null
+-- otherwise, and for a malformed path). Never casts a non-uuid.
 create function public.meeting_file_status(p_name text) returns text
 language sql stable security definer set search_path = ''
 as $$
   select case when public.is_meeting_storage_path(p_name)
-    then (select status from public.meetings where id = split_part(p_name, '/', 1)::uuid) end;
+    then (select status from public.meetings where id = split_part(p_name, '/', 1)::uuid
+      and (public.is_admin() or status = 'published')) end;
 $$;
 revoke execute on function public.meeting_file_status(text) from public, anon;
 grant execute on function public.meeting_file_status(text) to authenticated;
 
--- Read: admins; residents with 'meetings' for published meetings only. Write: admins, valid path, not yet published
--- (a published meeting's files are kept read-only).
+-- Read: admins; residents with 'meetings' for published meetings only. Upload: admins, valid path, not yet published.
 create policy meeting_files_read on storage.objects for select to authenticated
   using (bucket_id = 'meeting-files' and ((select public.is_admin())
     or ((select public.has_permission('meetings')) and public.meeting_file_status(name) = 'published')));
 create policy meeting_files_insert on storage.objects for insert to authenticated
   with check (bucket_id = 'meeting-files' and (select public.is_admin())
     and coalesce(public.meeting_file_status(name), 'published') <> 'published');
+-- Overwrite and delete only before the meeting closes: signatures and scans of a closed meeting stay as recorded.
 create policy meeting_files_update on storage.objects for update to authenticated
-  using (bucket_id = 'meeting-files' and (select public.is_admin()) and coalesce(public.meeting_file_status(name), 'published') <> 'published')
-  with check (bucket_id = 'meeting-files' and (select public.is_admin()) and coalesce(public.meeting_file_status(name), 'published') <> 'published');
+  using (bucket_id = 'meeting-files' and (select public.is_admin())
+    and coalesce(public.meeting_file_status(name), 'closed') in ('draft', 'invited', 'in_progress'))
+  with check (bucket_id = 'meeting-files' and (select public.is_admin())
+    and coalesce(public.meeting_file_status(name), 'closed') in ('draft', 'invited', 'in_progress'));
 create policy meeting_files_delete on storage.objects for delete to authenticated
-  using (bucket_id = 'meeting-files' and (select public.is_admin()) and coalesce(public.meeting_file_status(name), 'published') <> 'published');
+  using (bucket_id = 'meeting-files' and (select public.is_admin())
+    and coalesce(public.meeting_file_status(name), 'closed') in ('draft', 'invited', 'in_progress'));

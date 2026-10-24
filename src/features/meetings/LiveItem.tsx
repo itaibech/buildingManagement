@@ -22,6 +22,7 @@ function VoteFields({ votes, attending, onVotes }: VoteProps) {
         <Stepper label={L.abstain} value={votes.abstain} onChange={(n) => onVotes({ ...votes, abstain: n })} />
       </Group>
       {error && <Text c="debt.7" size="sm" role="alert">{error}</Text>}
+      {error && <Text c="signal.9" size="sm">{L.voteHeld}</Text>}
       <Group gap="sm">
         <Button variant="light" onClick={() => onVotes(unanimous(attending))}>{L.unanimous}</Button>
         <Button variant="subtle" color="stone.7" onClick={() => onVotes(null)}>{L.clearVote}</Button>

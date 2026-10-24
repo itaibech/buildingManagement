@@ -65,6 +65,23 @@ describe('autosaver', () => {
     expect(save).toHaveBeenLastCalledWith('item:1', { decision: '2' })
   })
 
+  it('hold: kept in the device draft but never sent until a normal push replaces it', async () => {
+    const store = memoryStore()
+    const save = vi.fn(async () => undefined)
+    const a = createAutosaver({ delay: 100, save, store, online: () => true })
+    a.hold('item:1', { votes_for: 9 })
+    a.push('att:2', { status: 'present' })
+    await vi.advanceTimersByTimeAsync(200)
+    expect(save).toHaveBeenCalledTimes(1)
+    expect(save).toHaveBeenCalledWith('att:2', { status: 'present' })
+    expect(store.load()).toEqual({ 'item:1': { votes_for: 9, __held: true } })
+    expect(a.status()).toBe('saved')
+    a.push('item:1', { votes_for: 2 })
+    await vi.advanceTimersByTimeAsync(200)
+    expect(save).toHaveBeenLastCalledWith('item:1', { votes_for: 2 })
+    expect(store.load()).toEqual({})
+  })
+
   it('restores a stored draft from an earlier session', () => {
     const store = memoryStore({ 'item:1': { decision: 'נשמר במכשיר' } })
     const a = createAutosaver({ delay: 100, save: vi.fn(async () => undefined), store, online: () => true })

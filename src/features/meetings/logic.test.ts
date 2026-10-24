@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { decisionNumbers } from './decisions'
-import { actionsFor, isShortNotice, matchesArchive, needsPublishReminder, tabOf } from './lifecycle'
+import { actionsFor, isShortNotice, isTooEarly, matchesArchive, needsPublishReminder, tabOf } from './lifecycle'
 import { quorumState, requiredQuorum } from './quorum'
 import { unanimous, voteError } from './votes'
 
@@ -62,6 +62,11 @@ describe('lifecycle', () => {
     expect(needsPublishReminder({ status: 'closed', closed_at: '2026-10-20T09:00:00Z' }, now)).toBe(true)
     expect(needsPublishReminder({ status: 'closed', closed_at: '2026-10-22T09:00:00Z' }, now)).toBe(false)
     expect(needsPublishReminder({ status: 'published', closed_at: '2026-10-01T09:00:00Z' }, now)).toBe(false)
+  })
+  it('after a postponement, opening before the postponed time is too early', () => {
+    expect(isTooEarly('2026-11-03T18:00:00Z', '2026-11-03T17:59:00Z')).toBe(true)
+    expect(isTooEarly('2026-11-03T18:00:00Z', '2026-11-03T18:00:00Z')).toBe(false)
+    expect(isTooEarly(null, '2026-11-03T10:00:00Z')).toBe(false)
   })
   it('sorts states into the page tabs', () => {
     expect(['draft', 'invited', 'in_progress', 'closed', 'published'].map(tabOf)).toEqual(['upcoming', 'upcoming', 'upcoming', 'pending', 'archive'])

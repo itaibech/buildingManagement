@@ -39,6 +39,8 @@ export interface AutosaverOptions {
 
 export interface Autosaver {
   push(key: string, value: Record<string, unknown>): void
+  /** Keeps the value in the device draft only (e.g. a vote the server would refuse); a later push sends it. */
+  hold(key: string, value: Record<string, unknown>): void
   flush(): Promise<void>
   pending(): Draft
   status(): SaveStatus
@@ -65,16 +67,19 @@ export function createAutosaver(o: AutosaverOptions): Autosaver {
     return true
   }
 
+  const sendable = (): [string, Record<string, unknown>][] => Object.entries(draft).filter(([, v]) => v.__held !== true)
+
   async function flush(): Promise<void> {
     clearTimeout(timer)
-    if (running || !Object.keys(draft).length) return
+    if (running) return
+    if (!sendable().length) return set(status === 'idle' ? 'idle' : 'saved')
     if (!online()) return set('offline')
     running = true
     set('saving')
-    const results = await Promise.all(Object.entries(draft).map(([k, v]) => saveOne(k, v)))
+    const results = await Promise.all(sendable().map(([k, v]) => saveOne(k, v)))
     running = false
     if (results.includes(false)) { set('error'); schedule(o.retryMs ?? 5000); return }
-    if (Object.keys(draft).length) return flush()
+    if (sendable().length) return flush()
     set('saved')
   }
 
@@ -83,6 +88,10 @@ export function createAutosaver(o: AutosaverOptions): Autosaver {
       draft = { ...draft, [key]: value }
       o.store.save(draft)
       schedule(o.delay)
+    },
+    hold(key, value) {
+      draft = { ...draft, [key]: { ...value, __held: true } }
+      o.store.save(draft)
     },
     flush,
     pending: () => ({ ...draft }),
@@ -106,5 +115,5 @@ export function useAutosave(storageKey: string, save: AutosaverOptions['save'], 
     flush()
     return () => { window.removeEventListener('online', flush); window.removeEventListener('pagehide', flush); saver.dispose() }
   }, [saver])
-  return { push: saver.push, flush: saver.flush, status, restored }
+  return { push: saver.push, hold: saver.hold, flush: saver.flush, status, restored }
 }
