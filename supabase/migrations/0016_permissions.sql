@@ -56,6 +56,25 @@ create index group_permissions_permission_idx on public.group_permissions (permi
 alter table public.profiles add column group_id uuid references public.user_groups on delete set null;
 create index profiles_group_id_idx on public.profiles (group_id);
 
+-- A profile's group must belong to the profile's building (for every role, server sessions included).
+-- SECURITY DEFINER: user_groups is admin-only under RLS, and the check must see the row whoever writes.
+create function public.profiles_group_building_check() returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  if new.group_id is not null and not exists (
+    select 1 from public.user_groups g where g.id = new.group_id and g.building_id = new.building_id
+  ) then
+    raise exception 'The group belongs to another building' using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function public.profiles_group_building_check() from public, anon, authenticated;
+create trigger profiles_group_building_check
+  before insert or update of group_id, building_id on public.profiles
+  for each row execute function public.profiles_group_building_check();
+
 -- The default group of every building: "דייר" with announcements and tickets. Existing users have group_id null,
 -- so they are in it.
 insert into public.user_groups (building_id, name, description, is_default)
@@ -222,15 +241,19 @@ as $$
 $$;
 
 -- Same counts and total as 0010, now SECURITY DEFINER so finance_reports holders get the building-wide answer.
--- It returns one row of aggregates only: never an apartment id, number or balance.
+-- It returns one row of aggregates only: never an apartment id, number or balance. Scoped to the caller's
+-- building. Non-admins always get the current month (p_month is ignored), so they can't step month by month
+-- through the history to infer when one apartment paid.
 create or replace function public.collection_summary(p_month date)
 returns table (apartments_total int, apartments_paid_up int, amount_due_total numeric)
 language plpgsql stable security definer set search_path = ''
 as $$
 declare
-  m constant date := date_trunc('month', p_month::timestamp)::date;
+  v_admin constant boolean := public.is_admin();
+  m constant date := case when v_admin then date_trunc('month', p_month::timestamp)::date else public.current_month() end;
+  v_building constant uuid := (select p.building_id from public.profiles p where p.user_id = (select auth.uid()));
 begin
-  if not (public.is_admin() or public.has_permission('finance_reports')) then
+  if not (v_admin or public.has_permission('finance_reports')) then
     raise exception 'not permitted' using errcode = '42501';
   end if;
   return query
@@ -239,6 +262,7 @@ begin
       (select f.fee_mode from public.apartment_fee_at(a.id, m) f) = 'exempt' as exempt
     from public.apartments a
     left join public.apartment_ledger l on l.apartment_id = a.id and l.month <= m
+    where a.building_id = v_building
     group by a.id
   )
   select (count(*) filter (where not bal.exempt))::int,

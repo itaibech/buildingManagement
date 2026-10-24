@@ -34,6 +34,7 @@ function setAuth(profile: Profile | null, granted: PermissionKey[] = ['home', 'a
     isAdmin: profile?.role === 'admin',
     loading: false,
     error: null,
+    permissionsError: false,
     retry,
     signOut: async () => undefined,
     recovery: false,

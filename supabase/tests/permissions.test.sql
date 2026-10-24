@@ -3,7 +3,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(77);
+select plan(81);
 
 -- ---------------------------------------------------------------- fixtures (as postgres)
 insert into auth.users (id, email, aud, role) values
@@ -51,7 +51,15 @@ insert into public.expenses (category_id, spent_on, amount, vendor, note) values
   ('98000000-0000-0000-0000-0000000000ca', '2026-03-05', 120, 'ספק סודי', 'הערה סודית'),
   ('98000000-0000-0000-0000-0000000000ca', '2026-03-20', 80, 'ספק סודי', '');
 insert into public.budgets (year, category_id, amount) values (2026, '98000000-0000-0000-0000-0000000000ca', 1000);
-select set_config('pm.default_group', (select id::text from public.user_groups where is_default), true);
+select set_config('pm.b1', (select id::text from public.buildings order by created_at, id limit 1), true);
+-- A second building with its own default group and a large debt: never counted for building 1.
+insert into public.buildings (id, name, billing_start) values ('97000000-0000-0000-0000-000000000001', 'בניין אחר', '2026-01-01');
+insert into public.user_groups (id, building_id, name, is_default)
+  values ('97000000-0000-0000-0000-0000000000a1', '97000000-0000-0000-0000-000000000001', 'דייר', true);
+insert into public.apartments (id, building_id, number) values ('97000000-0000-0000-0000-0000000000b1', '97000000-0000-0000-0000-000000000001', 1);
+insert into public.charges (building_id, apartment_id, month, amount, kind) values
+  ('97000000-0000-0000-0000-000000000001', '97000000-0000-0000-0000-0000000000b1', '2026-02-01', 99999, 'levy');
+select set_config('pm.default_group', (select id::text from public.user_groups where is_default and building_id = current_setting('pm.b1')::uuid), true);
 insert into public.announcements (id, title) values ('e8000000-0000-0000-0000-000000000001', 'הודעה');
 insert into public.tickets (id, title, opened_by) values
   ('f8000000-0000-0000-0000-000000000001', 'תקלה', 'a8000000-0000-0000-0000-000000000003');
@@ -68,17 +76,17 @@ select is(
   (select count(*)::int from public.user_groups g join public.buildings b on b.id = g.building_id where g.is_default),
   (select count(*)::int from public.buildings), 'exactly one default group per building'
 );
-select is((select name from public.user_groups where is_default), 'דייר', 'the default group is "דייר"');
+select is((select name from public.user_groups where is_default and building_id = current_setting('pm.b1')::uuid), 'דייר', 'the default group is "דייר"');
 select is(
   (select array_agg(permission order by permission) from public.group_permissions gp
-    join public.user_groups g on g.id = gp.group_id where g.is_default),
+    join public.user_groups g on g.id = gp.group_id where g.is_default and g.building_id = current_setting('pm.b1')::uuid),
   array['announcements', 'tickets'], 'the default group has announcements and tickets only'
 );
 select throws_ok($$insert into public.group_permissions (group_id, permission)
-  select id, 'no_such_page' from public.user_groups where is_default$$, '23503', null,
+  select id, 'no_such_page' from public.user_groups where is_default and building_id = current_setting('pm.b1')::uuid$$, '23503', null,
   'group_permissions: only catalog keys');
 select throws_ok($$insert into public.group_permissions (group_id, permission)
-  select id, 'home' from public.user_groups where is_default$$, '23514', null,
+  select id, 'home' from public.user_groups where is_default and building_id = current_setting('pm.b1')::uuid$$, '23514', null,
   'group_permissions: home is always on, never stored');
 select throws_ok($$insert into public.user_groups (name, is_default) values ('שני', true)$$, '23505', null,
   'a second default group is impossible, even for the server');
@@ -126,7 +134,7 @@ select throws_ok($$update public.profiles set group_id = current_setting('pm.def
 
 -- ---------------------------------------------------------------- toggling a permission takes effect at once
 set local request.jwt.claims = '{"sub":"a8000000-0000-0000-0000-000000000001","role":"authenticated"}';
-insert into public.group_permissions (group_id, permission) select id, 'finance_own' from public.user_groups where is_default;
+insert into public.group_permissions (group_id, permission) select id, 'finance_own' from public.user_groups where is_default and building_id = current_setting('pm.b1')::uuid;
 set local request.jwt.claims = '{"sub":"a8000000-0000-0000-0000-000000000002","role":"authenticated"}';
 select ok(public.has_permission('finance_own'), 'toggle: finance_own on the default group grants it');
 select is((select array_agg(distinct apartment_id) from public.charges), array['b8000000-0000-0000-0000-00000000000a'::uuid],
@@ -139,7 +147,7 @@ select is((select count(*)::int from public.expenses), 0, 'finance_own: still no
 set local request.jwt.claims = '{"sub":"a8000000-0000-0000-0000-000000000001","role":"authenticated"}';
 insert into public.group_permissions (group_id, permission)
 select g.id, p.key from public.user_groups g cross join public.permissions p
-where g.is_default and p.key <> 'home' on conflict do nothing;
+where g.is_default and g.building_id = current_setting('pm.b1')::uuid and p.key <> 'home' on conflict do nothing;
 set local request.jwt.claims = '{"sub":"a8000000-0000-0000-0000-000000000002","role":"authenticated"}';
 select is(array(select public.my_permissions()),
   array['home', 'announcements', 'tickets', 'maintenance', 'directory', 'finance_own', 'finance_reports', 'ev_own'],
@@ -182,6 +190,13 @@ select is(
     where oid = 'public.collection_summary'::regproc)) x),
   'amount_due_total,apartments_paid_up,apartments_total,p_month', 'collection_summary: totals only, no apartment columns'
 );
+select is(
+  (select row(apartments_total, apartments_paid_up, amount_due_total)::text from public.collection_summary('2000-01-01')),
+  (select row(apartments_total, apartments_paid_up, amount_due_total)::text from public.collection_summary(public.current_month())),
+  'finance_reports: collection_summary ignores p_month for non-admins (always the current month)'
+);
+select ok((select amount_due_total < 99999 from public.collection_summary(public.current_month())),
+  'finance_reports: collection_summary counts only the caller''s building');
 select ok((select balance is not null from public.building_cash limit 1), 'finance_reports: building cash');
 select ok((select count(*) > 0 from public.budgets), 'finance_reports: budgets');
 
@@ -207,11 +222,11 @@ select throws_ok($$select public.set_default_group('98000000-0000-0000-0000-0000
 set local request.jwt.claims = '{"sub":"a8000000-0000-0000-0000-000000000001","role":"authenticated"}';
 select throws_ok($$update public.user_groups set is_default = true where id = '98000000-0000-0000-0000-000000000001'$$,
   '42501', null, 'the default flag changes only through set_default_group');
-select throws_ok($$delete from public.user_groups where is_default$$, '42501', null, 'the default group cannot be deleted');
+select throws_ok($$delete from public.user_groups where is_default and building_id = current_setting('pm.b1')::uuid$$, '42501', null, 'the default group cannot be deleted');
 select public.set_default_group('98000000-0000-0000-0000-000000000001');
-select is((select array_agg(name) from public.user_groups where is_default), array['רואה חשבון'],
+select is((select array_agg(name) from public.user_groups where is_default and building_id = current_setting('pm.b1')::uuid), array['רואה חשבון'],
   'set_default_group: exactly one default, the new one');
-select public.set_default_group((select id from public.user_groups where name = 'דייר'));
+select public.set_default_group((select id from public.user_groups where name = 'דייר' and building_id = current_setting('pm.b1')::uuid));
 delete from public.user_groups where id = '98000000-0000-0000-0000-000000000001';
 select is((select group_id from public.profiles where user_id = 'a8000000-0000-0000-0000-000000000003'), null,
   'deleting a group clears its members'' group');
@@ -222,6 +237,10 @@ select ok(public.has_permission('tickets'), 'deleted group: its members fall bac
 set local request.jwt.claims = '{"sub":"a8000000-0000-0000-0000-000000000001","role":"authenticated"}';
 delete from public.group_permissions;
 select ok(public.has_permission('finance_reports') and public.has_permission('directory'), 'admin: every permission');
+select is((select amount_due_total from public.collection_summary('2000-01-01')), 0.00::numeric,
+  'admin: collection_summary still answers for the month asked');
+select throws_ok($$update public.profiles set group_id = '97000000-0000-0000-0000-0000000000a1'
+  where user_id = 'a8000000-0000-0000-0000-000000000003'$$, '23514', null, 'a profile''s group must be in its building');
 select is((select count(*)::int from public.charges where apartment_id::text like 'b8000000-%'), 2, 'admin: every charge');
 select is((select count(*)::int from public.expenses where vendor = 'ספק סודי'), 2, 'admin: raw expenses');
 

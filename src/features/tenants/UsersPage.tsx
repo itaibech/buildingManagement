@@ -61,6 +61,8 @@ function GroupSelect({ value, onChange, groups }: { value: string | null; onChan
 }
 
 const defaultGroupId = (groups: UserGroup[]): string | null => groups.find((g) => g.isDefault)?.id ?? null
+/** The default group is stored as null, so the user follows a later change of default. */
+const storedGroup = (id: string | null, groups: UserGroup[]): string | null => (id === defaultGroupId(groups) ? null : id)
 
 function Identity({ p, plate, children }: { p: Profile; plate: number | null; children?: ReactNode }) {
   return (
@@ -87,7 +89,7 @@ function PendingRow({ p, residents, options, groups }: RowProps & { p: Profile }
   const [state, setState] = useState<'idle' | 'busy' | 'failed'>('idle')
   const onApprove = () => {
     setState('busy')
-    approve({ userId: p.user_id, residentId, role, groupId }).then(() => { setState('idle'); notifySuccess(he.toast.userApproved) }, () => setState('failed'))
+    approve({ userId: p.user_id, residentId, role, groupId: storedGroup(groupId, groups) }).then(() => { setState('idle'); notifySuccess(he.toast.userApproved) }, () => setState('failed'))
   }
   return (
     <Card padding="md" data-testid={`pending-${p.user_id}`}>
@@ -113,7 +115,7 @@ function UserControls({ p, options, groups, locked }: { p: Profile; options: Opt
       <Group align="flex-end" wrap="wrap" gap="sm">
         <ResidentSelect value={p.resident_id} onChange={(id) => patch({ resident_id: id })} options={options} />
         <RoleControl value={p.role} onChange={(role) => patch({ role })} disabled={locked} />
-        {p.role !== 'admin' && <GroupSelect value={p.group_id ?? defaultGroupId(groups)} onChange={(id) => patch({ group_id: id })} groups={groups} />}
+        {p.role !== 'admin' && <GroupSelect value={p.group_id ?? defaultGroupId(groups)} onChange={(id) => patch({ group_id: storedGroup(id, groups) })} groups={groups} />}
         <Button variant="subtle" color="debt" disabled={locked} onClick={() => patch({ status: 'pending' })}>
           {he.users.block}
         </Button>

@@ -92,13 +92,13 @@ async function pick(select: HTMLElement, option: string): Promise<void> {
 const lastUpdate = () => db.calls.filter((c) => c.table === 'profiles' && c.op === 'update').at(-1)
 
 describe('UsersPage groups', () => {
-  it('approving a resident puts them in the default group unless another is picked', async () => {
+  it('approving a resident puts them in the default group (stored as null, so they follow default changes)', async () => {
     renderPage()
     const row = await screen.findByTestId('pending-p1')
     const group = await within(row).findByLabelText(he.permissions.group)
     expect(group).toHaveValue('דייר')
     fireEvent.click(within(row).getByRole('button', { name: he.users.approve }))
-    await waitFor(() => expect(lastUpdate()?.values).toEqual({ status: 'approved', resident_id: null, role: 'resident', group_id: 'g1' }))
+    await waitFor(() => expect(lastUpdate()?.values).toEqual({ status: 'approved', resident_id: null, role: 'resident', group_id: null }))
   })
 
   it('the approval can pick another group', async () => {
@@ -116,6 +116,15 @@ describe('UsersPage groups', () => {
     fireEvent.click(within(row).getByRole('button', { name: he.users.edit }))
     await pick(within(row).getByLabelText(he.permissions.group), 'רואה חשבון')
     await waitFor(() => expect(lastUpdate()).toEqual({ table: 'profiles', op: 'update', values: { group_id: 'g2' }, filters: [['user_id', 'd1']] }))
+  })
+
+  it('moving a user to the default group stores null', async () => {
+    db.rows.profiles = [...(db.rows.profiles ?? []), profile('d2', 'דיירת בקבוצה', { group_id: 'g2' })]
+    renderPage()
+    const row = await screen.findByTestId('user-d2')
+    fireEvent.click(within(row).getByRole('button', { name: he.users.edit }))
+    await pick(within(row).getByLabelText(he.permissions.group), 'דייר')
+    await waitFor(() => expect(lastUpdate()).toEqual({ table: 'profiles', op: 'update', values: { group_id: null }, filters: [['user_id', 'd2']] }))
   })
 
   it('admins have no group select (they see everything)', async () => {

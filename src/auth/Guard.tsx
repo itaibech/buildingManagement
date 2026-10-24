@@ -8,7 +8,7 @@ import { useAuth } from './AuthProvider'
 import PendingPage from './PendingPage'
 
 export function RequireApproved() {
-  const { session, profile, loading, error, retry } = useAuth()
+  const { session, profile, loading, error, permissionsError, retry } = useAuth()
   if (loading) {
     return (
       <Box p="md" pt="xl" maw={1100} mx="auto">
@@ -17,11 +17,11 @@ export function RequireApproved() {
     )
   }
   if (!session) return <Navigate to="/login" replace />
-  if (error) {
+  if (error || permissionsError) {
     return (
       <Center mih="100vh" p="md">
         <Stack align="center">
-          <Text>{he.profileLoadError}</Text>
+          <Text>{error ? he.profileLoadError : he.permissions.loadError}</Text>
           <Button onClick={retry}>{he.retry}</Button>
         </Stack>
       </Center>
