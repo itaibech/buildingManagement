@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { he } from '../../lib/he'
 import { parseBudgetSheet, parseExpensesSheet, parseIncomeSheet } from '../import/parseWorkbook'
 import { SHEETS } from '../import/readWorkbook'
-import { balancesRows, buildYearWorkbook, toSheetRows, type YearData } from './buildWorkbook'
+import { apartmentsRows, balancesRows, buildYearWorkbook, toSheetRows, type YearData } from './buildWorkbook'
 
 const apartments = [
-  { id: 'a2', number: 2, floor: 1, notes: null, building_id: 'b', created_at: '' },
-  { id: 'a1', number: 1, floor: 0, notes: null, building_id: 'b', created_at: '' },
+  { id: 'a2', number: 2, floor: 1, notes: null, building_id: 'b', created_at: '', is_committee: false, payment_method: 'manual', standing_order_from: null },
+  { id: 'a1', number: 1, floor: 0, notes: null, building_id: 'b', created_at: '', is_committee: false, payment_method: 'manual', standing_order_from: null },
 ]
 const resident = (id: string, apartment_id: string, full_name: string, phone: string | null) =>
   ({ id, apartment_id, full_name, phone, email: null, is_owner: true, building_id: 'b', created_at: '' })
@@ -40,11 +40,21 @@ describe('toSheetRows', () => {
 
   it('adds the current fee and its source to the balances export', () => {
     const rows = balancesRows([
-      { apartmentId: 'a1', number: 1, names: ['דנה'], balance: 120, scheduled: 0, fee: 330, feeMode: 'building' },
-      { apartmentId: 'a2', number: 2, names: [], balance: 0, scheduled: 0, fee: 0, feeMode: 'exempt' },
-    ])
-    expect(rows[0].slice(-2)).toEqual([he.fees.exportFee, he.fees.exportMode])
-    expect(rows.slice(1).map((r) => r.slice(-2))).toEqual([[330, 'לפי תעריף הבניין'], [0, 'פטור']])
+      { apartmentId: 'a1', number: 1, names: ['דנה'], balance: 120, scheduled: 0, fee: 330, feeMode: 'building', isCommittee: false, standingOrder: true },
+      { apartmentId: 'a2', number: 2, names: [], balance: 0, scheduled: 0, fee: 0, feeMode: 'exempt', isCommittee: true, standingOrder: false },
+    ], (id) => id === 'a2')
+    expect(rows[0].slice(-5)).toEqual([he.fees.exportFee, he.fees.exportMode, 'אמצעי תשלום', 'נציג ועד', 'עמדת טעינה'])
+    expect(rows.slice(1).map((r) => r.slice(-5))).toEqual([[330, 'לפי תעריף הבניין', 'הוראת קבע', '', ''], [0, 'פטור', 'רגיל', 'כן', 'כן']])
+  })
+
+  it('adds payment method, committee and EV charger to the apartments export', () => {
+    const base = { building_id: 'b', floor: 1, notes: null, created_at: '', standing_order_from: null }
+    const rows = apartmentsRows([
+      { ...base, id: 'a1', number: 1, is_committee: true, payment_method: 'manual' },
+      { ...base, id: 'a2', number: 2, is_committee: false, payment_method: 'standing_order', standing_order_from: '2026-01-01' },
+    ], [], (id) => id === 'a1')
+    expect(rows[0].slice(-3)).toEqual(['אמצעי תשלום', 'נציג ועד', 'עמדת טעינה'])
+    expect(rows.slice(1).map((r) => r.slice(-3))).toEqual([['רגיל', 'כן', 'כן'], ['הוראת קבע', '', '']])
   })
 })
 

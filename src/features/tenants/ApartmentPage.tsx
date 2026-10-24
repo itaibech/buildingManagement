@@ -4,12 +4,13 @@ import { Fragment, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { he } from '../../lib/he'
 import { formatILS } from '../../lib/format'
-import { AptPlate, BackLink, EmptyState, ExemptBadge, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
+import { ApartmentTags, AptPlate, BackLink, EmptyState, ExemptBadge, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
+import { useChargers } from '../ev/api'
 import { useApartmentFee } from '../finance/api'
 import { ApartmentBalanceLine } from '../finance/ApartmentLedger'
 import { telHref } from '../settings/api'
 import { ApartmentForm } from './ApartmentForm'
-import { isMoneyHistoryError, useApartments, useDeleteApartment, useDeleteResident, useResidents, type Apartment, type Resident } from './api'
+import { isMoneyHistoryError, isStandingOrder, useApartments, useDeleteApartment, useDeleteResident, useResidents, type Apartment, type Resident } from './api'
 import { ConfirmDialog, FormModal } from './dialogs'
 import { ResidentForm } from './ResidentForm'
 
@@ -57,6 +58,8 @@ function FeeLine({ apartmentId }: { apartmentId: string }) {
 }
 
 function ApartmentSummary({ apartment, onEdit, onDelete }: { apartment: Apartment; onEdit: () => void; onDelete: () => void }) {
+  const chargers = useChargers()
+  const ev = (chargers.data ?? []).some((c) => c.apartment_id === apartment.id)
   return (
     <Card padding="md">
       <Group justify="space-between" wrap="wrap" gap="sm">
@@ -66,6 +69,7 @@ function ApartmentSummary({ apartment, onEdit, onDelete }: { apartment: Apartmen
             {apartment.floor !== null && <Text fw={600}>{he.tenants.floorLabel(apartment.floor)}</Text>}
             {apartment.notes && <Text size="sm" c="dimmed">{apartment.notes}</Text>}
             <FeeLine apartmentId={apartment.id} />
+            <ApartmentTags committee={apartment.is_committee} standingOrder={isStandingOrder(apartment)} ev={ev} />
             <ApartmentBalanceLine apartmentId={apartment.id} />
           </Stack>
         </Group>

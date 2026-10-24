@@ -45,7 +45,7 @@ const wrap = (node: ReactNode) =>
   )
 
 const balance = (feeMode: ApartmentBalance['feeMode']): ApartmentBalance =>
-  ({ apartmentId: 'a1', number: 1, names: ['דנה'], balance: 0, scheduled: 0, fee: feeMode === 'exempt' ? 0 : 330, feeMode })
+  ({ apartmentId: 'a1', number: 1, names: ['דנה'], balance: 0, scheduled: 0, fee: feeMode === 'exempt' ? 0 : 330, feeMode, isCommittee: false, standingOrder: false })
 
 beforeEach(() => {
   db.tables = {}

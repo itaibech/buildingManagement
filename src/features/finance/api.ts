@@ -8,7 +8,8 @@ import { useApartments, useResidents } from '../tenants/api'
 import type { TimelineRow } from './feeTimeline'
 import { RECEIPT_BUCKET, receiptPath, shiftMonth, sortByDebt, type LedgerRow } from './ledger'
 
-export type PaymentMethod = 'cash' | 'transfer' | 'cheque' | 'app' | 'other'
+// 'standing_order' is written only by apply_standing_orders (automatic payments); the payment form offers the rest.
+export type PaymentMethod = 'cash' | 'transfer' | 'cheque' | 'app' | 'other' | 'standing_order'
 export const PAYMENT_METHODS: readonly PaymentMethod[] = ['transfer', 'cash', 'cheque', 'app', 'other']
 export type ChargeKind = 'levy' | 'extra' | 'opening'
 
@@ -21,6 +22,10 @@ export interface ApartmentBalance {
   /** This month's fee and where it comes from (building fee, custom amount, exempt). */
   fee: number
   feeMode: FeeMode
+  /** Committee representative ("נציג ועד"). */
+  isCommittee: boolean
+  /** The monthly fee is collected by standing order ("הוראת קבע"). */
+  standingOrder: boolean
 }
 export interface Payment { id: string; apartment_id: string; paid_on: string; amount: number; method: PaymentMethod; note: string }
 export interface PaymentInput { apartment_id: string; paid_on: string; amount: number; method: PaymentMethod; note: string }
@@ -83,6 +88,8 @@ export function useBalances() {
       scheduled: num(byId.get(a.id)?.scheduled_charges),
       fee: num(byId.get(a.id)?.current_fee),
       feeMode: feeMode(byId.get(a.id)?.current_fee_mode),
+      isCommittee: a.is_committee,
+      standingOrder: a.payment_method === 'standing_order',
     })).sort((x, y) => x.number - y.number))
   }, [apartments.data, residents.data, balances.data])
   const all = [apartments, residents, balances]
@@ -101,14 +108,14 @@ export function useMyApartmentId() {
   })
 }
 
-/** The resident's own apartment (id and number only); null when not linked. */
+/** The resident's own apartment (id, number and payment method); null when not linked. */
 export function useMyApartment() {
   const mine = useMyApartmentId()
   const id = mine.data ?? null
   const q = useQuery({
     queryKey: [...KEY, 'my-apartment-row', id],
     enabled: mine.isSuccess,
-    queryFn: async () => (id ? must(await supabase.from('apartments').select('id, number').eq('id', id))[0] ?? null : null),
+    queryFn: async () => (id ? must(await supabase.from('apartments').select('id, number, payment_method').eq('id', id))[0] ?? null : null),
   })
   return { ...q, isLoading: mine.isLoading || q.isLoading, isError: mine.isError || q.isError, refetch: () => { void mine.refetch(); void q.refetch() } }
 }

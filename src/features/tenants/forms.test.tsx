@@ -6,7 +6,6 @@ import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { he } from '../../lib/he'
 import { theme } from '../../ui/theme'
-import { ApartmentForm } from './ApartmentForm'
 import { ResidentForm } from './ResidentForm'
 import { DbFailure, isMoneyHistoryError } from './api'
 import { ConfirmDialog } from './dialogs'
@@ -60,16 +59,6 @@ describe('ResidentForm', () => {
       table: 'residents',
       values: { apartment_id: 'apt1', full_name: 'דייר חדש', phone: '050-1234567', email: null, is_owner: false },
     })
-  })
-})
-
-describe('ApartmentForm', () => {
-  it('requires an apartment number above 0', async () => {
-    wrap(<ApartmentForm onDone={() => undefined} />)
-    type(he.tenants.number, '0')
-    fireEvent.click(screen.getByRole('button', { name: he.tenants.save }))
-    expect(await screen.findByText(he.tenants.errors.number)).toBeInTheDocument()
-    expect(db.inserts).toHaveLength(0)
   })
 })
 

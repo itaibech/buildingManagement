@@ -2,10 +2,10 @@ import { Anchor, Button, Card, Group, Stack, Text, Title } from '@mantine/core'
 import { IconCopy, IconPhone } from '@tabler/icons-react'
 import { formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
-import { ExemptBadge, ListSkeleton, Money, notifyError, notifySuccess } from '../../ui'
+import { ApartmentTags, ExemptBadge, ListSkeleton, Money, notifyError, notifySuccess } from '../../ui'
 import { telHref, useBuilding } from '../settings/api'
-import { useBuildingCash, useMyBalance } from './api'
-import { heroState } from './ledger'
+import { useBuildingCash, useMyApartment, useMyBalance, type ApartmentBalance } from './api'
+import { hasBadges, heroState } from './ledger'
 
 /** Dimmed failure line with a retry button. */
 export function LoadFailed({ onRetry }: { onRetry: () => void }) {
@@ -39,6 +39,17 @@ export function MyBalanceHero() {
   )
 }
 
+/** Exempt, committee and standing-order badges for a balance row (none when nothing applies). */
+export function BalanceBadges({ row }: { row: ApartmentBalance }) {
+  if (!hasBadges(row)) return null
+  return (
+    <Group gap={6} wrap="wrap">
+      {row.feeMode === 'exempt' && <ExemptBadge />}
+      <ApartmentTags committee={row.isCommittee} standingOrder={row.standingOrder} />
+    </Group>
+  )
+}
+
 /** Money actually in the building's account today. */
 export function CashCard() {
   const q = useBuildingCash()
@@ -57,17 +68,26 @@ export function CashCard() {
   )
 }
 
-/** Resident: "דמי ועד חודשיים: ₪X", or that the apartment is exempt. Nothing when not linked. */
+/** Resident: "דמי ועד חודשיים: ₪X", or that the apartment is exempt, and the standing order. Nothing when not linked. */
 export function MyFeeCard() {
   const q = useMyBalance()
+  const mine = useMyApartment()
   if (!q.data) return null
   const exempt = q.data.feeMode === 'exempt'
+  const standing = mine.data?.payment_method === 'standing_order'
   return (
     <Card>
       <Group gap="sm" justify="space-between" wrap="wrap">
         <Text fw={600} className="bm-num">{exempt ? he.fees.myExempt : he.fees.myFee(formatILS(q.data.fee))}</Text>
         {exempt && <ExemptBadge />}
+        {standing && <ApartmentTags standingOrder />}
       </Group>
+      {standing && (
+        <Stack gap={0} mt="xs">
+          <Text size="sm">{he.fees.myStandingOrder}</Text>
+          <Text size="sm" c="dimmed">{he.tenants.form.standingScope}</Text>
+        </Stack>
+      )}
     </Card>
   )
 }
