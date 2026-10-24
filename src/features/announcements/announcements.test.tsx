@@ -49,7 +49,7 @@ const wrap = (node: ReactNode) =>
 
 const item = (o: Partial<Item> = {}): Item => ({
   id: 'x', building_id: 'b', title: 'כותרת', body: 'גוף', pinned: false, expires_at: null,
-  author_id: null, created_at: '2026-10-01T10:00:00Z', isRead: false, ...o,
+  author_id: null, created_at: '2026-10-01T10:00:00Z', link: null, isRead: false, ...o,
 })
 
 describe('AnnouncementItem', () => {
