@@ -7,6 +7,8 @@ export interface Building {
   address: string | null
   payment_instructions: string | null
   committee_contact: string | null
+  /** Cash counts payments from this date on (debt settlement warns about earlier payment dates). */
+  opening_cash_date?: string | null
 }
 export type BuildingPatch = Pick<Building, 'name' | 'address' | 'payment_instructions' | 'committee_contact'>
 
@@ -18,7 +20,7 @@ export function useBuilding() {
     queryKey: KEY,
     queryFn: async (): Promise<Building | null> => {
       const { data, error } = await supabase.from('buildings')
-        .select('id, name, address, payment_instructions, committee_contact').order('created_at').limit(1)
+        .select('id, name, address, payment_instructions, committee_contact, opening_cash_date').order('created_at').limit(1)
       if (error) throw new Error(error.message)
       return data[0] ?? null
     },

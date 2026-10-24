@@ -24,13 +24,20 @@ function toneOf(amount: number, tone: MoneyProps['tone']): Tone {
   return amount > 0 ? 'debt' : 'paid'
 }
 
+/** The formatted amount with ₪ in Assistant: Secular One has no ₪ glyph, so the browser drew a fallback. */
+function WithSign({ text }: { text: string }) {
+  const at = text.indexOf('₪')
+  if (at < 0) return <>{text}</>
+  return <>{text.slice(0, at)}<span className="bm-currency">₪</span>{text.slice(at + 1)}</>
+}
+
 /** A ₪ amount: > 0 owed (debt), 0 settled (paid), < 0 credit (paid, absolute value + "זיכוי"). */
 export function Money({ amount, tone = 'auto', size = 'md' }: MoneyProps) {
   const t = toneOf(amount, tone)
   const credit = tone === 'auto' && amount < 0
   return (
     <Text component="span" className="bm-display bm-num" data-tone={t} c={COLOR[t]} fz={FONT_SIZE[size]}>
-      {formatILS(credit ? Math.abs(amount) : amount)}
+      <WithSign text={formatILS(credit ? Math.abs(amount) : amount)} />
       {credit && ` ${he.credit}`}
     </Text>
   )

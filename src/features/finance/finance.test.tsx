@@ -148,18 +148,26 @@ describe('resident finance by permission', () => {
 })
 
 describe('admin balances', () => {
-  it('sorts by debt and marks debtors with the debt tone', async () => {
+  it('lists by apartment number, sorts by amount on request (remembered), and marks debtors with the debt tone', async () => {
+    localStorage.clear()
     db.admin = true
     db.tables.apartment_balances = [
       { apartment_id: 'a1', balance: -100, scheduled_charges: 0 },
       { apartment_id: 'a2', balance: 50, scheduled_charges: 0 },
       { apartment_id: 'a3', balance: 900, scheduled_charges: 0 },
     ]
-    wrap(<FinancePage />)
+    const { unmount } = wrap(<FinancePage />)
+    const labels = async () => (await screen.findAllByRole('button', { name: /פתיחת הכרטסת/ })).map((r) => r.getAttribute('aria-label'))
+    expect(await labels()).toEqual([he.finance.openLedger(1), he.finance.openLedger(2), he.finance.openLedger(3)])
+    fireEvent.click(screen.getByRole('radio', { name: he.finance.sorts.amount }))
+    expect(await labels()).toEqual([he.finance.openLedger(3), he.finance.openLedger(2), he.finance.openLedger(1)])
     const rows = await screen.findAllByRole('button', { name: /פתיחת הכרטסת/ })
-    expect(rows.map((r) => r.getAttribute('aria-label'))).toEqual([he.finance.openLedger(3), he.finance.openLedger(2), he.finance.openLedger(1)])
     expect(within(rows[0]!).getByText(/900/)).toHaveAttribute('data-tone', 'debt')
     expect(within(rows[2]!).getByText(/100/)).toHaveAttribute('data-tone', 'paid')
+    unmount()
+    wrap(<FinancePage />)
+    expect(await labels()).toEqual([he.finance.openLedger(3), he.finance.openLedger(2), he.finance.openLedger(1)])
+    localStorage.clear()
   })
 })
 

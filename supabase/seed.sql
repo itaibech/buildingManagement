@@ -219,6 +219,21 @@ insert into public.apartment_billing (apartment_id, payment_method, standing_ord
 values ('10000000-0000-0000-0000-000000000007', 'standing_order', '2026-01-01');
 select public.apply_standing_orders();
 
+-- Debt settlement (Task 19, invented): apartment 8 is exempt from the fee, and all it owes is EV charging entered as
+-- EV-labelled extras (no meter readings, as an Excel import leaves them): ₪843.40 a month for Nov–Dec 2025 and
+-- Jan 2026 = ₪2,530.20, the oldest from 2025. Source 'manual' so import.test.sql's 2025 import counts stay put.
+insert into public.apartments (id, building_id, number, floor)
+select '10000000-0000-0000-0000-000000000008', b.id, 8, 4 from public.buildings b;
+insert into public.residents (id, building_id, apartment_id, full_name, phone, is_owner)
+select '20000000-0000-0000-0000-000000000008', b.id, '10000000-0000-0000-0000-000000000008', 'רונית לדוגמה', '050-0000008', true
+from public.buildings b;
+insert into public.apartment_fee_overrides (apartment_id, mode, amount, effective_from)
+values ('10000000-0000-0000-0000-000000000008', 'exempt', null, '2026-01-01');
+insert into public.charges (apartment_id, month, amount, kind, label) values
+  ('10000000-0000-0000-0000-000000000008', '2025-11-01', 843.40, 'extra', 'טעינת רכב חשמלי'),
+  ('10000000-0000-0000-0000-000000000008', '2025-12-01', 843.40, 'extra', 'טעינת רכב חשמלי'),
+  ('10000000-0000-0000-0000-000000000008', '2026-01-01', 843.40, 'extra', 'טעינת רכב חשמלי');
+
 -- Permissions (Task 18, invented): a second group so the groups page has something to compare. The local resident
 -- stays in the default group "דייר" (announcements + tickets), as every approved resident does after 0016.
 insert into public.user_groups (id, name, description)

@@ -1,5 +1,5 @@
 /** Pure finance helpers: ledger grid, budget vs actual, month arithmetic. No I/O here. */
-import { formatILS } from '../../lib/format'
+import { formatILS, HEBREW_MONTHS } from '../../lib/format'
 import { he } from '../../lib/he'
 import type { ApartmentBalance } from './api'
 
@@ -9,6 +9,8 @@ export interface LedgerRow {
   month: string
   charged: number
   paid: number
+  /** The month's write-offs ("מחיקת חוב", <= 0), already inside `charged`. */
+  adjusted?: number
 }
 
 export interface LedgerCell {
@@ -92,10 +94,18 @@ export function budgetVsActual(budgets: BudgetLine[], expenses: ExpenseLine[], y
   return [...rows.values()]
 }
 
-/** Largest debt first; ties keep their order. */
-export function sortByDebt<T extends { balance: number }>(rows: readonly T[]): T[] {
-  return [...rows].sort((a, b) => b.balance - a.balance)
+export type BalanceSort = 'number' | 'amount'
+export const BALANCE_SORTS: readonly BalanceSort[] = ['number', 'amount']
+export const isBalanceSort = (v: unknown): v is BalanceSort => BALANCE_SORTS.some((s) => s === v)
+
+/** 'number': by apartment number. 'amount': largest debt first (credits last), ties by apartment number. A copy. */
+export function sortBalances<T extends { number: number; balance: number }>(rows: readonly T[], sort: BalanceSort): T[] {
+  const byNumber = (a: T, b: T): number => a.number - b.number
+  return [...rows].sort(sort === 'number' ? byNumber : (a, b) => b.balance - a.balance || byNumber(a, b))
 }
+
+/** The month's Hebrew name for a YYYY-MM-DD date ("נובמבר"). */
+export const monthName = (month: string): string => HEBREW_MONTHS[Number(month.slice(5, 7)) - 1] ?? month
 
 /** First of the month for a YYYY-MM-DD date. */
 export function monthOf(date: string): string {
