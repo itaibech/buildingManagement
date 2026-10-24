@@ -2,6 +2,7 @@ import { Alert, Button, Checkbox, Stack, TextInput } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { he } from '../../lib/he'
 import { focusFirstError, notifySuccess } from '../../ui'
+import { formatPhone } from '../../lib/phone'
 import { useSaveResident, type Resident } from './api'
 
 const PHONE = /^0\d{1,2}-?\d{7}$/
@@ -40,7 +41,7 @@ export function ResidentForm({ apartmentId, resident, onDone }: ResidentFormProp
     const values = {
       apartment_id: apartmentId,
       full_name: v.full_name.trim(),
-      phone: v.phone.trim() || null,
+      phone: formatPhone(v.phone) || null,
       email: v.email.trim() || null,
       is_owner: v.is_owner,
     }
