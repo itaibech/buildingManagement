@@ -247,3 +247,12 @@ from unnest(array['announcements', 'tickets', 'maintenance', 'directory', 'finan
 update public.residents set email = 'yossi@example.test' where id = '20000000-0000-0000-0000-000000000002';
 update public.residents set email = 'michal@example.test' where id = '20000000-0000-0000-0000-000000000003';
 update public.residents set email = 'avi@example.test' where id = '20000000-0000-0000-0000-000000000004';
+
+-- Meetings (Task 24, invented): a draft committee meeting ten days ahead, with an agenda, ready to invite.
+insert into public.meetings (id, kind, title, scheduled_at, location)
+values ('70000000-0000-0000-0000-000000000001', 'committee', 'ישיבת ועד רבעונית',
+  date_trunc('day', now()) + interval '10 days 19 hours' - interval '2 hours', 'לובי');
+insert into public.meeting_agenda_items (meeting_id, position, title) values
+  ('70000000-0000-0000-0000-000000000001', 1, 'אישור פרוטוקול הישיבה הקודמת'),
+  ('70000000-0000-0000-0000-000000000001', 2, 'הצעת מחיר לניקוי חדר המדרגות'),
+  ('70000000-0000-0000-0000-000000000001', 3, 'תכנון תקציב השנה הבאה');

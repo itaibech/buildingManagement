@@ -1,5 +1,5 @@
 import type { EmailContent } from './template.ts'
-import type { TicketInfo } from './types.ts'
+import type { MeetingInfo, MeetingVariant, TicketInfo } from './types.ts'
 
 const MONTHS = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר']
 const STATUS: Record<string, string> = { open: 'פתוחה', in_progress: 'בטיפול', closed: 'סגורה' }
@@ -57,5 +57,35 @@ export function testContent(name: string, appUrl: string): EmailContent {
     subject: 'מייל בדיקה מאפליקציית ניהול הבניין', greeting: greeting(name), heading: 'שליחת המיילים עובדת',
     paragraphs: ['זהו מייל בדיקה. אם הגיע אליכם, הדיירים יקבלו את המיילים שתשלחו מהאפליקציה.'],
     link: { href: appUrl, label: 'לאפליקציה' },
+  }
+}
+
+const KIND: Record<string, string> = { general: 'אסיפת דיירים כללית', committee: 'ישיבת ועד' }
+const ilParts = (iso: string): Record<string, string> => Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Jerusalem', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+}).formatToParts(new Date(iso)).map((p) => [p.type, p.value]))
+/** DD/MM/YYYY and HH:MM in Israel time. */
+export const ilDate = (iso: string): string => { const p = ilParts(iso); return `${p.day}/${p.month}/${p.year}` }
+const ilTime = (iso: string): string => { const p = ilParts(iso); return `${p.hour}:${p.minute}` }
+
+function meetingSubject(m: MeetingInfo, variant: MeetingVariant): string {
+  const kind = KIND[m.kind] ?? KIND.committee
+  if (variant === 'published') return `פורסם פרוטוקול ${m.title} מתאריך ${ilDate(m.opened_at ?? m.scheduled_at)}`
+  return `${variant === 'update' ? 'עדכון זימון' : 'זימון'} ל${kind}: ${m.title}`
+}
+
+/** kind 'meeting': the invitation (or its update) with the time, place and agenda; or the published protocol. */
+export function meetingContent(m: MeetingInfo, variant: MeetingVariant, name: string, appUrl: string): EmailContent {
+  const link = { href: `${appUrl}#/meetings/${m.id}`, label: variant === 'published' ? 'לפרוטוקול באפליקציה' : 'לפרטי הישיבה באפליקציה' }
+  if (variant === 'published') {
+    return { subject: meetingSubject(m, variant), greeting: greeting(name), heading: m.title, link,
+      paragraphs: ['פרוטוקול הישיבה פורסם וזמין לכל הדיירים באפליקציה, כולל מי שלא נכח.'] }
+  }
+  const agenda = m.agenda.map((t, i) => `${i + 1}. ${t}`).join('\n')
+  return {
+    subject: meetingSubject(m, variant), greeting: greeting(name), heading: `${KIND[m.kind] ?? KIND.committee}: ${m.title}`, link,
+    lines: [{ label: 'מועד', value: `${ilDate(m.scheduled_at)} בשעה ${ilTime(m.scheduled_at)}` }, { label: 'מקום', value: m.location || '—' }],
+    paragraphs: [variant === 'update' ? 'פרטי הישיבה עודכנו. אלה הפרטים העדכניים.' : 'הנכם מוזמנים לישיבה.', `סדר היום:\n${agenda}`],
+    after: ['הנוכחות חשובה לקיום מניין חוקי. דייר שאינו יכול להגיע רשאי למנות מיופה כוח.'],
   }
 }

@@ -71,7 +71,7 @@ insert into public.maintenance_log (task_id, done_on)
 select id, '2026-01-01' from public.maintenance_tasks limit 1;
 
 -- ---------------------------------------------------------------- catalog and default group
-select is((select count(*)::int from public.permissions), 8, 'catalog: 8 permission keys');
+select is((select count(*)::int from public.permissions), 9, 'catalog: 9 permission keys (meetings added in 0021)');
 select is(
   (select count(*)::int from public.user_groups g join public.buildings b on b.id = g.building_id where g.is_default),
   (select count(*)::int from public.buildings), 'exactly one default group per building'
@@ -80,7 +80,7 @@ select is((select name from public.user_groups where is_default and building_id 
 select is(
   (select array_agg(permission order by permission) from public.group_permissions gp
     join public.user_groups g on g.id = gp.group_id where g.is_default and g.building_id = current_setting('pm.b1')::uuid),
-  array['announcements', 'tickets'], 'the default group has announcements and tickets only'
+  array['announcements', 'meetings', 'tickets'], 'the default group has announcements, tickets and meetings (0021) only'
 );
 select throws_ok($$insert into public.group_permissions (group_id, permission)
   select id, 'no_such_page' from public.user_groups where is_default and building_id = current_setting('pm.b1')::uuid$$, '23503', null,
@@ -94,8 +94,8 @@ select throws_ok($$insert into public.user_groups (name, is_default) values ('ש
 -- ---------------------------------------------------------------- default group: announcements + tickets only
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"a8000000-0000-0000-0000-000000000002","role":"authenticated"}';
-select is(array(select public.my_permissions()), array['home', 'announcements', 'tickets'],
-  'default group: my_permissions = home, announcements, tickets');
+select is(array(select public.my_permissions()), array['home', 'announcements', 'tickets', 'meetings'],
+  'default group: my_permissions = home, announcements, tickets, meetings');
 select ok(public.has_permission('home'), 'default group: home is always on');
 select ok((select count(*) > 0 from public.announcements), 'default group: reads announcements');
 select ok((select count(*) > 0 from public.tickets), 'default group: reads tickets');
@@ -150,7 +150,7 @@ select g.id, p.key from public.user_groups g cross join public.permissions p
 where g.is_default and g.building_id = current_setting('pm.b1')::uuid and p.key <> 'home' on conflict do nothing;
 set local request.jwt.claims = '{"sub":"a8000000-0000-0000-0000-000000000002","role":"authenticated"}';
 select is(array(select public.my_permissions()),
-  array['home', 'announcements', 'tickets', 'maintenance', 'directory', 'finance_own', 'finance_reports', 'ev_own'],
+  array['home', 'announcements', 'tickets', 'maintenance', 'directory', 'finance_own', 'finance_reports', 'ev_own', 'meetings'],
   'all toggles on: every key');
 select is((select count(*)::int from public.charges where apartment_id = 'b8000000-0000-0000-0000-00000000000b'), 0,
   'all toggles: no other apartment''s charges');

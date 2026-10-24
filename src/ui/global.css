@@ -261,6 +261,82 @@ body {
   }
 }
 
+/* Stays in view below the app header while a long list scrolls (the live quorum meter). */
+.bm-sticky {
+  position: sticky;
+  top: calc(var(--app-shell-header-offset, 0px) + 8px);
+  z-index: 4;
+}
+
+.bm-pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Meeting protocol (Task 24): the same document on screen (a card) and in print (A4, black on white). */
+.bm-protocol {
+  line-height: 1.55;
+}
+.bm-protocol header {
+  text-align: center;
+  border-bottom: 2px solid currentColor;
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+}
+.bm-protocol h1 {
+  font-family: var(--bm-heading-font);
+  font-weight: 400;
+  font-size: 1.75rem;
+  margin: 0 0 4px;
+}
+.bm-protocol h2 {
+  font-size: 1.125rem;
+  margin: 16px 0 6px;
+}
+.bm-protocol h3 {
+  font-size: 1rem;
+  margin: 14px 0 4px;
+}
+.bm-protocol p,
+.bm-protocol ul,
+.bm-protocol ol {
+  margin: 2px 0;
+}
+.bm-protocol-dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 16px;
+  margin: 0;
+}
+.bm-protocol-dl > div {
+  display: contents;
+}
+.bm-protocol-dl dt {
+  font-weight: 600;
+}
+.bm-protocol-dl dd {
+  margin: 0;
+}
+.bm-protocol-binding {
+  margin-top: 16px !important;
+  padding: 8px 0;
+  border-top: 1px solid rgba(107, 116, 128, 0.4);
+}
+.bm-protocol-signs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+.bm-protocol-sign {
+  min-width: 200px;
+}
+.bm-protocol-sign img {
+  display: block;
+  max-height: 80px;
+  max-width: 240px;
+  border-bottom: 1px solid currentColor;
+}
+
 /* Directory print view (portalled to <body>): hidden on screen, the only thing printed. */
 .bm-print {
   display: none;
@@ -302,6 +378,20 @@ body {
     display: table-header-group;
   }
   .bm-print-table tbody {
+    break-inside: avoid;
+  }
+  @page {
+    size: A4;
+    margin: 16mm 14mm;
+  }
+  .bm-protocol-print .bm-protocol-section {
+    break-inside: avoid;
+  }
+  .bm-protocol-print h2,
+  .bm-protocol-print h3 {
+    break-after: avoid;
+  }
+  .bm-protocol-print .bm-protocol-signs {
     break-inside: avoid;
   }
   .bm-print-num {

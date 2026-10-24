@@ -57,14 +57,14 @@ isOneToOne: false
                   ]
                 },"announcements": {
                   Row: {
-                    "author_id": string | null,"body": string,"building_id": string,"created_at": string,"expires_at": string | null,"id": string,"pinned": boolean,"title": string
+                    "author_id": string | null,"body": string,"building_id": string,"created_at": string,"expires_at": string | null,"id": string,"link": string | null,"pinned": boolean,"title": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "author_id"?: string | null,"body"?: string,"building_id"?: string,"created_at"?: string,"expires_at"?: string | null,"id"?: string,"pinned"?: boolean,"title": string
+                    "author_id"?: string | null,"body"?: string,"building_id"?: string,"created_at"?: string,"expires_at"?: string | null,"id"?: string,"link"?: string | null,"pinned"?: boolean,"title": string
                   }
                   Update: {
-                    "author_id"?: string | null,"body"?: string,"building_id"?: string,"created_at"?: string,"expires_at"?: string | null,"id"?: string,"pinned"?: boolean,"title"?: string
+                    "author_id"?: string | null,"body"?: string,"building_id"?: string,"created_at"?: string,"expires_at"?: string | null,"id"?: string,"link"?: string | null,"pinned"?: boolean,"title"?: string
                   }
                   Relationships: [
                     {
@@ -645,6 +645,162 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"meeting_addenda": {
+                  Row: {
+                    "body": string,"created_at": string,"created_by": string | null,"id": string,"meeting_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "body": string,"created_at"?: string,"created_by"?: string | null,"id"?: string,"meeting_id": string
+                  }
+                  Update: {
+                    "body"?: string,"created_at"?: string,"created_by"?: string | null,"id"?: string,"meeting_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "meeting_addenda_meeting_id_fkey"
+      columns: ["meeting_id"]
+isOneToOne: false
+      referencedRelation: "meetings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"meeting_agenda_items": {
+                  Row: {
+                    "added_during_meeting": boolean,"created_at": string,"decision": string,"decision_number": number | null,"discussion": string,"id": string,"item_status": string,"meeting_id": string,"position": number,"title": string,"updated_at": string,"votes_abstain": number | null,"votes_against": number | null,"votes_for": number | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "added_during_meeting"?: boolean,"created_at"?: string,"decision"?: string,"decision_number"?: number | null,"discussion"?: string,"id"?: string,"item_status"?: string,"meeting_id": string,"position"?: number,"title": string,"updated_at"?: string,"votes_abstain"?: number | null,"votes_against"?: number | null,"votes_for"?: number | null
+                  }
+                  Update: {
+                    "added_during_meeting"?: boolean,"created_at"?: string,"decision"?: string,"decision_number"?: number | null,"discussion"?: string,"id"?: string,"item_status"?: string,"meeting_id"?: string,"position"?: number,"title"?: string,"updated_at"?: string,"votes_abstain"?: number | null,"votes_against"?: number | null,"votes_for"?: number | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "meeting_agenda_items_meeting_id_fkey"
+      columns: ["meeting_id"]
+isOneToOne: false
+      referencedRelation: "meetings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"meeting_attendance": {
+                  Row: {
+                    "apartment_id": string | null,"apartment_number": number,"attendee_name": string,"id": string,"meeting_id": string,"proxy_file_path": string | null,"proxy_name": string,"status": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "apartment_id"?: string | null,"apartment_number"?: number,"attendee_name"?: string,"id"?: string,"meeting_id": string,"proxy_file_path"?: string | null,"proxy_name"?: string,"status": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "apartment_id"?: string | null,"apartment_number"?: number,"attendee_name"?: string,"id"?: string,"meeting_id"?: string,"proxy_file_path"?: string | null,"proxy_name"?: string,"status"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "meeting_attendance_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: false
+      referencedRelation: "apartment_balances"
+      referencedColumns: ["apartment_id"]
+    },{
+      foreignKeyName: "meeting_attendance_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: false
+      referencedRelation: "apartments"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "meeting_attendance_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: false
+      referencedRelation: "monthly_fees"
+      referencedColumns: ["apartment_id"]
+    },{
+      foreignKeyName: "meeting_attendance_meeting_id_fkey"
+      columns: ["meeting_id"]
+isOneToOne: false
+      referencedRelation: "meetings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"meeting_events": {
+                  Row: {
+                    "actor": string | null,"created_at": string,"details": NonNullable<Json>,"id": string,"kind": string,"meeting_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "actor"?: string | null,"created_at"?: string,"details"?: NonNullable<Json>,"id"?: string,"kind": string,"meeting_id": string
+                  }
+                  Update: {
+                    "actor"?: string | null,"created_at"?: string,"details"?: NonNullable<Json>,"id"?: string,"kind"?: string,"meeting_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "meeting_events_meeting_id_fkey"
+      columns: ["meeting_id"]
+isOneToOne: false
+      referencedRelation: "meetings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"meeting_signatures": {
+                  Row: {
+                    "id": string,"image_path": string,"meeting_id": string,"method": string,"recorded_by": string | null,"role": string,"signed_at": string,"signer_name": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "id"?: string,"image_path": string,"meeting_id": string,"method"?: string,"recorded_by"?: string | null,"role": string,"signed_at"?: string,"signer_name": string
+                  }
+                  Update: {
+                    "id"?: string,"image_path"?: string,"meeting_id"?: string,"method"?: string,"recorded_by"?: string | null,"role"?: string,"signed_at"?: string,"signer_name"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "meeting_signatures_meeting_id_fkey"
+      columns: ["meeting_id"]
+isOneToOne: false
+      referencedRelation: "meetings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"meetings": {
+                  Row: {
+                    "building_id": string,"chair_name": string,"closed_at": string | null,"created_at": string,"created_by": string | null,"id": string,"invite_announcement_id": string | null,"invited_at": string | null,"kind": string,"location": string,"opened_at": string | null,"postponed_at": string | null,"postponed_to": string | null,"publish_announcement_id": string | null,"published_at": string | null,"quorum_mode": string,"quorum_note": string,"quorum_value": number | null,"scheduled_at": string,"secretary_name": string,"status": string,"title": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "building_id"?: string,"chair_name"?: string,"closed_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"invite_announcement_id"?: string | null,"invited_at"?: string | null,"kind"?: string,"location"?: string,"opened_at"?: string | null,"postponed_at"?: string | null,"postponed_to"?: string | null,"publish_announcement_id"?: string | null,"published_at"?: string | null,"quorum_mode"?: string,"quorum_note"?: string,"quorum_value"?: number | null,"scheduled_at": string,"secretary_name"?: string,"status"?: string,"title": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "building_id"?: string,"chair_name"?: string,"closed_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"invite_announcement_id"?: string | null,"invited_at"?: string | null,"kind"?: string,"location"?: string,"opened_at"?: string | null,"postponed_at"?: string | null,"postponed_to"?: string | null,"publish_announcement_id"?: string | null,"published_at"?: string | null,"quorum_mode"?: string,"quorum_note"?: string,"quorum_value"?: number | null,"scheduled_at"?: string,"secretary_name"?: string,"status"?: string,"title"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "meetings_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "meetings_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "meetings_invite_announcement_id_fkey"
+      columns: ["invite_announcement_id"]
+isOneToOne: false
+      referencedRelation: "announcements"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "meetings_publish_announcement_id_fkey"
+      columns: ["publish_announcement_id"]
+isOneToOne: false
+      referencedRelation: "announcements"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"payments": {
                   Row: {
                     "amount": number,"apartment_id": string,"building_id": string,"created_at": string,"for_month": string | null,"id": string,"is_special": boolean | null,"method": string,"note": string,"paid_on": string,"settlement_id": string | null,"source": string,"special_id": string | null
@@ -965,7 +1121,10 @@ isOneToOne: false
                 }
           }
           Functions: {
-            "add_special_charge":
+            "add_addendum":
+{ Args: { "p_body": string,"p_meeting": string }; Returns: string
+                           },
+"add_special_charge":
 { Args: { "p_amount": number,"p_apartment_id": string,"p_category_id"?: string,"p_date_mode"?: string,"p_expense"?: boolean,"p_label": string,"p_method"?: string,"p_month": string,"p_note"?: string,"p_paid"?: boolean }; Returns: Json
                            },
 "apartment_fee_at":
@@ -995,6 +1154,9 @@ isOneToOne: false
                            },
 "can_read_apartment_finance":
 { Args: { "p_apartment_id": string }; Returns: boolean
+                           },
+"close_meeting":
+{ Args: { "p_closed_at"?: string,"p_meeting": string }; Returns: undefined
                            },
 "collection_summary":
 { Args: { "p_month": string }; Returns: {
@@ -1117,11 +1279,20 @@ isOneToOne: false
 "import_year":
 { Args: { "payload": Json }; Returns: Json
                            },
+"invite_meeting":
+{ Args: { "p_confirm_short_notice"?: boolean,"p_meeting": string }; Returns: string
+                           },
 "is_admin":
 { Args: Record<PropertyKey, never>; Returns: boolean
                            },
 "is_approved":
 { Args: Record<PropertyKey, never>; Returns: boolean
+                           },
+"is_meeting_file_path":
+{ Args: { "p_meeting": string,"p_name": string }; Returns: boolean
+                           },
+"is_meeting_storage_path":
+{ Args: { "p_name": string }; Returns: boolean
                            },
 "is_receipt_path":
 { Args: { "p_name": string }; Returns: boolean
@@ -1131,6 +1302,66 @@ isOneToOne: false
                            },
 "mark_tickets_seen":
 { Args: { "p_ids"?: (string)[] }; Returns: undefined
+                           },
+"meeting_agenda_titles":
+{ Args: { "p_meeting": string }; Returns: {
+              "id": string,"item_position": number,"title": string
+            }[]
+                           },
+"meeting_announce":
+{ Args: { "m": Omit<Database["public"]['Tables']["meetings"]['Row'], Database["public"]['Tables']["meetings"]['ComputedFields']>,"p_body": string,"p_pinned": boolean,"p_title": string }; Returns: string
+                           },
+"meeting_file_status":
+{ Args: { "p_name": string }; Returns: string
+                           },
+"meeting_invitation_body":
+{ Args: { "p_meeting": string }; Returns: string
+                           },
+"meeting_kind_label":
+{ Args: { "p_kind": string }; Returns: string
+                           },
+"meeting_local":
+{ Args: { "p_at": string,"p_format": string }; Returns: string
+                           },
+"meeting_lock":
+{ Args: { "p_meeting": string }; Returns: {
+              "building_id": string,
+"chair_name": string,
+"closed_at": string | null,
+"created_at": string,
+"created_by": string | null,
+"id": string,
+"invite_announcement_id": string | null,
+"invited_at": string | null,
+"kind": string,
+"location": string,
+"opened_at": string | null,
+"postponed_at": string | null,
+"postponed_to": string | null,
+"publish_announcement_id": string | null,
+"published_at": string | null,
+"quorum_mode": string,
+"quorum_note": string,
+"quorum_value": number | null,
+"scheduled_at": string,
+"secretary_name": string,
+"status": string,
+"title": string,
+"updated_at": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "meetings"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"meeting_quorum":
+{ Args: { "p_meeting": string }; Returns: {
+              "attending": number,"met": boolean,"required": number,"total": number
+            }[]
+                           },
+"meeting_require":
+{ Args: { "p_ok": boolean,"p_reason": string }; Returns: undefined
                            },
 "my_apartment_id":
 { Args: Record<PropertyKey, never>; Returns: string
@@ -1142,6 +1373,15 @@ isOneToOne: false
 { Args: Record<PropertyKey, never>; Returns: {
               "activity_at": string,"activity_by": string,"activity_kind": string,"apartment_number": number,"opened_by": string,"status": string,"ticket_id": string,"title": string,"unseen": boolean
             }[]
+                           },
+"open_meeting":
+{ Args: { "p_chair"?: string,"p_meeting": string,"p_opened_at"?: string,"p_secretary"?: string }; Returns: undefined
+                           },
+"postpone_meeting":
+{ Args: { "p_meeting": string }; Returns: string
+                           },
+"publish_meeting":
+{ Args: { "p_meeting": string }; Returns: string
                            },
 "record_ev_reading":
 { Args: { "p_charger_id": string,"p_month": string,"p_note"?: string,"p_read_on"?: string,"p_reading": number }; Returns: Json
@@ -1175,6 +1415,9 @@ isOneToOne: false
               "amount": number,"month": string
             }[]
                            },
+"sign_meeting":
+{ Args: { "p_image_path": string,"p_meeting": string,"p_method"?: string,"p_role": string,"p_signer_name": string }; Returns: string
+                           },
 "standing_order_due":
 { Args: { "p_apartment_id": string }; Returns: {
               "amount": number,"apartment_id": string,"building_id": string,"month": string
@@ -1185,6 +1428,9 @@ isOneToOne: false
                            },
 "undo_special_charge":
 { Args: { "p_special_id": string }; Returns: Json
+                           },
+"update_meeting_invitation":
+{ Args: { "p_meeting": string }; Returns: string
                            },
 "user_names":
 { Args: { "ids": (string)[] }; Returns: {

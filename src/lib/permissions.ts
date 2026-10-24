@@ -13,6 +13,7 @@ export const PERMISSION_KEYS = [
   'finance_own',
   'finance_reports',
   'ev_own',
+  'meetings',
 ] as const
 
 export type PermissionKey = (typeof PERMISSION_KEYS)[number]

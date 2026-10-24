@@ -1,5 +1,5 @@
 import { checkCap, readCap } from './cap.ts'
-import { announcementContent, debtContent, testContent, ticketContent } from './content.ts'
+import { announcementContent, debtContent, meetingContent, testContent, ticketContent } from './content.ts'
 import { openMonths, splitDebtors } from './debt.ts'
 import { buildRecipients } from './recipients.ts'
 import { render, type Brand, type EmailContent } from './template.ts'
@@ -65,6 +65,20 @@ async function planTicket(req: EmailRequest, ctx: Context, data: DataSource, bra
   return { messages, apartmentIds: sel === 'all' ? null : ids, skipped: [], perApartment: countBy(recipients) }
 }
 
+/** The variant must match the meeting's state: invitations while invited, the protocol once published. */
+async function planMeeting(req: EmailRequest, ctx: Context, data: DataSource, brand: Brand): Promise<Plan | Reply> {
+  const m = await data.meeting(req.id ?? '', ctx.building.id)
+  if (!m) return fail(404, 'הישיבה לא נמצאה')
+  const variant = req.variant ?? 'invite'
+  if (m.status !== (variant === 'published' ? 'published' : 'invited')) return fail(409, 'הישיבה אינה במצב שמתאים למייל הזה')
+  const [apartments, residents] = await Promise.all([data.apartments(ctx.building.id), data.residents(ctx.building.id)])
+  const sel = req.apartmentIds ?? 'all'
+  const ids = resolveIds(sel, apartments)
+  const recipients = buildRecipients(residents, ids)
+  const messages = toMessages(brand, recipients, (r) => meetingContent(m, variant, r.name, brand.appUrl))
+  return { messages, apartmentIds: sel === 'all' ? null : ids, skipped: [], perApartment: countBy(recipients) }
+}
+
 async function planDebt(req: EmailRequest, ctx: Context, data: DataSource, brand: Brand): Promise<Plan> {
   const [apartments, residents] = await Promise.all([data.apartments(ctx.building.id), data.residents(ctx.building.id)])
   const sel = req.apartmentIds ?? 'all'
@@ -93,6 +107,7 @@ function buildPlan(req: EmailRequest, ctx: Context, data: DataSource, brand: Bra
   if (req.kind === 'announcement') return planAnnouncement(req, ctx, data, brand)
   if (req.kind === 'ticket') return planTicket(req, ctx, data, brand)
   if (req.kind === 'debt') return planDebt(req, ctx, data, brand)
+  if (req.kind === 'meeting') return planMeeting(req, ctx, data, brand)
   return planTest(ctx, brand)
 }
 

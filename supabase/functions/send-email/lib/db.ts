@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Balance, Caller, Context, DataSource, LedgerRow, LogRow, Reservation, Resident, TicketInfo } from './types.ts'
+import type { Balance, Caller, Context, DataSource, LedgerRow, LogRow, MeetingInfo, Reservation, Resident, TicketInfo } from './types.ts'
 
 /** The slice of a supabase-js client (built with the caller's JWT) used to identify the caller. */
 export interface AuthClient {
@@ -53,6 +53,15 @@ async function ticket(db: SupabaseClient, id: string, buildingId: string): Promi
     openerApartmentId: await openerApartment(db, t.opened_by) }
 }
 
+async function meeting(db: SupabaseClient, id: string, buildingId: string): Promise<MeetingInfo | null> {
+  const m = maybe<Omit<MeetingInfo, 'agenda'>>(await db.from('meetings')
+    .select('id, kind, title, scheduled_at, opened_at, location, status').eq('id', id).eq('building_id', buildingId).maybeSingle())
+  if (!m) return null
+  const items = must<{ title: string }[]>(await db.from('meeting_agenda_items').select('title').eq('meeting_id', id)
+    .eq('item_status', 'open').order('position').order('created_at'))
+  return { ...m, agenda: items.map((i) => i.title) }
+}
+
 async function balances(db: SupabaseClient, ids: string[]): Promise<Balance[]> {
   const rows = must<{ apartment_id: string; balance: number | string }[]>(
     await db.from('apartment_balances').select('apartment_id, balance').in('apartment_id', ids))
@@ -83,6 +92,7 @@ export function dataSource(db: SupabaseClient): DataSource {
     announcement: async (id, b) => maybe<{ title: string; body: string }>(
       await db.from('announcements').select('title, body').eq('id', id).eq('building_id', b).maybeSingle()),
     ticket: (id, b) => ticket(db, id, b),
+    meeting: (id, b) => meeting(db, id, b),
     balances: (ids) => balances(db, ids),
     ledger: (ids) => ledger(db, ids),
     sentToday: async (b) => Number(must<number>(await db.rpc('email_sent_today', { p_building: b }))),

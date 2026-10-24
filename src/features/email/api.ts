@@ -6,7 +6,8 @@ import { supabase } from '../../lib/supabase'
 import { notifyError, notifyInfo, notifySuccess } from '../../ui/notify'
 import { planCalls } from './chunks'
 
-export type EmailKind = 'announcement' | 'ticket' | 'debt' | 'test'
+export type EmailKind = 'announcement' | 'ticket' | 'debt' | 'test' | 'meeting'
+export type MeetingEmailVariant = 'invite' | 'update' | 'published'
 
 /** What to send. apartmentIds omitted = the kind's default (ticket: the opener's apartment; others: all). */
 export interface EmailRequest {
@@ -14,6 +15,8 @@ export interface EmailRequest {
   id?: string
   apartmentIds?: string[] | 'all'
   note?: string
+  /** kind 'meeting' only: which email (invitation, its update, or the published protocol). */
+  variant?: MeetingEmailVariant
 }
 
 export interface EmailPreview {
