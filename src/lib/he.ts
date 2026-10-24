@@ -225,6 +225,7 @@ export const he = {
     superAdmin: 'מנהל ראשי',
     you: 'זה אתה',
     residentOption: (n: number, name: string) => `דירה ${n} · ${name}`,
+    groupSummary: (name: string) => `קבוצה: ${name}`,
     actionError: 'הפעולה נכשלה. נסו שוב.',
   },
   announcements: {
@@ -505,6 +506,9 @@ export const he = {
     noBudget: (year: number) => `אין תקציב או הוצאות ל-${year}`,
     noBudgetBody: 'הוסיפו שורת תקציב לכל קטגוריה כדי לעקוב אחרי הביצוע.',
     expensesByCategory: (year: number) => `הוצאות הבניין ב-${year}`,
+    myMoney: 'הכספים שלי',
+    buildingReports: 'דוחות הבניין',
+    buildingReportsHint: 'סיכומים של הבניין כולו, ללא פירוט של דירות.',
     noExpensesYear: 'עוד לא נרשמו הוצאות השנה',
     errors: {
       required: 'שדה חובה',
@@ -895,6 +899,8 @@ export const he = {
     noAccessBody: 'הוועד קובע אילו עמודים פתוחים לכל קבוצה. אפשר לפנות לוועד אם צריך גישה.',
     backHome: 'חזרה לדף הבית',
     loadError: 'לא הצלחנו לטעון את ההרשאות',
+    homeEmpty: 'עדיין אין עמודים פתוחים לקבוצה שלך',
+    homeEmptyBody: 'הוועד קובע אילו עמודים פתוחים לכל קבוצה.',
   },
   toast: {
     apartmentSaved: 'הדירה נשמרה',

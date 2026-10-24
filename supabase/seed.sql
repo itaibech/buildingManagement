@@ -218,3 +218,11 @@ update public.apartments set is_committee = true where id = '10000000-0000-0000-
 insert into public.apartment_billing (apartment_id, payment_method, standing_order_from)
 values ('10000000-0000-0000-0000-000000000007', 'standing_order', '2026-01-01');
 select public.apply_standing_orders();
+
+-- Permissions (Task 18, invented): a second group so the groups page has something to compare. The local resident
+-- stays in the default group "דייר" (announcements + tickets), as every approved resident does after 0016.
+insert into public.user_groups (id, name, description)
+values ('60000000-0000-0000-0000-000000000001', 'חבר ועד צופה', 'צפייה בדוחות הבניין, בתחזוקה וברשימת הדיירים');
+insert into public.group_permissions (group_id, permission)
+select '60000000-0000-0000-0000-000000000001', k
+from unnest(array['announcements', 'tickets', 'maintenance', 'directory', 'finance_reports']) k;

@@ -1,4 +1,6 @@
 import { Alert, Button, Card, Stack, Text, Textarea, TextInput, Title } from '@mantine/core'
+import { IconShieldLock } from '@tabler/icons-react'
+import { Link } from 'react-router'
 import { useForm, type UseFormReturnType } from '@mantine/form'
 import { he } from '../../lib/he'
 import { focusFirstError, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
@@ -67,12 +69,18 @@ function SettingsForm({ building }: { building: Building }) {
   )
 }
 
+const permissionsLink = (
+  <Button component={Link} to="/settings/permissions" variant="subtle" px="xs" leftSection={<IconShieldLock size={20} stroke={1.75} aria-hidden="true" />}>
+    {he.permissions.title}
+  </Button>
+)
+
 /** Admin "הגדרות בניין": building name and address, and the "how to pay" text residents see. */
 export default function SettingsPage() {
   const q = useBuilding()
   return (
     <>
-      <PageHeader title={he.nav.settings} />
+      <PageHeader title={he.nav.settings} extra={permissionsLink} />
       {q.isLoading && <ListSkeleton rows={4} />}
       {q.isError && <LoadFailed onRetry={() => void q.refetch()} />}
       {q.data && <SettingsForm key={q.data.id} building={q.data} />}
