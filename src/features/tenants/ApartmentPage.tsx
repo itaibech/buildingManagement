@@ -10,7 +10,7 @@ import { useApartmentFee } from '../finance/api'
 import { ApartmentBalanceLine } from '../finance/ApartmentLedger'
 import { telHref } from '../settings/api'
 import { ApartmentForm } from './ApartmentForm'
-import { isMoneyHistoryError, isStandingOrder, useApartments, useDeleteApartment, useDeleteResident, useResidents, type Apartment, type Resident } from './api'
+import { billingOf, isMoneyHistoryError, useApartmentBilling, useApartments, useDeleteApartment, useDeleteResident, useResidents, type Apartment, type Resident } from './api'
 import { ConfirmDialog, FormModal } from './dialogs'
 import { ResidentForm } from './ResidentForm'
 
@@ -59,7 +59,9 @@ function FeeLine({ apartmentId }: { apartmentId: string }) {
 
 function ApartmentSummary({ apartment, onEdit, onDelete }: { apartment: Apartment; onEdit: () => void; onDelete: () => void }) {
   const chargers = useChargers()
+  const billing = useApartmentBilling()
   const ev = (chargers.data ?? []).some((c) => c.apartment_id === apartment.id)
+  const standingOrder = billingOf(billing.data, apartment.id).paymentMethod === 'standing_order'
   return (
     <Card padding="md">
       <Group justify="space-between" wrap="wrap" gap="sm">
@@ -69,7 +71,7 @@ function ApartmentSummary({ apartment, onEdit, onDelete }: { apartment: Apartmen
             {apartment.floor !== null && <Text fw={600}>{he.tenants.floorLabel(apartment.floor)}</Text>}
             {apartment.notes && <Text size="sm" c="dimmed">{apartment.notes}</Text>}
             <FeeLine apartmentId={apartment.id} />
-            <ApartmentTags committee={apartment.is_committee} standingOrder={isStandingOrder(apartment)} ev={ev} />
+            <ApartmentTags committee={apartment.is_committee} standingOrder={standingOrder} ev={ev} />
             <ApartmentBalanceLine apartmentId={apartment.id} />
           </Stack>
         </Group>

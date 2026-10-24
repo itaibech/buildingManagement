@@ -4,7 +4,8 @@ import { formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
 import { ApartmentTags, ExemptBadge, ListSkeleton, Money, notifyError, notifySuccess } from '../../ui'
 import { telHref, useBuilding } from '../settings/api'
-import { useBuildingCash, useMyApartment, useMyBalance, type ApartmentBalance } from './api'
+import { billingOf, useApartmentBilling } from '../tenants/api'
+import { useBuildingCash, useMyBalance, type ApartmentBalance } from './api'
 import { hasBadges, heroState } from './ledger'
 
 /** Dimmed failure line with a retry button. */
@@ -71,10 +72,10 @@ export function CashCard() {
 /** Resident: "דמי ועד חודשיים: ₪X", or that the apartment is exempt, and the standing order. Nothing when not linked. */
 export function MyFeeCard() {
   const q = useMyBalance()
-  const mine = useMyApartment()
+  const billing = useApartmentBilling()
   if (!q.data) return null
   const exempt = q.data.feeMode === 'exempt'
-  const standing = mine.data?.payment_method === 'standing_order'
+  const standing = billingOf(billing.data, q.data.apartmentId).paymentMethod === 'standing_order'
   return (
     <Card>
       <Group gap="sm" justify="space-between" wrap="wrap">

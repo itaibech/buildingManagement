@@ -81,16 +81,60 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"apartment_fee_overrides": {
+                },"apartment_billing": {
                   Row: {
-                    "amount": number | null,"apartment_id": string,"building_id": string,"created_at": string,"effective_from": string,"id": string,"mode": string,"source": string
+                    "apartment_id": string,"building_id": string,"created_at": string,"payment_method": string,"standing_order_from": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount"?: number | null,"apartment_id": string,"building_id"?: string,"created_at"?: string,"effective_from": string,"id"?: string,"mode"?: string,"source"?: string
+                    "apartment_id": string,"building_id"?: string,"created_at"?: string,"payment_method"?: string,"standing_order_from"?: string | null
                   }
                   Update: {
-                    "amount"?: number | null,"apartment_id"?: string,"building_id"?: string,"created_at"?: string,"effective_from"?: string,"id"?: string,"mode"?: string,"source"?: string
+                    "apartment_id"?: string,"building_id"?: string,"created_at"?: string,"payment_method"?: string,"standing_order_from"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "apartment_billing_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: true
+      referencedRelation: "apartment_balances"
+      referencedColumns: ["apartment_id"]
+    },{
+      foreignKeyName: "apartment_billing_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: true
+      referencedRelation: "apartments"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "apartment_billing_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: true
+      referencedRelation: "monthly_fees"
+      referencedColumns: ["apartment_id"]
+    },{
+      foreignKeyName: "apartment_billing_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "apartment_billing_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"apartment_fee_overrides": {
+                  Row: {
+                    "amount": number | null,"apartment_id": string,"building_id": string,"created_at": string,"effective_from": string,"id": string,"mode": string,"restore_amount": number | null,"restore_mode": string | null,"source": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount"?: number | null,"apartment_id": string,"building_id"?: string,"created_at"?: string,"effective_from": string,"id"?: string,"mode"?: string,"restore_amount"?: number | null,"restore_mode"?: string | null,"source"?: string
+                  }
+                  Update: {
+                    "amount"?: number | null,"apartment_id"?: string,"building_id"?: string,"created_at"?: string,"effective_from"?: string,"id"?: string,"mode"?: string,"restore_amount"?: number | null,"restore_mode"?: string | null,"source"?: string
                   }
                   Relationships: [
                     {
@@ -127,14 +171,14 @@ isOneToOne: false
                   ]
                 },"apartments": {
                   Row: {
-                    "building_id": string,"created_at": string,"floor": number | null,"id": string,"is_committee": boolean,"notes": string | null,"number": number,"payment_method": string,"standing_order_from": string | null
+                    "building_id": string,"created_at": string,"floor": number | null,"id": string,"is_committee": boolean,"notes": string | null,"number": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "building_id"?: string,"created_at"?: string,"floor"?: number | null,"id"?: string,"is_committee"?: boolean,"notes"?: string | null,"number": number,"payment_method"?: string,"standing_order_from"?: string | null
+                    "building_id"?: string,"created_at"?: string,"floor"?: number | null,"id"?: string,"is_committee"?: boolean,"notes"?: string | null,"number": number
                   }
                   Update: {
-                    "building_id"?: string,"created_at"?: string,"floor"?: number | null,"id"?: string,"is_committee"?: boolean,"notes"?: string | null,"number"?: number,"payment_method"?: string,"standing_order_from"?: string | null
+                    "building_id"?: string,"created_at"?: string,"floor"?: number | null,"id"?: string,"is_committee"?: boolean,"notes"?: string | null,"number"?: number
                   }
                   Relationships: [
                     {
@@ -814,6 +858,9 @@ isOneToOne: false
 "building_cash_balance":
 { Args: { "p_building_id": string }; Returns: number
                            },
+"building_fee_at":
+{ Args: { "p_building_id": string,"p_month": string }; Returns: number
+                           },
 "can_manage_ticket":
 { Args: { "p_ticket_id": string }; Returns: boolean
                            },
@@ -954,7 +1001,7 @@ isOneToOne: false
 { Args: { "p_ev"?: boolean,"p_ev_initial"?: number,"p_fee"?: number,"p_floor"?: number,"p_id"?: string,"p_is_committee"?: boolean,"p_notes"?: string,"p_number"?: number,"p_payment_method"?: string,"p_standing_order_from"?: string }; Returns: string
                            },
 "save_apartment_fee":
-{ Args: { "p_committee": boolean,"p_fee": number,"p_id": string,"p_month": string,"p_was_committee": boolean }; Returns: undefined
+{ Args: { "p_committee": boolean,"p_fee": number,"p_id": string,"p_month": string,"p_was_committee": boolean }; Returns: boolean
                            },
 "save_apartment_validate":
 { Args: { "p_ev_initial": number,"p_fee": number,"p_number": number,"p_payment_method": string,"p_standing_order_from": string }; Returns: undefined

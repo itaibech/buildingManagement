@@ -7,14 +7,14 @@ import { ApartmentTags, AptPlate, EmptyState, ListSkeleton, Money, PageHeader } 
 import { useChargers } from '../ev/api'
 import { useBalances } from '../finance/api'
 import { ApartmentForm } from './ApartmentForm'
-import { isStandingOrder, useApartments, useResidents, type Apartment, type Resident } from './api'
+import { billingOf, useApartmentBilling, useApartments, useResidents, type Apartment, type Resident } from './api'
 import { apartmentsRows } from '../export/buildWorkbook'
 import { useExportAction } from '../export/useExport'
 import { FormModal } from './dialogs'
 
-interface RowExtras { fee?: number; ev: boolean }
+interface RowExtras { fee?: number; ev: boolean; standingOrder: boolean }
 
-function ApartmentRow({ apartment, residents, fee, ev }: { apartment: Apartment; residents: Resident[] } & RowExtras) {
+function ApartmentRow({ apartment, residents, fee, ev, standingOrder }: { apartment: Apartment; residents: Resident[] } & RowExtras) {
   const meta = [
     apartment.floor !== null ? he.tenants.floorLabel(apartment.floor) : null,
     he.tenants.residentsCount(residents.length),
@@ -26,7 +26,7 @@ function ApartmentRow({ apartment, residents, fee, ev }: { apartment: Apartment;
       <Stack gap={0} style={{ flex: 1, minWidth: 0 }}>
         <Text fw={600} truncate>{residents.map((r) => r.full_name).join(', ') || he.apartment(apartment.number)}</Text>
         <Text size="sm" c="dimmed">{meta}</Text>
-        <ApartmentTags committee={apartment.is_committee} standingOrder={isStandingOrder(apartment)} ev={ev} />
+        <ApartmentTags committee={apartment.is_committee} standingOrder={standingOrder} ev={ev} />
       </Stack>
       {fee !== undefined && <Money amount={fee} tone="neutral" />}
       <IconChevronLeft size={20} stroke={1.75} color="var(--mantine-color-stone-6)" aria-hidden="true" />
@@ -43,13 +43,14 @@ function useResidentsByApartment(): Map<string, Resident[]> {
   }, [residents.data])
 }
 
-/** Apartment id → this month's fee, and the apartments with an EV charger (for the list's badges and amounts). */
+/** Apartment id → this month's fee, EV charger and standing order (for the list's badges, amounts and export). */
 function useRowExtras(): (id: string) => RowExtras {
   const balances = useBalances()
   const chargers = useChargers()
+  const billing = useApartmentBilling()
   const fees = useMemo(() => new Map((balances.data ?? []).map((b) => [b.apartmentId, b.fee])), [balances.data])
   const ev = useMemo(() => new Set((chargers.data ?? []).map((c) => c.apartment_id)), [chargers.data])
-  return (id) => ({ fee: fees.get(id), ev: ev.has(id) })
+  return (id) => ({ fee: fees.get(id), ev: ev.has(id), standingOrder: billingOf(billing.data, id).paymentMethod === 'standing_order' })
 }
 
 /** Admin: every apartment sorted by number; tap through to its residents. */
@@ -61,7 +62,7 @@ export default function ApartmentsPage() {
   const list = apartments.data ?? []
   const residents = useResidents()
   const extras = useRowExtras()
-  const exportAction = useExportAction(he.export.files.apartments, () => apartmentsRows(list, residents.data ?? [], (id) => extras(id).ev), !!apartments.data && !!residents.data)
+  const exportAction = useExportAction(he.export.files.apartments, () => apartmentsRows(list, residents.data ?? [], extras), !!apartments.data && !!residents.data)
   return (
     <Stack gap="md">
       <PageHeader title={he.nav.apartments} action={add} secondaryAction={exportAction} />

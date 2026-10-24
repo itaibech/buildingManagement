@@ -201,6 +201,10 @@ Then, in this order:
 1. Merge to `main`: CI, then migrations, then Pages.
 2. The bootstrap email is set by migration 0013 (step 4; the SQL there is only a fallback).
 3. The super admin signs in with **Google** immediately, before the URL is shared with anyone.
+4. Standing orders (migration 0014) run daily through pg_cron. In the Supabase SQL editor, check that
+   `select jobname, schedule from cron.job;` lists `apply-standing-orders` with `15 1 * * *`. If it's missing
+   (the migration logs a WARNING when pg_cron can't be enabled), enable pg_cron (Database → Extensions) and run
+   `select cron.schedule('apply-standing-orders', '15 1 * * *', 'select public.apply_standing_orders()');`.
 
 ## License
 

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { MantineProvider } from '@mantine/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -17,6 +17,8 @@ import { toSaveApartmentArgs, type Apartment } from './api'
 const db = vi.hoisted(() => ({
   tables: {} as Record<string, unknown[]>,
   rpcs: [] as { name: string; args: unknown }[],
+  /** Runs on each rpc call, to change what the next queries return. */
+  onRpc: (() => undefined) as (name: string) => void,
 }))
 
 vi.mock('../../lib/supabase', () => {
@@ -32,7 +34,8 @@ vi.mock('../../lib/supabase', () => {
       from: (table: string) => builder(table),
       rpc: (name: string, args: unknown) => {
         db.rpcs.push({ name, args })
-        return Promise.resolve({ data: 'apt-new', error: null })
+        db.onRpc(name)
+        return Promise.resolve({ data: name === 'set_apartment_fee' ? true : 'apt-new', error: null })
       },
     },
   }
@@ -40,7 +43,7 @@ vi.mock('../../lib/supabase', () => {
 
 const APT: Apartment = {
   id: 'apt1', building_id: 'b1', number: 4, floor: 2, notes: null, created_at: '2026-01-01',
-  is_committee: false, payment_method: 'manual', standing_order_from: null,
+  is_committee: false,
 }
 
 function wrap(node: ReactNode) {
@@ -55,8 +58,12 @@ function wrap(node: ReactNode) {
 const F = he.tenants.form
 const type = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label, { exact: false }), { target: { value } })
 
+// jsdom has no scrollIntoView; Mantine's Select calls it when its list opens.
+Element.prototype.scrollIntoView ??= () => undefined
+
 beforeEach(() => {
   db.rpcs = []
+  db.onRpc = () => undefined
   db.tables = { fee_schedule: [{ id: 'f1', effective_from: '2026-01-01', amount: 390 }] }
 })
 
@@ -140,6 +147,52 @@ describe('ApartmentForm', () => {
     expect(box).toBeChecked()
     fireEvent.click(box)
     await waitFor(() => expect(screen.getByLabelText(F.fee, { exact: false })).toHaveValue('₪300'))
+  })
+})
+
+describe('ApartmentForm with saved data', () => {
+  const custom = (fee: number) => [{ apartment_id: 'apt1', balance: 0, scheduled_charges: 0, current_fee: fee, current_fee_mode: 'custom' }]
+  beforeEach(() => {
+    db.tables.apartments = [APT]
+    db.tables.apartment_balances = custom(300)
+    db.tables.apartment_fee_overrides = [{ id: 't1', apartment_id: 'apt1', effective_from: '2026-01-01', mode: 'custom', amount: 300 }]
+  })
+
+  it('keeps a change made in the fee history sheet when the form is saved', async () => {
+    db.onRpc = (name) => {
+      if (name === 'set_apartment_fee') db.tables.apartment_balances = custom(450)
+    }
+    const onDone = vi.fn()
+    wrap(<ApartmentForm apartment={APT} onDone={onDone} />)
+    await waitFor(() => expect(screen.getByLabelText(F.fee, { exact: false })).toHaveValue('₪300'))
+    fireEvent.click(screen.getByRole('button', { name: F.feeHistory }))
+    const sheet = await screen.findByRole('dialog', { name: he.fees.open(4) })
+    fireEvent.click(within(sheet).getByRole('button', { name: he.fees.change }))
+    fireEvent.change(within(sheet).getByLabelText(he.fees.amount, { exact: false }), { target: { value: '450' } })
+    fireEvent.click(within(sheet).getByRole('button', { name: he.fees.save }))
+    await waitFor(() => expect(screen.getByLabelText(F.fee, { exact: false })).toHaveValue('₪450'))
+    fireEvent.click(within(sheet).getByRole('button', { name: he.close }))
+    fireEvent.click(screen.getByRole('button', { name: he.tenants.save }))
+    await waitFor(() => expect(onDone).toHaveBeenCalled())
+    const saves = db.rpcs.filter((r) => r.name === 'save_apartment')
+    expect(saves).toHaveLength(1)
+    expect(saves[0]?.args).toMatchObject({ p_fee: 450 })
+  })
+
+  it('reads the payment method from apartment_billing and warns when the standing order moves later', async () => {
+    db.tables.apartment_billing = [{ apartment_id: 'apt1', payment_method: 'standing_order', standing_order_from: '2026-01-01' }]
+    wrap(<ApartmentForm apartment={APT} onDone={() => undefined} />)
+    expect(await screen.findByText(F.standingFrom)).toBeInTheDocument()
+    expect(screen.queryByText(F.standingLater)).not.toBeInTheDocument()
+    const year = screen.getAllByLabelText(he.finance.year).find((el) => el.getAttribute('aria-haspopup') === 'listbox') as HTMLElement
+    fireEvent.click(year)
+    const listbox = await waitFor(() => {
+      const el = document.getElementById(year.getAttribute('aria-controls') ?? '')
+      if (!el) throw new Error('listbox not open')
+      return el
+    })
+    fireEvent.click(within(listbox).getByRole('option', { name: '2027', hidden: true }))
+    expect(await screen.findByText(F.standingLater)).toBeInTheDocument()
   })
 })
 

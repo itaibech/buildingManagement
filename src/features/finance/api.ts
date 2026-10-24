@@ -4,7 +4,7 @@ import { he } from '../../lib/he'
 import { supabase } from '../../lib/supabase'
 import { isFeeMode, type FeeMode } from '../../ui/feeBadge'
 import { notifyError } from '../../ui/notify'
-import { useApartments, useResidents } from '../tenants/api'
+import { billingOf, useApartmentBilling, useApartments, useResidents } from '../tenants/api'
 import type { TimelineRow } from './feeTimeline'
 import { RECEIPT_BUCKET, receiptPath, shiftMonth, sortByDebt, type LedgerRow } from './ledger'
 
@@ -55,6 +55,7 @@ function must<T>({ data, error }: { data: T | null; error: { message: string } |
 const num = (v: number | string | null | undefined): number => Number(v ?? 0)
 const catName = (c: { name: string } | null): string => c?.name ?? ''
 const feeMode = (v: string | null | undefined): FeeMode => (isFeeMode(v) ? v : 'building')
+const restoreMode = (v: string | null): 'building' | 'custom' | null => (v === 'building' || v === 'custom' ? v : null)
 const BALANCE_COLUMNS = 'apartment_id, balance, scheduled_charges, current_fee, current_fee_mode'
 
 /** Every finance mutation refreshes every finance query: the numbers all depend on each other. */
@@ -73,12 +74,13 @@ function useFinanceMutation<A, R>(fn: (args: A) => Promise<R>) {
 export function useBalances() {
   const apartments = useApartments()
   const residents = useResidents()
+  const billing = useApartmentBilling()
   const balances = useQuery({
     queryKey: [...KEY, 'balances'],
     queryFn: async () => must(await supabase.from('apartment_balances').select(BALANCE_COLUMNS)),
   })
   const data = useMemo((): ApartmentBalance[] | undefined => {
-    if (!apartments.data || !residents.data || !balances.data) return undefined
+    if (!apartments.data || !residents.data || !balances.data || !billing.data) return undefined
     const byId = new Map(balances.data.map((b) => [b.apartment_id, b]))
     return sortByDebt(apartments.data.map((a) => ({
       apartmentId: a.id,
@@ -89,10 +91,10 @@ export function useBalances() {
       fee: num(byId.get(a.id)?.current_fee),
       feeMode: feeMode(byId.get(a.id)?.current_fee_mode),
       isCommittee: a.is_committee,
-      standingOrder: a.payment_method === 'standing_order',
+      standingOrder: billingOf(billing.data, a.id).paymentMethod === 'standing_order',
     })).sort((x, y) => x.number - y.number))
-  }, [apartments.data, residents.data, balances.data])
-  const all = [apartments, residents, balances]
+  }, [apartments.data, residents.data, balances.data, billing.data])
+  const all = [apartments, residents, balances, billing]
   return { data, isLoading: all.some((q) => q.isLoading), isError: all.some((q) => q.isError), refetch: () => all.forEach((q) => void q.refetch()) }
 }
 
@@ -108,14 +110,14 @@ export function useMyApartmentId() {
   })
 }
 
-/** The resident's own apartment (id, number and payment method); null when not linked. */
+/** The resident's own apartment (id and number only); null when not linked. */
 export function useMyApartment() {
   const mine = useMyApartmentId()
   const id = mine.data ?? null
   const q = useQuery({
     queryKey: [...KEY, 'my-apartment-row', id],
     enabled: mine.isSuccess,
-    queryFn: async () => (id ? must(await supabase.from('apartments').select('id, number, payment_method').eq('id', id))[0] ?? null : null),
+    queryFn: async () => (id ? must(await supabase.from('apartments').select('id, number').eq('id', id))[0] ?? null : null),
   })
   return { ...q, isLoading: mine.isLoading || q.isLoading, isError: mine.isError || q.isError, refetch: () => { void mine.refetch(); void q.refetch() } }
 }
@@ -237,9 +239,13 @@ export function useFeeTimeline(apartmentId?: string) {
   return useQuery({
     queryKey: [...KEY, 'fee-timeline', apartmentId ?? 'all'],
     queryFn: async (): Promise<TimelineRow[]> => {
-      let q = supabase.from('apartment_fee_overrides').select('id, apartment_id, effective_from, mode, amount').order('effective_from', { ascending: false })
+      let q = supabase.from('apartment_fee_overrides').select('id, apartment_id, effective_from, mode, amount, restore_mode, restore_amount')
+        .order('effective_from', { ascending: false })
       if (apartmentId) q = q.eq('apartment_id', apartmentId)
-      return must(await q).map((r) => ({ ...r, mode: feeMode(r.mode), amount: r.amount === null ? null : num(r.amount) }))
+      return must(await q).map((r) => ({
+        ...r, mode: feeMode(r.mode), amount: r.amount === null ? null : num(r.amount),
+        restore_mode: restoreMode(r.restore_mode), restore_amount: r.restore_amount === null ? null : num(r.restore_amount),
+      }))
     },
   })
 }

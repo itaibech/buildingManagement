@@ -209,4 +209,19 @@ describe('ImportPage', () => {
     expect(jan(sentPayload())).toEqual([290])
     expect(sentPayload().keep_prior_levies).toBe(true)
   })
+
+  it('never re-imports months already paid by standing order, and says so in the preview', async () => {
+    db.tables.payments = [{ paid_on: '2026-01-01', amount: 390, source: 'auto', apartments: { number: 1 } }]
+    await upload(renderPage())
+    await pick(he.import.monthFor('אוקטובר'), 'אוקטובר')
+    next()
+    await screen.findByText(he.import.feesIntro)
+    next()
+    next()
+    expect(await screen.findByText(he.import.autoSkipped(1))).toBeInTheDocument()
+    expect(screen.queryByText(he.import.paidTitle(1))).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: he.import.confirm }))
+    await screen.findByText(he.import.doneTitle)
+    expect(sentPayload().payments.filter((x) => x.apartment === 1 && x.paid_on === '2026-01-01')).toEqual([])
+  })
 })

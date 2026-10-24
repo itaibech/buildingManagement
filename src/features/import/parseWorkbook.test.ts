@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { he } from '../../lib/he'
 import {
-  budgetUpdates, buildImport, feesToReplace, findOverlaps, findPaymentOverlaps, initialFees, isExistingFee, likelyExempt, overlapKey,
+  budgetUpdates, buildImport, feesToReplace, findOverlaps, findPaymentOverlaps, guardPayments, initialFees, isExistingFee, likelyExempt, overlapKey,
   priorCharges, proposeFees, skipRecorded, summarize, type PaymentRow,
 } from './buildImport'
 import { budgetFixture, expensesFixture, INCOME_HEADER, incomeFixture } from './fixture'
@@ -247,6 +247,17 @@ describe('payments overlap guard (re-importing an exported year)', () => {
   it('by default skips what is already recorded, importing only the rest of the cell', () => {
     const out = skipRecorded(payments, findPaymentOverlaps(payments, existing))
     expect(out).toEqual([pay(1, '2026-03-01', 300), pay(1, '2026-04-01', 390)])
+  })
+
+  it('always leaves out standing-order (auto) months, even when the admin imports recorded payments', () => {
+    const withAuto = [...existing, { apartment: 1, paid_on: '2026-04-01', amount: 390, source: 'auto' }]
+    const opted = guardPayments(payments, withAuto, true)
+    expect(opted.autoSkipped).toBe(1)
+    expect(opted.payments.filter((p) => p.apartment === 1 && p.paid_on === '2026-04-01')).toEqual([])
+    expect(opted.payments).toContainEqual(pay(1, '2026-03-01', 400))
+    const byDefault = guardPayments(payments, withAuto, false)
+    expect(byDefault.payments).toEqual([pay(1, '2026-03-01', 300)])
+    expect(byDefault.paid.map((o) => `${o.apartment}|${o.month}`)).toEqual(['1|2026-03', '2|2026-03'])
   })
 
   it('counts the previous import\'s levy and EV charges a file without them would remove', () => {

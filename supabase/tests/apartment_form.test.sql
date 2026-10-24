@@ -3,7 +3,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(41);
+select plan(48);
 
 insert into auth.users (id, email, aud, role) values
   ('a9600000-0000-0000-0000-000000000001', 'form-admin@test.local', 'authenticated', 'authenticated'),
@@ -30,11 +30,11 @@ insert into public.fee_schedule (amount, effective_from) values (400, '2024-01-0
 
 -- ---------------------------------------------------------------- schema
 select has_column('public', 'apartments', 'is_committee', 'apartments.is_committee');
-select has_column('public', 'apartments', 'payment_method', 'apartments.payment_method');
-select throws_ok($$update public.apartments set payment_method = 'standing_order', standing_order_from = '2024-01-15'
-  where number = 960$$, '23514', null, 'standing_order_from must be the first of a month');
-select throws_ok($$update public.apartments set payment_method = 'standing_order' where number = 960$$,
-  '23514', null, 'a standing order needs its first month');
+select hasnt_column('public', 'apartments', 'payment_method', 'the payment method is not on the public apartments table');
+select throws_ok($$insert into public.apartment_billing (apartment_id, payment_method, standing_order_from)
+  values ('b9600000-0000-0000-0000-00000000000a', 'standing_order', '2024-01-15')$$, '23514', null, 'standing_order_from must be the first of a month');
+select throws_ok($$insert into public.apartment_billing (apartment_id, payment_method)
+  values ('b9600000-0000-0000-0000-00000000000a', 'standing_order')$$, '23514', null, 'a standing order needs its first month');
 
 create temp table ids (k text primary key, id uuid) on commit drop;
 grant all on ids to authenticated;
@@ -46,16 +46,16 @@ create function pg_temp.mismatches(k text) returns bigint language sql as $$
   select count(*) from (
     select f.month, f.amount from public.monthly_fees f
     where f.apartment_id = (select id from ids where ids.k = mismatches.k) and f.amount > 0
-      and f.month >= (select a.standing_order_from from public.apartments a where a.id = (select id from ids where ids.k = mismatches.k))
+      and f.month >= (select b.standing_order_from from public.apartment_billing b where b.apartment_id = (select id from ids where ids.k = mismatches.k))
     except select paid_on, amount from pg_temp.auto(k)
   ) x
 $$;
 
 grant execute on function pg_temp.auto(text), pg_temp.mismatches(text) to authenticated;
 
--- Monthly run: 01:00 UTC on the 1st (03:00 / 04:00 in Israel). The local stack and Supabase both ship pg_cron.
-select is((select count(*)::int from cron.job where jobname = 'apply-standing-orders' and schedule = '0 1 1 * *'
-  and command = 'select public.apply_standing_orders()'), 1, 'standing orders are scheduled monthly');
+-- Daily idempotent run at 01:15 UTC (03:15 / 04:15 in Israel), so a missed run heals the next day. The local stack and Supabase both ship pg_cron.
+select is((select count(*)::int from cron.job where jobname = 'apply-standing-orders' and schedule = '15 1 * * *'
+  and command = 'select public.apply_standing_orders()'), 1, 'standing orders are scheduled daily');
 
 -- ---------------------------------------------------------------- residents can't call either RPC
 set local role authenticated;
@@ -70,7 +70,9 @@ set local request.jwt.claims = '{"sub":"a9600000-0000-0000-0000-000000000001","r
 select throws_ok($$select public.save_apartment(null, 0, null, null, null, false, 'manual', null, false, 0)$$,
   '22023', null, 'the number must be positive');
 select throws_ok($$select public.save_apartment(null, 970, null, null, -1, false, 'manual', null, false, 0)$$,
-  '22023', null, 'the fee must not be negative');
+  '22023', 'fee must be between 0 and 1,000,000', 'the fee must not be negative');
+select throws_ok($$select public.save_apartment(null, 970, null, null, 1000001, false, 'manual', null, false, 0)$$,
+  '22023', 'fee must be between 0 and 1,000,000', 'nor above 1,000,000');
 select throws_ok($$select public.save_apartment(null, 970, null, null, null, false, 'cash', null, false, 0)$$,
   '22023', null, 'unknown payment method');
 select throws_ok($$select public.save_apartment(null, 970, null, null, null, false, 'standing_order', '2024-03-15', false, 0)$$,
@@ -128,7 +130,7 @@ set local role authenticated;
 select public.save_apartment((select id from ids where k = 'so'), 961, 2, 'הערה', null, false, 'manual', null, false, 0);
 select is((select count(*) from pg_temp.auto('so') where paid_on > public.current_month()), 0::bigint, 'future auto rows are removed');
 select is((select count(*) from pg_temp.auto('so')), (select n from before_manual), 'past auto rows are kept');
-select is((select standing_order_from from public.apartments where id = (select id from ids where k = 'so')), null::date,
+select is((select standing_order_from from public.apartment_billing where apartment_id = (select id from ids where k = 'so')), null::date,
   'a manual apartment has no standing order month');
 select public.set_apartment_fee((select id from ids where k = 'so'), '2024-04-01', 'custom', 410);
 select is((select amount from public.payments where apartment_id = (select id from ids where k = 'so')
@@ -152,6 +154,9 @@ select public.save_apartment((select id from ids where k = 'fee'), 962, 3, null,
 select is((select row(a.is_committee, f.fee_mode)::text from public.apartments a,
   public.apartment_fee_at(a.id, public.current_month()) f where a.id = (select id from ids where k = 'fee')),
   '(t,exempt)', 'committee: flag set and exempt from the current month');
+select is((select row(mode, restore_mode, restore_amount)::text from public.apartment_fee_overrides
+  where apartment_id = (select id from ids where k = 'fee') and effective_from = public.current_month()),
+  '(exempt,custom,450.00)', 'the exempt row remembers the same-month custom fee it replaced');
 select public.save_apartment((select id from ids where k = 'fee'), 962, 3, null, 450, false, 'manual', null, false, 0);
 select is((select row(a.is_committee, f.fee_mode, f.amount)::text from public.apartments a,
   public.apartment_fee_at(a.id, public.current_month()) f where a.id = (select id from ids where k = 'fee')),
@@ -174,9 +179,25 @@ select is((select count(*) from public.ev_chargers where apartment_id = (select 
 select is((select initial_reading from public.ev_chargers where apartment_id = (select id from ids where k = 'ev')), 1234.56::numeric,
   'and its initial reading is left alone');
 
+-- ---------------------------------------------------------------- billing is finance-private
+select public.save_apartment('b9600000-0000-0000-0000-00000000000a', 960, null, null, null, false, 'standing_order', null, false, 0);
+select is((select count(*) from public.apartment_billing), 4::bigint, 'the admin reads every apartment''s billing');
+set local request.jwt.claims = '{"sub":"a9600000-0000-0000-0000-000000000002","role":"authenticated"}';
+select is((select array_agg(apartment_id) from public.apartment_billing), array['b9600000-0000-0000-0000-00000000000a'::uuid],
+  'a resident reads only their own apartment''s billing');
+select is((select payment_method from public.apartment_billing where apartment_id = 'b9600000-0000-0000-0000-00000000000a'),
+  'standing_order', 'including their own standing order');
+select throws_ok($$insert into public.apartment_billing (apartment_id) values ('b9600000-0000-0000-0000-00000000000a')$$,
+  '42501', null, 'billing has no write policy for API roles');
+set local request.jwt.claims = '{"sub":"a9600000-0000-0000-0000-000000000001","role":"authenticated"}';
+update public.apartment_billing set payment_method = 'manual', standing_order_from = null
+  where apartment_id = 'b9600000-0000-0000-0000-00000000000a';
+select is((select payment_method from public.apartment_billing where apartment_id = 'b9600000-0000-0000-0000-00000000000a'),
+  'standing_order', 'admins can''t write billing directly either (save_apartment only)');
+
 -- ---------------------------------------------------------------- standing order starting this month (default)
 insert into ids select 'now', public.save_apartment(null, 964, null, null, null, false, 'standing_order', null, false, 0);
-select is((select standing_order_from from public.apartments where id = (select id from ids where k = 'now')),
+select is((select standing_order_from from public.apartment_billing where apartment_id = (select id from ids where k = 'now')),
   public.current_month(), 'the standing order defaults to the current month');
 select is((select count(*) from pg_temp.auto('now')), 1::bigint, 'and pays the current month right away');
 

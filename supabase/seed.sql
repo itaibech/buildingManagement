@@ -215,6 +215,6 @@ insert into public.payments (apartment_id, paid_on, amount, method, note) values
 -- Apartment form (Task 16, invented): apartment 5 is a committee representative (its exemption is above);
 -- apartment 7 pays by standing order since January, so every month's fee is recorded as an automatic payment.
 update public.apartments set is_committee = true where id = '10000000-0000-0000-0000-000000000005';
-update public.apartments set payment_method = 'standing_order', standing_order_from = '2026-01-01'
-where id = '10000000-0000-0000-0000-000000000007';
+insert into public.apartment_billing (apartment_id, payment_method, standing_order_from)
+values ('10000000-0000-0000-0000-000000000007', 'standing_order', '2026-01-01');
 select public.apply_standing_orders();

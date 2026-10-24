@@ -1,6 +1,6 @@
 import { Alert, Anchor, Button, Checkbox, Group, Input, NumberInput, SegmentedControl, Stack, Text, Textarea } from '@mantine/core'
 import { useForm, type UseFormReturnType } from '@mantine/form'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
@@ -11,8 +11,8 @@ import { useFeeSchedule } from '../finance/api'
 import { currentMonth } from '../finance/feeTimeline'
 import { MonthField, MoneyInput } from '../finance/fields'
 import { useApartmentFees, type ApartmentFeeRow } from '../finance/hooks'
-import { buildingRateAt, initialFee, initialValues, toApartmentInput, type FormValues } from './formValues'
-import { DbFailure, isPayMethod, useSaveApartment, type Apartment, type PayMethod } from './api'
+import { buildingRateAt, initialFee, initialValues, movesStandingOrderLater, rederived, toApartmentInput, type FormValues } from './formValues'
+import { billingOf, DbFailure, isPayMethod, useApartmentBilling, useSaveApartment, type Apartment, type Billing, type PayMethod } from './api'
 import { FormModal } from './dialogs'
 
 export interface ApartmentFormProps {
@@ -27,6 +27,8 @@ interface Context {
   /** Edit: the apartment's fee now, its timeline and history sheet. */
   row?: ApartmentFeeRow
   charger?: Charger
+  /** The saved payment method (manual for a new apartment). */
+  billing: Billing
   month: string
 }
 
@@ -42,7 +44,9 @@ function errorText(error: Error | null): string | null {
   return error instanceof DbFailure && error.code === UNIQUE_VIOLATION ? E.duplicateNumber : E.save
 }
 
-function FeeFields({ form, ctx, exemptByTimeline }: { form: Form; ctx: Context; exemptByTimeline: boolean }) {
+interface FeeFieldsProps { form: Form; ctx: Context; exemptByTimeline: boolean; onHistory: () => void }
+
+function FeeFields({ form, ctx, exemptByTimeline, onHistory }: FeeFieldsProps) {
   const [history, setHistory] = useState(false)
   const committee = form.values.isCommittee
   const hint = committee ? F.committeeHint : exemptByTimeline ? F.timelineExempt : F.feeHint
@@ -56,9 +60,10 @@ function FeeFields({ form, ctx, exemptByTimeline }: { form: Form; ctx: Context; 
             <Text size="sm" c="dimmed" className="bm-num">{F.feeNow(formatILS(ctx.row.fee))}</Text>
             <StatusBadge kind="fee" value={ctx.row.feeMode} />
           </Group>
-          <Button variant="subtle" px="xs" onClick={() => setHistory(true)}>{F.feeHistory}</Button>
+          <Button variant="subtle" px="xs" onClick={() => { onHistory(); setHistory(true) }}>{F.feeHistory}</Button>
           <FormModal opened={history} title={he.fees.open(ctx.row.number)} onClose={() => setHistory(false)}>
-            <FeeTimelineSheet r={ctx.row} />
+            {/* React bubbles the sheet's own form submit up the component tree into the apartment form: stop it here. */}
+            <div onSubmit={(e) => e.stopPropagation()}><FeeTimelineSheet r={ctx.row} /></div>
           </FormModal>
         </Group>
       )}
@@ -67,7 +72,7 @@ function FeeFields({ form, ctx, exemptByTimeline }: { form: Form; ctx: Context; 
   )
 }
 
-function PaymentFields({ form }: { form: Form }) {
+function PaymentFields({ form, saved }: { form: Form; saved: Billing }) {
   return (
     <Stack gap="xs">
       <Input.Wrapper label={F.paymentMethod}>
@@ -78,6 +83,7 @@ function PaymentFields({ form }: { form: Form }) {
         <>
           <MonthField label={F.standingFrom} value={form.values.standingOrderFrom} onChange={(m) => form.setFieldValue('standingOrderFrom', m)} />
           <Text size="sm" c="dimmed">{F.standingScope}</Text>
+          {movesStandingOrderLater(saved, form.values) && <Alert color="signal">{F.standingLater}</Alert>}
         </>
       )}
     </Stack>
@@ -107,7 +113,7 @@ function EvFields({ form, charger }: { form: Form; charger?: Charger }) {
 function useApartmentForm(apartment: Apartment | undefined, ctx: Context): Form {
   const fee = apartment ? initialFee(apartment, ctx.row, ctx.row?.timeline ?? [], ctx.month) : ''
   return useForm<FormValues>({
-    initialValues: initialValues(apartment, fee, !!ctx.charger, ctx.month),
+    initialValues: initialValues(apartment, { fee, billing: ctx.billing, hasCharger: !!ctx.charger, month: ctx.month }),
     validate: {
       number: (v) => (typeof v === 'number' && Number.isInteger(v) && v > 0 ? null : E.number),
       fee: (v) => (typeof v === 'number' && v < 0 ? E.fee : null),
@@ -116,9 +122,28 @@ function useApartmentForm(apartment: Apartment | undefined, ctx: Context): Form 
   })
 }
 
+/**
+ * Once the fee history sheet was opened, a change it makes (the fee data refetches) is copied into the fee field
+ * and the committee box, so saving the form doesn't overwrite it with the values the form opened with.
+ */
+function useSheetSync(form: Form, apartment: Apartment | undefined, ctx: Context): () => void {
+  const opened = useRef(false)
+  const next = apartment ? rederived(apartment, ctx.row, ctx.row?.timeline ?? [], ctx.month) : null
+  const key = next ? `${next.fee}|${next.isCommittee}` : ''
+  const applied = useRef(key)
+  const { setValues } = form
+  useEffect(() => {
+    if (!opened.current || !next || applied.current === key) return
+    applied.current = key
+    setValues(next)
+  })
+  return () => { opened.current = true }
+}
+
 function ApartmentFormBody({ apartment, ctx, onDone }: ApartmentFormProps & { ctx: Context }) {
   const save = useSaveApartment()
   const form = useApartmentForm(apartment, ctx)
+  const onHistory = useSheetSync(form, apartment, ctx)
   const submit = form.onSubmit((v) => {
     save.mutate(toApartmentInput(v, apartment?.id), { onSuccess: () => { notifySuccess(he.toast.apartmentSaved); onDone() } })
   }, focusFirstError)
@@ -130,8 +155,8 @@ function ApartmentFormBody({ apartment, ctx, onDone }: ApartmentFormProps & { ct
         <NumberInput label={he.tenants.number} withAsterisk allowDecimal={false} min={1} hideControls inputMode="numeric" dir="ltr" data-autofocus {...form.getInputProps('number')} />
         <NumberInput label={he.tenants.floor} allowDecimal={false} hideControls inputMode="numeric" dir="ltr" {...form.getInputProps('floor')} />
         <Textarea label={he.tenants.notes} rows={2} {...form.getInputProps('notes')} />
-        <FeeFields form={form} ctx={ctx} exemptByTimeline={exemptByTimeline} />
-        <PaymentFields form={form} />
+        <FeeFields form={form} ctx={ctx} exemptByTimeline={exemptByTimeline} onHistory={onHistory} />
+        <PaymentFields form={form} saved={ctx.billing} />
         <EvFields form={form} charger={ctx.charger} />
         {error && <Alert color="debt">{error}</Alert>}
         <Button type="submit" fullWidth loading={save.isPending}>{he.tenants.save}</Button>
@@ -148,13 +173,15 @@ export function ApartmentForm({ apartment, onDone }: ApartmentFormProps) {
   const schedule = useFeeSchedule()
   const fees = useApartmentFees()
   const chargers = useChargers()
-  if (schedule.isError || fees.isError || chargers.isError) return <Text c="debt.7">{he.tenants.loadError}</Text>
-  if (!schedule.data || !fees.data || !chargers.data) return <ListSkeleton rows={4} />
+  const billing = useApartmentBilling()
+  if ([schedule, fees, chargers, billing].some((q) => q.isError)) return <Text c="debt.7">{he.tenants.loadError}</Text>
+  if (!schedule.data || !fees.data || !chargers.data || !billing.data) return <ListSkeleton rows={4} />
   const month = currentMonth()
   const ctx: Context = {
     rate: buildingRateAt(schedule.data, month),
     row: apartment && fees.data.find((r) => r.apartmentId === apartment.id),
     charger: apartment && chargers.data.find((c) => c.apartment_id === apartment.id),
+    billing: billingOf(billing.data, apartment?.id ?? ''),
     month,
   }
   return <ApartmentFormBody apartment={apartment} ctx={ctx} onDone={onDone} />

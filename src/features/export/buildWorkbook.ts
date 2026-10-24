@@ -31,17 +31,17 @@ const residentsOf = (residents: Resident[], apartmentId: string): Resident[] => 
 const yes = (flag: boolean): string => (flag ? he.export.yes : '')
 const payMethod = (standingOrder: boolean): string => he.tenants.form.methods[standingOrder ? 'standing_order' : 'manual']
 
-/** `hasCharger`: whether the apartment has an EV charger. */
-export function apartmentsRows(apartments: Apartment[], residents: Resident[], hasCharger: (apartmentId: string) => boolean): Rows {
+/** `flags`: the apartment's standing order (apartment_billing) and EV charger. */
+export function apartmentsRows(apartments: Apartment[], residents: Resident[], flags: (apartmentId: string) => { standingOrder: boolean; ev: boolean }): Rows {
   return toSheetRows(apartments, [
     { header: H.apartment, value: (a) => a.number },
     { header: H.floor, value: (a) => a.floor },
     { header: H.residents, value: (a) => joined(residentsOf(residents, a.id).map((r) => r.full_name)) },
     { header: H.phone, value: (a) => joined(residentsOf(residents, a.id).map((r) => r.phone)) },
     { header: H.notes, value: (a) => a.notes },
-    { header: H.method, value: (a) => payMethod(a.payment_method === 'standing_order') },
+    { header: H.method, value: (a) => payMethod(flags(a.id).standingOrder) },
     { header: H.committee, value: (a) => yes(a.is_committee) },
-    { header: H.ev, value: (a) => yes(hasCharger(a.id)) },
+    { header: H.ev, value: (a) => yes(flags(a.id).ev) },
   ])
 }
 

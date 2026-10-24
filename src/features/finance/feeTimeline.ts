@@ -5,7 +5,11 @@ import { he } from '../../lib/he'
 import type { FeeMode } from '../../ui'
 import { monthOf } from './ledger'
 
-export interface TimelineRow { id: string; apartment_id: string; effective_from: string; mode: FeeMode; amount: number | null }
+export interface TimelineRow {
+  id: string; apartment_id: string; effective_from: string; mode: FeeMode; amount: number | null
+  /** On an exempt row that replaced a row of the same month: what that row said (0014). */
+  restore_mode?: 'building' | 'custom' | null; restore_amount?: number | null
+}
 
 /** 'YYYY-MM-01' → 'MM/YYYY'. */
 export const shortMonth = (month: string): string => monthLabel(month)
@@ -39,13 +43,15 @@ export type FeeEffect = Pick<TimelineRow, 'mode' | 'amount'>
 const BUILDING: FeeEffect = { mode: 'building', amount: null }
 
 /**
- * What "ביטול פטור" restores: the mode/amount in force just before the exemption that applies at `asOf`
- * began (a custom amount survives), else the building fee.
+ * What "ביטול פטור" restores: what the exempt row replaced in its own month (restore_mode), else the mode/amount
+ * in force just before the exemption that applies at `asOf` began (a custom amount survives), else the building fee.
  */
 export function restoreAfterExempt(rows: readonly TimelineRow[], asOf: string): FeeEffect {
   const sorted = sortTimeline(rows)
   const i = sorted.findIndex((r) => r.effective_from <= asOf)
   if (i < 0 || sorted[i].mode !== 'exempt') return BUILDING
+  const replaced = sorted[i].restore_mode
+  if (replaced) return { mode: replaced, amount: replaced === 'custom' ? sorted[i].restore_amount ?? null : null }
   const before = sorted.slice(i + 1).find((r) => r.mode !== 'exempt')
   return before ? { mode: before.mode, amount: before.amount } : BUILDING
 }

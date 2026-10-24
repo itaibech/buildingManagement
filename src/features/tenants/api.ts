@@ -13,7 +13,12 @@ export type Role = 'admin' | 'resident'
 /** How the apartment pays its monthly fee: manually, or collected automatically by standing order. */
 export type PayMethod = 'manual' | 'standing_order'
 export const isPayMethod = (v: unknown): v is PayMethod => v === 'manual' || v === 'standing_order'
-export const isStandingOrder = (a: Pick<Apartment, 'payment_method'>): boolean => a.payment_method === 'standing_order'
+
+/** An apartment's payment method (apartment_billing, finance-private). */
+export interface Billing { paymentMethod: PayMethod; standingOrderFrom: string | null }
+const MANUAL: Billing = { paymentMethod: 'manual', standingOrderFrom: null }
+/** The apartment's billing; no row (or a row RLS hides) = manual. */
+export const billingOf = (billing: ReadonlyMap<string, Billing> | undefined, apartmentId: string): Billing => billing?.get(apartmentId) ?? MANUAL
 
 /** Everything the apartment form saves in one save_apartment call. fee null = the building rate. */
 export interface ApartmentInput {
@@ -79,6 +84,22 @@ export function useResidents(apartmentId?: string) {
     queryFn: async () => {
       const q = supabase.from('residents').select('*').order('full_name')
       return rows(await (apartmentId ? q.eq('apartment_id', apartmentId) : q))
+    },
+  })
+}
+
+/**
+ * Payment methods by apartment id. RLS: admins get every apartment, a resident only their own (others read as
+ * manual). Under ['finance'] so save_apartment (and every finance mutation) refreshes it.
+ */
+export function useApartmentBilling() {
+  return useQuery({
+    queryKey: ['finance', 'billing'],
+    queryFn: async (): Promise<ReadonlyMap<string, Billing>> => {
+      const data = rows(await supabase.from('apartment_billing').select('apartment_id, payment_method, standing_order_from'))
+      return new Map(data.map((b) => [b.apartment_id, {
+        paymentMethod: isPayMethod(b.payment_method) ? b.payment_method : 'manual', standingOrderFrom: b.standing_order_from,
+      }]))
     },
   })
 }

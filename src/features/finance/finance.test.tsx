@@ -96,7 +96,7 @@ describe('resident finance page', () => {
     expect(ledgerFilter?.args).toEqual(['apartment_id', 'a1'])
     // Only its own apartment row is fetched (id + number), never the whole list.
     const aptCalls = db.calls.filter((c) => c.table === 'apartments')
-    expect(aptCalls.map((c) => [c.op, ...c.args])).toEqual([['select', 'id, number, payment_method'], ['eq', 'id', 'a1']])
+    expect(aptCalls.map((c) => [c.op, ...c.args])).toEqual([['select', 'id, number'], ['eq', 'id', 'a1']])
   })
 
   it('shows the balance sentence and upcoming charges', async () => {

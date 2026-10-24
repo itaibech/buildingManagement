@@ -1,7 +1,7 @@
 // Pure helpers for the add / edit apartment form: initial values from what applies now, and the form → input mapping.
 import type { FeeMode } from '../../ui'
 import { restoreAfterExempt, type TimelineRow } from '../finance/feeTimeline'
-import type { Apartment, ApartmentInput, PayMethod } from './api'
+import type { Apartment, ApartmentInput, Billing, PayMethod } from './api'
 
 export interface FormValues {
   number: number | string
@@ -36,18 +36,33 @@ export function initialFee(apartment: Apartment, now: FeeNow | undefined, timeli
   return restore.mode === 'custom' && restore.amount !== null ? restore.amount : ''
 }
 
-export function initialValues(apartment: Apartment | undefined, fee: number | string, hasCharger: boolean, month: string): FormValues {
+export interface InitialInputs { fee: number | string; billing: Billing; hasCharger: boolean; month: string }
+
+export function initialValues(apartment: Apartment | undefined, { fee, billing, hasCharger, month }: InitialInputs): FormValues {
   return {
     number: apartment?.number ?? '',
     floor: apartment?.floor ?? '',
     notes: apartment?.notes ?? '',
     fee,
     isCommittee: apartment?.is_committee ?? false,
-    paymentMethod: apartment?.payment_method === 'standing_order' ? 'standing_order' : 'manual',
-    standingOrderFrom: apartment?.standing_order_from ?? month,
+    paymentMethod: billing.paymentMethod,
+    standingOrderFrom: billing.standingOrderFrom ?? month,
     ev: hasCharger,
     evInitial: 0,
   }
+}
+
+/** A standing order whose first month moves later keeps the automatic payments of the earlier months. */
+export const movesStandingOrderLater = (saved: Billing, v: Pick<FormValues, 'paymentMethod' | 'standingOrderFrom'>): boolean =>
+  saved.paymentMethod === 'standing_order' && saved.standingOrderFrom !== null && v.paymentMethod === 'standing_order'
+    && v.standingOrderFrom > saved.standingOrderFrom
+
+/**
+ * After the fee history sheet changed the timeline: the fee field and the committee box as the data now says,
+ * so saving the form doesn't undo the sheet's change (committee stays only while the exemption does).
+ */
+export function rederived(apartment: Apartment, now: FeeNow | undefined, timeline: readonly TimelineRow[], month: string): Pick<FormValues, 'fee' | 'isCommittee'> {
+  return { fee: initialFee(apartment, now, timeline, month), isCommittee: apartment.is_committee && now?.feeMode === 'exempt' }
 }
 
 const numberOr = <T>(v: number | string, fallback: T): number | T => (typeof v === 'number' ? v : fallback)

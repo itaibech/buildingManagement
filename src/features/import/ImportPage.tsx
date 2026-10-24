@@ -6,7 +6,7 @@ import { useImportYear, type ImportCounts } from './api'
 import { columnsReady, feesReady, summarize, yearValid } from './buildImport'
 import { CategoriesStep, ColumnsStep, FeesStep } from './MappingSteps'
 import { ImportError } from './parseWorkbook'
-import { DoneStep, EvNotice, ExemptNotice, LevyNotice, OverlapNotice, PaidNotice, PreviewStep, PriorNotice, ReplaceNotes, UploadStep } from './PreviewStep'
+import { AutoSkippedNote, DoneStep, EvNotice, ExemptNotice, LevyNotice, OverlapNotice, PaidNotice, PreviewStep, PriorNotice, ReplaceNotes, UploadStep } from './PreviewStep'
 import { readWorkbook, type ReadResult } from './readWorkbook'
 import { WizardSteps } from './WizardSteps'
 import { useDerived, useImportContext, useImportState, type Derived, type ImportContext, type ImportState } from './useImportFlow'
@@ -51,6 +51,7 @@ function PreviewBody({ st, d, ctx, save, back, confirm }: PreviewBodyProps) {
         onYear={st.setYear} onBudgetYear={st.setBudgetYear} error={save.isError ? he.import.errors.failed : ''}>
         {d.levies.map((l) => <LevyNotice key={l.col} levy={l} apartments={d.payload?.apartments.length ?? 0} onAmount={(a) => setLevy(l.col, a)} />)}
         <EvNotice ev={d.ev} include={d.includeEv} managed={ctx.hasChargers} skipped={d.evSkipped} onInclude={st.setIncludeEv} />
+        <AutoSkippedNote count={d.autoSkipped} />
         <PaidNotice overlaps={d.paid} include={st.importPaid} onInclude={st.setImportPaid} />
         <PriorNotice prior={d.prior} keep={st.keepPrior} onKeep={st.setKeepPrior} />
         <OverlapNotice overlaps={d.overlaps} include={st.importOverlaps} onInclude={st.setImportOverlaps} />
