@@ -65,7 +65,8 @@ function doPost(e) {
   if (bad) return reply({ ok: false, error: 'invalid ' + bad });
   if (MailApp.getRemainingDailyQuota() < 1) return reply({ ok: false, error: 'daily quota exhausted' });
   try {
-    MailApp.sendEmail({ to: m.to.trim(), subject: m.subject, htmlBody: m.html, body: m.text, name: m.fromName || 'ועד הבית' });
+    // GmailApp, not MailApp: MailApp folds a long Hebrew sender name mid-character, so one letter shows as "��".
+    GmailApp.sendEmail(m.to.trim(), m.subject, m.text, { htmlBody: m.html, name: m.fromName || 'ועד הבית' });
     return reply({ ok: true });
   } catch (err) {
     return reply({ ok: false, error: String(err && err.message ? err.message : err).slice(0, 300) });
