@@ -1,4 +1,4 @@
-import { IconFileSpreadsheet, IconPrinter } from '@tabler/icons-react'
+import { IconFileExport, IconFileSpreadsheet, IconPrinter } from '@tabler/icons-react'
 import { useMemo } from 'react'
 import { useAuth } from '../../auth/AuthProvider'
 import { todayISO } from '../../lib/dates'
@@ -36,7 +36,7 @@ export function useDirectoryExport(groups: DirectoryGroup[], apartments: Apartme
   const lines: DirectoryLine[] = useMemo(() => directoryLines(groups, apartments), [groups, apartments])
   const t = he.tenants.directoryExport
   const action: SecondaryAction | undefined = isAdmin ? {
-    label: he.export.action, shortLabel: he.export.short, icon: <IconFileSpreadsheet size={22} stroke={1.75} />, disabled: !ready,
+    label: he.export.short, icon: <IconFileExport size={22} stroke={1.75} />, disabled: !ready,
     items: [
       { label: filtered ? t.excelFiltered(groups.length) : t.excel, icon: <IconFileSpreadsheet size={18} stroke={1.75} />,
         onClick: () => downloadDirectory(groups, apartments) },

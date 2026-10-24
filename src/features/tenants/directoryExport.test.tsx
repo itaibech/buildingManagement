@@ -86,7 +86,7 @@ function renderPage() {
   )
 }
 
-const openMenu = () => fireEvent.click(screen.getAllByText(he.export.action)[0] as HTMLElement)
+const openMenu = () => fireEvent.click(screen.getAllByText(he.export.short)[0] as HTMLElement)
 
 describe('directory export menu', () => {
   beforeEach(() => { auth.isAdmin = true; xlsx.mockClear() })
@@ -96,7 +96,7 @@ describe('directory export menu', () => {
     auth.isAdmin = false
     renderPage()
     await screen.findByText('דנה בדיקה')
-    expect(screen.queryByText(he.export.action)).toBeNull()
+    expect(screen.queryByText(he.export.short)).toBeNull()
     expect(screen.queryByTestId('directory-print')).toBeNull()
   })
 
