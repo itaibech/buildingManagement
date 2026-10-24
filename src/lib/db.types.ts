@@ -257,14 +257,14 @@ isOneToOne: false
                   ]
                 },"charges": {
                   Row: {
-                    "amount": number,"apartment_id": string,"building_id": string,"created_at": string,"ev_reading_id": string | null,"id": string,"kind": string,"label": string,"month": string,"source": string
+                    "amount": number,"apartment_id": string,"building_id": string,"created_at": string,"ev_reading_id": string | null,"id": string,"kind": string,"label": string,"month": string,"note": string,"settlement_id": string | null,"source": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount": number,"apartment_id": string,"building_id"?: string,"created_at"?: string,"ev_reading_id"?: string | null,"id"?: string,"kind": string,"label"?: string,"month": string,"source"?: string
+                    "amount": number,"apartment_id": string,"building_id"?: string,"created_at"?: string,"ev_reading_id"?: string | null,"id"?: string,"kind": string,"label"?: string,"month": string,"note"?: string,"settlement_id"?: string | null,"source"?: string
                   }
                   Update: {
-                    "amount"?: number,"apartment_id"?: string,"building_id"?: string,"created_at"?: string,"ev_reading_id"?: string | null,"id"?: string,"kind"?: string,"label"?: string,"month"?: string,"source"?: string
+                    "amount"?: number,"apartment_id"?: string,"building_id"?: string,"created_at"?: string,"ev_reading_id"?: string | null,"id"?: string,"kind"?: string,"label"?: string,"month"?: string,"note"?: string,"settlement_id"?: string | null,"source"?: string
                   }
                   Relationships: [
                     {
@@ -621,14 +621,14 @@ isOneToOne: false
                   ]
                 },"payments": {
                   Row: {
-                    "amount": number,"apartment_id": string,"building_id": string,"created_at": string,"id": string,"method": string,"note": string,"paid_on": string,"source": string
+                    "amount": number,"apartment_id": string,"building_id": string,"created_at": string,"for_month": string | null,"id": string,"method": string,"note": string,"paid_on": string,"settlement_id": string | null,"source": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount": number,"apartment_id": string,"building_id"?: string,"created_at"?: string,"id"?: string,"method": string,"note"?: string,"paid_on"?: string,"source"?: string
+                    "amount": number,"apartment_id": string,"building_id"?: string,"created_at"?: string,"for_month"?: string | null,"id"?: string,"method": string,"note"?: string,"paid_on"?: string,"settlement_id"?: string | null,"source"?: string
                   }
                   Update: {
-                    "amount"?: number,"apartment_id"?: string,"building_id"?: string,"created_at"?: string,"id"?: string,"method"?: string,"note"?: string,"paid_on"?: string,"source"?: string
+                    "amount"?: number,"apartment_id"?: string,"building_id"?: string,"created_at"?: string,"for_month"?: string | null,"id"?: string,"method"?: string,"note"?: string,"paid_on"?: string,"settlement_id"?: string | null,"source"?: string
                   }
                   Relationships: [
                     {
@@ -908,7 +908,7 @@ isOneToOne: false
                   ]
                 },"apartment_ledger": {
                   Row: {
-                    "apartment_id": string | null,"charged": number | null,"month": string | null,"paid": number | null
+                    "adjusted": number | null,"apartment_id": string | null,"charged": number | null,"month": string | null,"paid": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -1129,10 +1129,21 @@ isOneToOne: false
 "set_default_group":
 { Args: { "p_group_id": string }; Returns: undefined
                            },
+"settle_debt":
+{ Args: { "p_apartment_id": string,"p_date_mode"?: string,"p_method"?: string,"p_mode": string,"p_months": (string)[],"p_note"?: string }; Returns: Json
+                           },
+"settlement_plan":
+{ Args: { "p_apartment_id": string,"p_months": (string)[] }; Returns: {
+              "amount": number,"month": string
+            }[]
+                           },
 "standing_order_due":
 { Args: { "p_apartment_id": string }; Returns: {
               "amount": number,"apartment_id": string,"building_id": string,"month": string
             }[]
+                           },
+"undo_settlement":
+{ Args: { "p_settlement_id": string }; Returns: Json
                            },
 "user_names":
 { Args: { "ids": (string)[] }; Returns: {
