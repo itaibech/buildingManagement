@@ -68,6 +68,11 @@ select throws_ok($$insert into public.apartment_fee_overrides (apartment_id, mod
   values ('b9600000-0000-0000-0000-00000000000a', 'custom', 5, '2019-01-01', 'building')$$, '23514', null, 'only exempt rows restore');
 
 -- ---------------------------------------------------------------- residents can't call either RPC
+-- Task 18: the residents here hold this page's permission (the default group otherwise has only
+-- announcements and tickets; permissions.test.sql covers the gates themselves).
+insert into public.group_permissions (group_id, permission)
+select g.id, k from public.user_groups g cross join unnest(array['finance_own']) k where g.is_default;
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"a9600000-0000-0000-0000-000000000002","role":"authenticated"}';
 select throws_ok($$select public.save_apartment(null, 999, null, null, null, false, 'manual', null, false, 0)$$,

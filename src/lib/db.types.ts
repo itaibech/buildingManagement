@@ -529,6 +529,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"group_permissions": {
+                  Row: {
+                    "group_id": string,"permission": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "group_id": string,"permission": string
+                  }
+                  Update: {
+                    "group_id"?: string,"permission"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "group_permissions_group_id_fkey"
+      columns: ["group_id"]
+isOneToOne: false
+      referencedRelation: "user_groups"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "group_permissions_permission_fkey"
+      columns: ["permission"]
+isOneToOne: false
+      referencedRelation: "permissions"
+      referencedColumns: ["key"]
+    }
+                  ]
                 },"maintenance_log": {
                   Row: {
                     "building_id": string,"cost": number | null,"created_at": string,"done_on": string,"expense_id": string | null,"id": string,"note": string,"task_id": string
@@ -637,16 +663,30 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"profiles": {
+                },"permissions": {
                   Row: {
-                    "approved_at": string | null,"building_id": string,"created_at": string,"email": string | null,"full_name": string,"is_super_admin": boolean,"resident_id": string | null,"role": string,"status": string,"user_id": string
+                    "description": string,"key": string,"label": string,"sort_order": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "approved_at"?: string | null,"building_id": string,"created_at"?: string,"email"?: string | null,"full_name"?: string,"is_super_admin"?: boolean,"resident_id"?: string | null,"role"?: string,"status"?: string,"user_id": string
+                    "description"?: string,"key": string,"label": string,"sort_order"?: number
                   }
                   Update: {
-                    "approved_at"?: string | null,"building_id"?: string,"created_at"?: string,"email"?: string | null,"full_name"?: string,"is_super_admin"?: boolean,"resident_id"?: string | null,"role"?: string,"status"?: string,"user_id"?: string
+                    "description"?: string,"key"?: string,"label"?: string,"sort_order"?: number
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"profiles": {
+                  Row: {
+                    "approved_at": string | null,"building_id": string,"created_at": string,"email": string | null,"full_name": string,"group_id": string | null,"is_super_admin": boolean,"resident_id": string | null,"role": string,"status": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "approved_at"?: string | null,"building_id": string,"created_at"?: string,"email"?: string | null,"full_name"?: string,"group_id"?: string | null,"is_super_admin"?: boolean,"resident_id"?: string | null,"role"?: string,"status"?: string,"user_id": string
+                  }
+                  Update: {
+                    "approved_at"?: string | null,"building_id"?: string,"created_at"?: string,"email"?: string | null,"full_name"?: string,"group_id"?: string | null,"is_super_admin"?: boolean,"resident_id"?: string | null,"role"?: string,"status"?: string,"user_id"?: string
                   }
                   Relationships: [
                     {
@@ -660,6 +700,12 @@ isOneToOne: false
       columns: ["building_id"]
 isOneToOne: false
       referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "profiles_group_id_fkey"
+      columns: ["group_id"]
+isOneToOne: false
+      referencedRelation: "user_groups"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "profiles_resident_id_fkey"
@@ -823,6 +869,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"user_groups": {
+                  Row: {
+                    "building_id": string,"created_at": string,"description": string,"id": string,"is_default": boolean,"name": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "building_id"?: string,"created_at"?: string,"description"?: string,"id"?: string,"is_default"?: boolean,"name": string
+                  }
+                  Update: {
+                    "building_id"?: string,"created_at"?: string,"description"?: string,"id"?: string,"is_default"?: boolean,"name"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "user_groups_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "user_groups_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    }
+                  ]
                 }
           }
           Views: {
@@ -878,11 +950,19 @@ isOneToOne: false
 "building_cash_balance":
 { Args: { "p_building_id": string }; Returns: number
                            },
+"building_expense_report":
+{ Args: { "p_year": number }; Returns: {
+              "category": string,"category_id": string,"month": string,"sort_order": number,"total": number
+            }[]
+                           },
 "building_fee_at":
 { Args: { "p_building_id": string,"p_month": string }; Returns: number
                            },
 "can_manage_ticket":
 { Args: { "p_ticket_id": string }; Returns: boolean
+                           },
+"can_read_apartment_ev":
+{ Args: { "p_apartment_id": string }; Returns: boolean
                            },
 "can_read_apartment_finance":
 { Args: { "p_apartment_id": string }; Returns: boolean
@@ -941,6 +1021,9 @@ isOneToOne: false
                            },
 "ev_validate":
 { Args: { "p": Json }; Returns: undefined
+                           },
+"has_permission":
+{ Args: { "p_key": string }; Returns: boolean
                            },
 "import_check":
 { Args: { "ok": boolean,"what": string }; Returns: undefined
@@ -1017,6 +1100,9 @@ isOneToOne: false
 "my_apartment_id":
 { Args: Record<PropertyKey, never>; Returns: string
                            },
+"my_permissions":
+{ Args: Record<PropertyKey, never>; Returns: string[]
+                           },
 "my_ticket_activity":
 { Args: Record<PropertyKey, never>; Returns: {
               "activity_at": string,"activity_by": string,"activity_kind": string,"apartment_number": number,"opened_by": string,"status": string,"ticket_id": string,"title": string,"unseen": boolean
@@ -1039,6 +1125,9 @@ isOneToOne: false
                            },
 "set_apartment_fee":
 { Args: { "p_amount"?: number,"p_apartment_id": string,"p_effective_from": string,"p_mode": string }; Returns: boolean
+                           },
+"set_default_group":
+{ Args: { "p_group_id": string }; Returns: undefined
                            },
 "standing_order_due":
 { Args: { "p_apartment_id": string }; Returns: {

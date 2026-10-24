@@ -45,6 +45,11 @@ insert into public.fee_schedule (amount, effective_from) values (390, '2026-01-0
 insert into public.apartment_fee_overrides (apartment_id, amount, effective_from)
   values ('b9000000-0000-0000-0000-00000000000a', 270, '2026-08-01');
 
+-- Task 18: the residents here hold this page's permission (the default group otherwise has only
+-- announcements and tickets; permissions.test.sql covers the gates themselves).
+insert into public.group_permissions (group_id, permission)
+select g.id, k from public.user_groups g cross join unnest(array['finance_own','finance_reports']) k where g.is_default;
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"a9000000-0000-0000-0000-000000000001","role":"authenticated"}';
 select is((select amount from public.monthly_fees where apartment_id = 'b9000000-0000-0000-0000-00000000000a' and month = '2026-06-01'),
@@ -153,7 +158,7 @@ select is((select array_agg(distinct apartment_id)::text from public.apartment_l
 select is((select array_agg(distinct apartment_id)::text from public.monthly_fees),
   '{b9000000-0000-0000-0000-00000000000a}', 'resident: only own monthly fees');
 select is((select balance from public.apartment_balances), -1070::numeric, 'resident: own balance is right');
-select is((select count(*) from public.expenses), 2::bigint, 'resident: reads expenses');
+select is((select count(*) from public.expenses), 0::bigint, 'resident: raw expense rows are admin-only (Task 18)');
 select is((select balance from public.building_cash), 3140::numeric, 'resident: reads building cash (all payments)');
 select is((select count(*) from public.expense_categories), 18::bigint, 'resident: reads categories');
 select is((select count(*) from public.budgets), 1::bigint, 'resident: reads budgets');
@@ -163,7 +168,9 @@ select throws_ok($$insert into public.payments (apartment_id, paid_on, amount, m
   values ('b9000000-0000-0000-0000-00000000000a', '2026-01-01', 1, 'cash')$$, '42501', null, 'resident: cannot insert payments');
 select throws_ok($$insert into public.charges (apartment_id, month, amount, kind)
   values ('b9000000-0000-0000-0000-00000000000a', '2026-01-01', -500, 'opening')$$, '42501', null, 'resident: cannot insert charges');
-select throws_ok($$select * from public.collection_summary('2026-01-01')$$, '42501', null, 'resident: collection summary denied');
+select is((select row(apartments_total, apartments_paid_up, amount_due_total)::text
+  from public.collection_summary((select m2 from tm))), '(2,1,870.00)',
+  'resident with finance_reports: the building-wide collection totals (Task 18)');
 select throws_ok($$insert into storage.objects (bucket_id, name) values ('receipts', 'r1.pdf')$$,
   '42501', null, 'resident: cannot upload receipts');
 select is((select count(*) from storage.objects where bucket_id = 'receipts'), 0::bigint, 'resident: cannot read receipts');

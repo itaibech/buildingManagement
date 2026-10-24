@@ -42,6 +42,11 @@ select has_function('public', 'delete_ev_reading', array['uuid'], 'delete_ev_rea
 select has_function('public', 'import_ev', array['jsonb'], 'import_ev exists');
 
 -- ---------------------------------------------------------------- admin records readings
+-- Task 18: the residents here hold this page's permission (the default group otherwise has only
+-- announcements and tickets; permissions.test.sql covers the gates themselves).
+insert into public.group_permissions (group_id, permission)
+select g.id, k from public.user_groups g cross join unnest(array['ev_own']) k where g.is_default;
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"a9400000-0000-0000-0000-000000000001","role":"authenticated"}';
 
