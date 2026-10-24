@@ -1,11 +1,12 @@
 import { ActionIcon, Card, Group, Menu, Stack, Text, Title } from '@mantine/core'
 import { IconDots, IconPencil, IconTrash } from '@tabler/icons-react'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { useAuth } from '../../auth/AuthProvider'
 import { formatDate } from '../../lib/format'
 import { he } from '../../lib/he'
 import { BackLink, ListSkeleton, notifySuccess, StatusBadge } from '../../ui'
+import { useMarkTicketsSeen } from '../notifications/api'
 import { ConfirmDialog, FormModal } from '../tenants/dialogs'
 import { AdminControls } from './AdminControls'
 import { useDeleteTicket, useTicket, type TicketDetail } from './api'
@@ -72,6 +73,16 @@ function Dialogs({ ticket, dialog, close }: { ticket: TicketDetail; dialog: Dial
   )
 }
 
+/** Marks the call seen when it is shown, and again whenever new activity arrives while it is open. */
+function useMarkSeenOnView(ticket: TicketDetail | null | undefined): void {
+  const { mutate } = useMarkTicketsSeen()
+  const id = ticket?.id
+  const version = ticket ? `${ticket.updated_at}|${ticket.comments.at(-1)?.created_at ?? ''}` : null
+  useEffect(() => {
+    if (id && version) mutate([id])
+  }, [id, version, mutate])
+}
+
 /** One service call: details, photos, admin controls and the comment thread. */
 export default function TicketPage() {
   const { id = '' } = useParams()
@@ -79,6 +90,7 @@ export default function TicketPage() {
   const query = useTicket(id)
   const [dialog, setDialog] = useState<Dialog>(null)
   const ticket = query.data
+  useMarkSeenOnView(ticket)
   if (query.isLoading) return <ListSkeleton />
   if (!ticket) return <Stack align="flex-start"><BackLink to="/tickets" label={he.tickets.back} /><Text>{query.isError ? he.tickets.errors.load : he.tickets.notFound}</Text></Stack>
   const canEdit = isAdmin || (ticket.opened_by === session?.user.id && ticket.status === 'open')

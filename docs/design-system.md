@@ -106,6 +106,11 @@ Mobile (<768)                        Desktop (≥768)
 - `DateInput`: the native date field with a Hebrew "יום/חודש/שנה" hint while empty (the OS-locale mask
   is hidden).
 - `BackLink({ to, label })`: the chevron link above a detail page.
+- `UnreadDot({ label })`: the `signal` dot for something not yet opened (unread announcement, call with unseen activity).
+- Notification center (`features/notifications`): an `IconBell` with the unseen total, beside exit in the mobile header
+  (a full-screen sheet) and in the side-nav header (a popover). Live notices are top-centre toasts with a "לצפייה"
+  action, at most 3 on screen; further ones collapse into "ועוד N עדכונים".
+  Badge = any unseen activity by others; toast = the interruptive subset (the rules in `notifications/rules.ts`).
 - `focusFirstError`: pass as `form.onSubmit(handler, focusFirstError)`.
 - Sheets: every Modal close is named "סגירה" and is 44px (theme). Short sheets use
   `FormModal compact` (centred, not full screen).

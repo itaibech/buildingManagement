@@ -3,11 +3,8 @@ import { IconChevronDown, IconDots, IconPencil, IconPin, IconTrash } from '@tabl
 import { useEffect, useRef, useState } from 'react'
 import { formatDate } from '../../lib/format'
 import { he } from '../../lib/he'
+import { UnreadDot } from '../../ui/UnreadDot'
 import type { AnnouncementItem as Item } from './api'
-
-function UnreadDot() {
-  return <Box role="img" aria-label={he.announcements.unread} w={10} h={10} bg="signal.6" style={{ borderRadius: '50%', flexShrink: 0 }} />
-}
 
 function Meta({ a, expired }: { a: Item; expired: boolean }) {
   const expiry = a.expires_at ? (expired ? he.announcements.expiredOn : he.announcements.expiresOn)(formatDate(a.expires_at)) : null
@@ -52,7 +49,7 @@ function Header({ item, expired, opened, onToggle }: { item: Item; expired: bool
   return (
     <UnstyledButton onClick={onToggle} aria-expanded={opened} mih={44} p="md" pb={opened ? 'xs' : undefined} className="bm-row" style={{ flex: 1, minWidth: 0 }}>
       <Group wrap="nowrap" gap="sm" align="center">
-        {!item.isRead && !expired ? <UnreadDot /> : <Box w={10} style={{ flexShrink: 0 }} />}
+        {!item.isRead && !expired ? <UnreadDot label={he.announcements.unread} /> : <Box w={10} style={{ flexShrink: 0 }} />}
         <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
           <Text fw={item.isRead ? 400 : 600} truncate={opened ? undefined : 'end'}>{item.title}</Text>
           <Group gap="xs" wrap="wrap">

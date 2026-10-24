@@ -22,6 +22,8 @@ const m = vi.hoisted(() => ({
   remove: vi.fn(),
   success: vi.fn(),
   error: vi.fn(),
+  markSeen: vi.fn(),
+  unseen: new Set<string>(),
 }))
 
 const mutation = (fn: (v: unknown, o?: { onSuccess?: (d: unknown) => void }) => void) => ({ mutate: fn, isPending: false, isError: false })
@@ -39,6 +41,10 @@ vi.mock('./api', async (orig) => ({
   useUpdateTicket: () => mutation(m.update),
   useAddComment: () => mutation(m.comment),
   useDeleteTicket: () => mutation(m.remove),
+}))
+vi.mock('../notifications/api', () => ({
+  useMarkTicketsSeen: () => ({ mutate: m.markSeen }),
+  useUnseenTicketIds: () => m.unseen,
 }))
 vi.mock('../../auth/AuthProvider', () => ({ useAuth: () => ({ isAdmin: m.isAdmin, session: { user: { id: 'me' } } }) }))
 vi.mock('../../ui', async (orig) => ({ ...(await orig<typeof import('../../ui')>()), notifySuccess: m.success, notifyError: m.error }))
@@ -58,7 +64,8 @@ const wrap = (node: ReactNode, path = '/') =>
 
 const ticket = (o: Partial<TicketListItem> = {}): TicketListItem => ({
   id: 't1', building_id: 'b', title: 'נורה שרופה', description: 'בקומה 2', location: 'לובי', status: 'open',
-  opened_by: 'me', vendor: null, created_at: new Date(Date.now() - 3 * 86400_000).toISOString(), photoCount: 2, ...o,
+  opened_by: 'me', vendor: null, created_at: new Date(Date.now() - 3 * 86400_000).toISOString(), photoCount: 2,
+  updated_at: new Date(Date.now() - 3 * 86400_000).toISOString(), last_activity_by: 'me', last_activity_kind: 'created', ...o,
 })
 const detail = (o: Partial<TicketDetail> = {}): TicketDetail => ({
   ...ticket(), openerName: 'דנה',
@@ -76,6 +83,7 @@ beforeEach(() => {
   m.isAdmin = false
   m.list = [ticket()]
   m.detail = detail()
+  m.unseen = new Set()
   globalThis.URL.createObjectURL = vi.fn(() => 'blob:preview')
   globalThis.URL.revokeObjectURL = vi.fn()
 })
@@ -88,6 +96,14 @@ describe('TicketsPage', () => {
     expect(within(row).getByText(/לובי · לפני 3 ימים/)).toBeInTheDocument()
     expect(within(row).getByText(he.ticketStatus.open)).toBeInTheDocument()
     expect(within(row).getByLabelText(he.tickets.photoCount(2))).toBeInTheDocument()
+  })
+
+  it('marks rows with unseen activity with the signal dot', () => {
+    m.list = [ticket(), ticket({ id: 't2', title: 'מעלית תקועה' })]
+    m.unseen = new Set(['t2'])
+    wrap(<TicketsPage />)
+    expect(within(screen.getByRole('link', { name: /מעלית תקועה/ })).getByLabelText(he.notifications.unseen)).toBeInTheDocument()
+    expect(within(screen.getByRole('link', { name: /נורה שרופה/ })).queryByLabelText(he.notifications.unseen)).not.toBeInTheDocument()
   })
 
   it('one filter: active (default), closed, or everything', () => {
@@ -153,6 +169,19 @@ describe('TicketPhotos', () => {
     fireEvent.error(container.querySelector('img[src="https://x/u.heic"]') as HTMLImageElement)
     const link = screen.getByRole('link', { name: he.tickets.heicFallback })
     expect(link).toHaveAttribute('href', 'https://x/u.heic')
+  })
+})
+
+describe('TicketPage seen state', () => {
+  it('marks the call seen when it opens, and again when new activity arrives while open', () => {
+    const view = wrap(<TicketPage />, '/tickets/t1')
+    expect(m.markSeen).toHaveBeenCalledTimes(1)
+    expect(m.markSeen).toHaveBeenCalledWith(['t1'])
+    view.rerender(<MantineProvider theme={theme}><MemoryRouter initialEntries={['/tickets/t1']}><Routes><Route path="/tickets/:id" element={<TicketPage />} /></Routes></MemoryRouter></MantineProvider>)
+    expect(m.markSeen).toHaveBeenCalledTimes(1)
+    m.detail = detail({ comments: [...detail().comments, { id: 'c3', body: 'חדשה', created_at: '2026-10-03T10:00:00Z', author_id: 'a', authorName: 'יוסי' }] })
+    view.rerender(<MantineProvider theme={theme}><MemoryRouter initialEntries={['/tickets/t1']}><Routes><Route path="/tickets/:id" element={<TicketPage />} /></Routes></MemoryRouter></MantineProvider>)
+    expect(m.markSeen).toHaveBeenCalledTimes(2)
   })
 })
 

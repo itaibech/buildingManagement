@@ -639,14 +639,14 @@ isOneToOne: false
                   ]
                 },"profiles": {
                   Row: {
-                    "building_id": string,"created_at": string,"email": string | null,"full_name": string,"is_super_admin": boolean,"resident_id": string | null,"role": string,"status": string,"user_id": string
+                    "approved_at": string | null,"building_id": string,"created_at": string,"email": string | null,"full_name": string,"is_super_admin": boolean,"resident_id": string | null,"role": string,"status": string,"user_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "building_id": string,"created_at"?: string,"email"?: string | null,"full_name"?: string,"is_super_admin"?: boolean,"resident_id"?: string | null,"role"?: string,"status"?: string,"user_id": string
+                    "approved_at"?: string | null,"building_id": string,"created_at"?: string,"email"?: string | null,"full_name"?: string,"is_super_admin"?: boolean,"resident_id"?: string | null,"role"?: string,"status"?: string,"user_id": string
                   }
                   Update: {
-                    "building_id"?: string,"created_at"?: string,"email"?: string | null,"full_name"?: string,"is_super_admin"?: boolean,"resident_id"?: string | null,"role"?: string,"status"?: string,"user_id"?: string
+                    "approved_at"?: string | null,"building_id"?: string,"created_at"?: string,"email"?: string | null,"full_name"?: string,"is_super_admin"?: boolean,"resident_id"?: string | null,"role"?: string,"status"?: string,"user_id"?: string
                   }
                   Relationships: [
                     {
@@ -777,16 +777,36 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"tickets": {
+                },"ticket_seen": {
                   Row: {
-                    "building_id": string,"created_at": string,"description": string,"id": string,"location": string,"opened_by": string | null,"status": string,"title": string,"vendor": string | null
+                    "seen_at": string,"ticket_id": string,"user_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "building_id"?: string,"created_at"?: string,"description"?: string,"id"?: string,"location"?: string,"opened_by"?: string | null,"status"?: string,"title": string,"vendor"?: string | null
+                    "seen_at"?: string,"ticket_id": string,"user_id": string
                   }
                   Update: {
-                    "building_id"?: string,"created_at"?: string,"description"?: string,"id"?: string,"location"?: string,"opened_by"?: string | null,"status"?: string,"title"?: string,"vendor"?: string | null
+                    "seen_at"?: string,"ticket_id"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "ticket_seen_ticket_id_fkey"
+      columns: ["ticket_id"]
+isOneToOne: false
+      referencedRelation: "tickets"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"tickets": {
+                  Row: {
+                    "building_id": string,"created_at": string,"description": string,"id": string,"last_activity_by": string | null,"last_activity_kind": string,"location": string,"opened_by": string | null,"status": string,"title": string,"updated_at": string,"vendor": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "building_id"?: string,"created_at"?: string,"description"?: string,"id"?: string,"last_activity_by"?: string | null,"last_activity_kind"?: string,"location"?: string,"opened_by"?: string | null,"status"?: string,"title": string,"updated_at"?: string,"vendor"?: string | null
+                  }
+                  Update: {
+                    "building_id"?: string,"created_at"?: string,"description"?: string,"id"?: string,"last_activity_by"?: string | null,"last_activity_kind"?: string,"location"?: string,"opened_by"?: string | null,"status"?: string,"title"?: string,"updated_at"?: string,"vendor"?: string | null
                   }
                   Relationships: [
                     {
@@ -991,8 +1011,16 @@ isOneToOne: false
 "mark_task_done":
 { Args: { "p_category_id"?: string,"p_cost"?: number,"p_done_on": string,"p_note": string,"p_task_id": string }; Returns: string
                            },
+"mark_tickets_seen":
+{ Args: { "p_ids"?: (string)[] }; Returns: undefined
+                           },
 "my_apartment_id":
 { Args: Record<PropertyKey, never>; Returns: string
+                           },
+"my_ticket_activity":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "activity_at": string,"activity_by": string,"activity_kind": string,"apartment_number": number,"opened_by": string,"status": string,"ticket_id": string,"title": string,"unseen": boolean
+            }[]
                            },
 "record_ev_reading":
 { Args: { "p_charger_id": string,"p_month": string,"p_note"?: string,"p_read_on"?: string,"p_reading": number }; Returns: Json

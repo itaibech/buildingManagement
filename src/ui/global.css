@@ -191,10 +191,13 @@ body {
   mask-image: linear-gradient(to left, transparent 0, #000 40px);
 }
 
-/* Mobile toasts sit above the tab bar. */
+/* Mobile toasts sit above the tab bar; live notices (top-centre) clear the notch. */
 @media (max-width: 767px) {
   .bm-toasts[data-position='bottom-center'] {
     bottom: calc(var(--bm-tabbar-height) + var(--bm-safe-bottom) + 8px) !important;
+  }
+  .bm-toasts[data-position='top-center'] {
+    top: calc(env(safe-area-inset-top, 0px) + 8px) !important;
   }
 }
 

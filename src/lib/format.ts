@@ -55,5 +55,6 @@ export function relativeDate(iso: string, now: Date = new Date()): string {
     value /= size
     unit = next
   }
-  return rtf.format(Math.round(value), unit)
+  // Chrome's Hebrew data appends the count to dual/singular forms ("לפני דקה (1)", "לפני שעתיים (2)").
+  return rtf.format(Math.round(value), unit).replace(/\s*\(\d+\)$/, '')
 }

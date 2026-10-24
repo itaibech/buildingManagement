@@ -8,8 +8,13 @@ import Shell from './Shell'
 
 const auth = vi.hoisted(() => ({ release: (): void => undefined, loginShownAtCall: null as boolean | null }))
 const signOut = vi.hoisted(() => vi.fn())
-const unread = vi.hoisted(() => ({ count: 0 }))
+const unread = vi.hoisted(() => ({ count: 0, tickets: 0, realtime: vi.fn() }))
 vi.mock('../features/announcements/api', () => ({ useUnreadCount: () => unread.count }))
+vi.mock('../features/notifications/api', () => ({ useUnseenTicketCount: () => unread.tickets }))
+vi.mock('../features/notifications/useRealtimeNotifications', () => ({ useRealtimeNotifications: unread.realtime }))
+vi.mock('../features/notifications/NotificationCenter', () => ({
+  NotificationBell: ({ sheet }: { sheet?: boolean }) => <button>{sheet ? 'BELL-SHEET' : 'BELL-POPOVER'}</button>,
+}))
 vi.mock('../auth/AuthProvider', () => ({
   useAuth: () => ({ signOut, profile: { resident_id: 'r1' }, isAdmin: false }),
 }))
@@ -63,6 +68,7 @@ async function exitWith(control: () => HTMLElement): Promise<void> {
 describe('Shell', () => {
   beforeEach(() => {
     unread.count = 0
+    unread.tickets = 0
     signOut.mockReset()
     signOut.mockImplementation(
       () =>
@@ -96,9 +102,26 @@ describe('Shell', () => {
     expect(screen.getAllByLabelText('3 הודעות שלא נקראו')).toHaveLength(2)
   })
 
+  it('shows the unseen call count on the tickets item in both navs', () => {
+    unread.tickets = 2
+    renderShell()
+    expect(screen.getAllByLabelText('2 תקלות עם עדכון חדש')).toHaveLength(2)
+  })
+
+  it('puts the notification bell in the mobile header (sheet) and the desktop side nav (popover)', () => {
+    renderShell()
+    expect(within(screen.getByRole('banner')).getByText('BELL-SHEET')).toBeInTheDocument()
+    expect(screen.getByText('BELL-POPOVER')).toBeInTheDocument()
+  })
+
+  it('starts the realtime subscription once, in the shell', () => {
+    renderShell()
+    expect(unread.realtime).toHaveBeenCalled()
+  })
+
   it('shows no badge when everything is read', () => {
     renderShell()
-    expect(screen.queryByRole('img', { name: /שלא נקראו|שלא נקראה/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: /שלא נקראו|שלא נקראה|עדכון חדש/ })).not.toBeInTheDocument()
   })
 })
 

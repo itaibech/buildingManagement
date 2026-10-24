@@ -24,7 +24,7 @@ function supabaseOrigins(supabaseUrl: string): { http: string; ws: string } {
 /**
  * The app's Content-Security-Policy. Fonts are self-hosted; the only third party is the Supabase project
  * (REST/Auth/Storage over https, Realtime over wss, signed storage URLs as images). Dev adds Vite's HMR socket
- * and its inline React-refresh preamble.
+ * and its inline React-refresh preamble. worker-src: the notification service worker (public/notify-sw.js).
  */
 export function buildCsp({ supabaseUrl, dev }: CspOptions): string {
   const sb = supabaseOrigins(supabaseUrl)
@@ -36,6 +36,7 @@ export function buildCsp({ supabaseUrl, dev }: CspOptions): string {
     "font-src 'self'",
     ['connect-src', "'self'", sb.http, sb.ws, ...(dev ? DEV_HMR : [])].join(' '),
     "manifest-src 'self'",
+    "worker-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

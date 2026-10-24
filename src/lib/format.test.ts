@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { formatDate, formatILS, HEBREW_MONTHS, monthLabel, relativeDate } from './format'
 
 describe('format', () => {
@@ -29,6 +29,13 @@ describe('relativeDate', () => {
   })
   it('says "עכשיו" for under a minute', () => {
     expect(relativeDate('2026-10-23T11:59:40Z', now)).toBe('עכשיו')
+  })
+  it('drops the "(1)" count some browsers append to dual/singular forms (Chrome: "לפני דקה (1)")', () => {
+    const spy = vi.spyOn(Intl.RelativeTimeFormat.prototype, 'format').mockReturnValue('לפני דקה (1)')
+    expect(relativeDate('2026-10-23T11:59:00Z', now)).toBe('לפני דקה')
+    spy.mockReturnValue('לפני שעתיים (2)')
+    expect(relativeDate('2026-10-23T10:00:00Z', now)).toBe('לפני שעתיים')
+    spy.mockRestore()
   })
   it('falls back to months for older dates', () => {
     expect(relativeDate('2026-07-20T12:00:00Z', now)).toBe('לפני 3 חודשים')
