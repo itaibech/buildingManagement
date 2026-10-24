@@ -2,6 +2,7 @@ import { createPortal } from 'react-dom'
 import { todayISO } from '../../lib/dates'
 import { formatDate } from '../../lib/format'
 import { he } from '../../lib/he'
+import { useBuilding } from '../settings/api'
 import { ownerLabel, type DirectoryLine } from './directoryExport'
 
 const H = he.export.headers
@@ -20,11 +21,12 @@ function groupLines(lines: DirectoryLine[]): DirectoryLine[][] {
  * The directory as a plain table for printing ("Save as PDF"). Hidden on screen; global.css shows it
  * (and hides the rest of the page) under `@media print`. Portalled to <body> so the app root can be hidden whole.
  */
-export function DirectoryPrintView({ lines, buildingName }: { lines: DirectoryLine[]; buildingName: string }) {
+export function DirectoryPrintView({ lines }: { lines: DirectoryLine[] }) {
+  const building = useBuilding()
   return createPortal(
     <div className="bm-print" data-testid="directory-print" dir="rtl">
       <header className="bm-print-header">
-        <strong>{buildingName}</strong>
+        <strong>{building.data?.name ?? he.appName}</strong>
         <span>{he.tenants.directoryExport.printTitle}</span>
         <span>{formatDate(todayISO())}</span>
       </header>

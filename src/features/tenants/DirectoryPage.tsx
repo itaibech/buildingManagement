@@ -3,7 +3,6 @@ import { IconDots, IconMail, IconPencil, IconPhone, IconPlus, IconSearch, IconTr
 import { Fragment, useMemo, useState } from 'react'
 import { useAuth } from '../../auth/AuthProvider'
 import { he } from '../../lib/he'
-import { useBuilding } from '../settings/api'
 import { AptPlate, EmptyState, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
 import { ApartmentForm } from './ApartmentForm'
 import { useApartments, type Apartment, useDeleteResident, useDirectory, type DirectoryEntry } from './api'
@@ -90,8 +89,8 @@ function ContactActions({ r }: { r: DirectoryEntry }) {
         <>
           <Button component="a" href={`mailto:${r.email}`} visibleFrom="sm" variant="subtle" title={r.email} px="xs"
             aria-label={he.tenants.emailAction(r.full_name)} leftSection={<IconMail size={18} stroke={1.75} />}
-            styles={{ label: { maxWidth: '16rem' } }}>
-            <bdi dir="ltr" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.email}</bdi>
+            styles={{ label: { maxWidth: '16rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }}>
+            <bdi dir="ltr">{r.email}</bdi>
           </Button>
           <ActionIcon component="a" href={`mailto:${r.email}`} hiddenFrom="sm" variant="subtle" size={44} title={r.email}
             aria-label={he.tenants.emailAction(r.full_name)}>
@@ -196,7 +195,6 @@ export default function DirectoryPage() {
     const found = groupByApartment((directory.data ?? []).filter((e) => matches(e, q)))
     return isAdmin ? withEmptyApartments(found, apartments.data ?? [], q) : found
   }, [directory.data, apartments.data, isAdmin, q])
-  const building = useBuilding()
   const { action: exportAction, lines } = useDirectoryExport(groups, apartments.data ?? [], q !== '', Boolean(directory.data && apartments.data))
   const empty = directory.data?.length === 0 && !(isAdmin && apartments.data?.length)
   return (
@@ -216,7 +214,7 @@ export default function DirectoryPage() {
           </Fragment>
         ))}
       </Card>
-      {isAdmin && <DirectoryPrintView lines={lines} buildingName={building.data?.name ?? he.appName} />}
+      {isAdmin && <DirectoryPrintView lines={lines} />}
       {isAdmin && <DirectoryDialogs dialog={dialog} close={() => setDialog(null)} />}
     </Stack>
   )

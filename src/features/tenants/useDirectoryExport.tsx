@@ -3,9 +3,8 @@ import { useMemo } from 'react'
 import { useAuth } from '../../auth/AuthProvider'
 import { todayISO } from '../../lib/dates'
 import { he } from '../../lib/he'
-import type { PageHeaderProps } from '../../ui'
+import { notifyError, notifySuccess, type PageHeaderProps } from '../../ui'
 import { exportXlsx } from '../export/exportXlsx'
-import { notifyError, notifySuccess } from '../../ui'
 import type { Apartment } from './api'
 import { directoryLines, directoryRows, type DirectoryGroup, type DirectoryLine } from './directoryExport'
 
@@ -38,9 +37,9 @@ export function useDirectoryExport(groups: DirectoryGroup[], apartments: Apartme
   const action: SecondaryAction | undefined = isAdmin ? {
     label: he.export.short, icon: <IconFileExport size={22} stroke={1.75} />, disabled: !ready,
     items: [
-      { label: filtered ? t.excelFiltered(groups.length) : t.excel, icon: <IconFileSpreadsheet size={18} stroke={1.75} />,
+      { label: filtered ? t.excelFiltered(lines.length) : t.excel, icon: <IconFileSpreadsheet size={18} stroke={1.75} />,
         onClick: () => downloadDirectory(groups, apartments) },
-      { label: filtered ? t.printFiltered(groups.length) : t.print, icon: <IconPrinter size={18} stroke={1.75} />, onClick: printDirectory },
+      { label: filtered ? t.printFiltered(lines.length) : t.print, icon: <IconPrinter size={18} stroke={1.75} />, onClick: printDirectory },
     ],
   } : undefined
   return { action, lines }

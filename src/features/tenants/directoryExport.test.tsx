@@ -120,7 +120,6 @@ describe('directory export menu', () => {
     openMenu()
     fireEvent.click(await screen.findByRole('menuitem', { name: he.tenants.directoryExport.excel }))
     expect(sheetOf(xlsx.mock.calls[0]).slice(1).map((r) => r[2])).toEqual(['דנה בדיקה', 'יוסי לדוגמה'])
-
   })
 
   it('exports and prints only the filtered list when a search is typed', async () => {
