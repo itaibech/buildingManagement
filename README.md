@@ -18,6 +18,7 @@ one place, on phone and desktop. It's inspired by Hombi, Bllink and Darimpo.
 | 5 | **הכנסות והוצאות** Finance | Monthly fees, levies, payments, debts per apartment, expenses by category, and budget vs actual |
 | 6 | **ייבוא מאקסל** Excel import | Imports the committee's existing payments and expenses workbook |
 | 7 | **מיילים** Email | Admins email an announcement or a service call to all or chosen apartments, and personalised debt reminders (one apartment or every debtor). See [Email setup](#email-setup) |
+| 8 | **ישיבות ועד** Meetings | Formal committee meetings and tenants' assemblies: invitation, quorum with a one-hour postponement, attendance with proxies, votes and numbered decisions, signatures, a printable protocol and an archive. See [Meetings](#meetings-ישיבות-ועד) |
 
 **Roles:** *admin* (committee, full access) and *resident* (read-only, plus
 opening service calls). A resident sees only their own apartment's finances.
@@ -44,6 +45,25 @@ After such a change, a settled month can show a small open amount again, or a cr
 - **Over-credited by a settlement payment:** delete that payment in "תשלומים", then settle again.
 
 The import preview warns when the target year contains settlements.
+
+## Meetings (ישיבות ועד)
+
+Admins open **עוד → ישיבות ועד**. Tabs: קרובות (draft, invited, in progress), ממתינות לפרסום (closed) and ארכיון (published, searchable by subject, decision text and year). Every state change goes through an admin-only RPC in `0021_meetings.sql`, and triggers lock edits by state.
+
+1. **Draft.** Type (ישיבת ועד / אסיפת דיירים כללית), subject, date and time, place, the agenda (add, remove, reorder) and the quorum rule: more than half of the apartments by default, or a % or a fixed number, with a "לפי התקנון" note.
+2. **שליחת זימון.** Posts a pinned announcement until the meeting date (it links to the meeting) and can email everyone (`send-email`, kind `meeting`). Under 5 days ahead, the app warns "לפי חוק המקרקעין יש להודיע 4–5 ימים מראש" and asks for a confirmation (the RPC refuses without it). After the invitation the details can still change, then **עדכון זימון** re-announces them. Every change is logged in the meeting's history.
+3. **ניהול הישיבה** (the live screen, built for a phone):
+   - Attendance per apartment: נוכח / ייפוי כוח / נעדר, the attendee's name or the proxy holder (and the proxy form). A live meter shows "נוכחות: X מתוך N דירות · נדרש מניין: R".
+   - Without a quorum: **דחיית האסיפה בשעה**. After that the meeting may open with any attendance, and the protocol says so.
+   - Opening needs a chair and a recorder. Then, per item: discussion summary, בעד / נגד / נמנעו (the total can't exceed the attendees, proxies included; "פה אחד" fills it in), the decision wording and its number. Items can be marked ירד מסדר היום / נדחה לישיבה הבאה, and items can be added during the meeting.
+   - Everything autosaves. Changes are kept on the device while offline and sync when the connection returns.
+4. **סיום הישיבה** records the closing time and the absent apartments, and numbers the decisions. From then on attendance, items and votes are locked; corrections go in a **תיקון לפרוטוקול**, printed as an appendix.
+5. **חתימות.** The chair and the recorder each sign on the screen (stored as a PNG in the private `meeting-files` bucket), or a scanned signed protocol is uploaded. Attendees may add signatures.
+6. **פרסום הפרוטוקול** (needs both signatures) posts an announcement linking to the protocol, can email everyone, and moves the meeting to the archive (read-only, files kept). A closed meeting left unpublished for more than 3 days shows a reminder.
+
+**Residents** with the `meetings` permission ("ישיבות ופרוטוקולים", on for the default group "דייר" because the law requires publishing to all members) see invitations and published protocols, with print. RLS hides drafts, the live meeting and unpublished protocols.
+
+**Protocol print.** "הדפסה / PDF" prints the protocol alone on A4 (file name `פרוטוקול-<date>`). Word export is not included.
 
 ## Stack
 
