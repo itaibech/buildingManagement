@@ -1,4 +1,5 @@
--- 0017 debt settlement (Task 19): "הסדרת חוב" from the apartment ledger sheet, atomically and admin-only.
+-- 0017 debt settlement and special charges (Task 19): "הסדרת חוב" and "חיוב מיוחד" from the apartment ledger
+-- sheet, atomically and admin-only. Special charges are at the end of the file.
 --   * charges.kind gains 'adjustment': a write-off ("מחיקת חוב"). Always negative, always with a reason (note).
 --     No money moves, so building cash and the expense reports are untouched; only the apartment's balance drops.
 --   * payments.for_month: the month a settlement payment settles (null = the month of paid_on, as before). The
@@ -173,3 +174,116 @@ end;
 $$;
 revoke execute on function public.undo_settlement(uuid) from anon, public;
 grant execute on function public.undo_settlement(uuid) to authenticated;
+
+-- ---------------------------------------------------------------- special charges ("חיוב מיוחד")
+-- A one-off charge on one apartment (e.g. "תיקון נזק בלובי"), optionally with the payment that already came in
+-- (same month, so the item nets to 0) and optionally mirrored as a building expense (the building paid for it).
+-- special_id links the rows one add_special_charge call wrote; is_special marks them (charges stay kind 'extra',
+-- so EV and other extras keep their meaning). undo_special_charge deletes every linked row.
+alter table public.charges add column special_id uuid;
+alter table public.charges add column is_special boolean generated always as (special_id is not null) stored;
+create index charges_special_id_idx on public.charges (special_id) where special_id is not null;
+alter table public.payments add column special_id uuid;
+alter table public.payments add column is_special boolean generated always as (special_id is not null) stored;
+create index payments_special_id_idx on public.payments (special_id) where special_id is not null;
+alter table public.expenses add column special_id uuid;
+create index expenses_special_id_idx on public.expenses (special_id) where special_id is not null;
+
+-- p_month: any month up to the current one (a later month would only be a scheduled charge). p_paid: also record
+-- the payment (p_method; paid_on = the month's first day, or today with p_date_mode 'today'; for_month = p_month).
+-- p_expense: also record a building expense (p_category_id, default the building's "שונות") on the same date.
+-- Returns {special_id, charge_id, payment_id, expense_id}.
+create function public.add_special_charge(p_apartment_id uuid, p_month date, p_amount numeric, p_label text,
+  p_note text default '', p_paid boolean default false, p_method text default null, p_expense boolean default false,
+  p_category_id uuid default null, p_date_mode text default 'debt_month')
+returns jsonb
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_building uuid;
+  v_id uuid := gen_random_uuid();
+  v_month date := date_trunc('month', p_month::timestamp)::date;
+  v_label text := coalesce(trim(p_label), '');
+  v_date date;
+  v_category uuid;
+  v_charge uuid;
+  v_payment uuid;
+  v_expense uuid;
+begin
+  if not public.is_admin() then
+    raise exception 'admin only' using errcode = '42501';
+  end if;
+  if v_label = '' then
+    raise exception 'a special charge needs a description' using errcode = '22023';
+  end if;
+  if p_amount is null or p_amount <= 0 or p_amount > 1000000 then
+    raise exception 'amount must be between 0 and 1,000,000' using errcode = '22023';
+  end if;
+  if v_month is null or v_month > public.current_month() then
+    raise exception 'the month must not be in the future' using errcode = '22023';
+  end if;
+  if p_date_mode is null or p_date_mode not in ('debt_month', 'today') then
+    raise exception 'date mode must be debt_month or today' using errcode = '22023';
+  end if;
+  if coalesce(p_paid, false) and (p_method is null or p_method not in ('cash', 'transfer', 'cheque', 'app', 'standing_order', 'other')) then
+    raise exception 'unknown payment method' using errcode = '22023';
+  end if;
+  select a.building_id into v_building from public.apartments a
+  where a.id = p_apartment_id
+    and a.building_id = (select p.building_id from public.profiles p where p.user_id = (select auth.uid()));
+  if v_building is null then
+    raise exception 'apartment not found' using errcode = 'P0002';
+  end if;
+  if coalesce(p_expense, false) then
+    v_category := (select c.id from public.expense_categories c where c.building_id = v_building
+      and (c.id = p_category_id or (p_category_id is null and c.name = 'שונות')) limit 1);
+    if v_category is null then
+      raise exception 'unknown expense category' using errcode = '22023';
+    end if;
+  end if;
+  v_date := case when p_date_mode = 'today' then (now() at time zone 'Asia/Jerusalem')::date else v_month end;
+
+  insert into public.charges (building_id, apartment_id, month, amount, kind, label, note, source, special_id)
+  values (v_building, p_apartment_id, v_month, round(p_amount, 2), 'extra', v_label, coalesce(trim(p_note), ''), 'manual', v_id)
+  returning id into v_charge;
+  if coalesce(p_paid, false) then
+    insert into public.payments (building_id, apartment_id, paid_on, for_month, amount, method, note, source, special_id)
+    values (v_building, p_apartment_id, v_date, v_month, round(p_amount, 2), p_method, v_label, 'manual', v_id)
+    returning id into v_payment;
+  end if;
+  if coalesce(p_expense, false) then
+    insert into public.expenses (building_id, category_id, spent_on, amount, note, source, special_id)
+    values (v_building, v_category, v_date, round(p_amount, 2), v_label, 'manual', v_id)
+    returning id into v_expense;
+  end if;
+  return jsonb_build_object('special_id', v_id, 'charge_id', v_charge, 'payment_id', v_payment, 'expense_id', v_expense);
+end;
+$$;
+revoke execute on function public.add_special_charge(uuid, date, numeric, text, text, boolean, text, boolean, uuid, text) from anon, public;
+grant execute on function public.add_special_charge(uuid, date, numeric, text, text, boolean, text, boolean, uuid, text) to authenticated;
+
+-- "ביטול חיוב מיוחד": deletes the charge and its linked payment and expense. Returns {charges, payments, expenses}.
+create function public.undo_special_charge(p_special_id uuid)
+returns jsonb
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_building uuid := (select p.building_id from public.profiles p where p.user_id = (select auth.uid()));
+  v_charges int;
+  v_payments int;
+  v_expenses int;
+begin
+  if not public.is_admin() then
+    raise exception 'admin only' using errcode = '42501';
+  end if;
+  delete from public.charges where special_id = p_special_id and building_id = v_building;
+  get diagnostics v_charges = row_count;
+  delete from public.payments where special_id = p_special_id and building_id = v_building;
+  get diagnostics v_payments = row_count;
+  delete from public.expenses where special_id = p_special_id and building_id = v_building;
+  get diagnostics v_expenses = row_count;
+  return jsonb_build_object('charges', v_charges, 'payments', v_payments, 'expenses', v_expenses);
+end;
+$$;
+revoke execute on function public.undo_special_charge(uuid) from anon, public;
+grant execute on function public.undo_special_charge(uuid) to authenticated;

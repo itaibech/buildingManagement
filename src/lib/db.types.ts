@@ -257,14 +257,14 @@ isOneToOne: false
                   ]
                 },"charges": {
                   Row: {
-                    "amount": number,"apartment_id": string,"building_id": string,"created_at": string,"ev_reading_id": string | null,"id": string,"kind": string,"label": string,"month": string,"note": string,"settlement_id": string | null,"source": string
+                    "amount": number,"apartment_id": string,"building_id": string,"created_at": string,"ev_reading_id": string | null,"id": string,"is_special": boolean | null,"kind": string,"label": string,"month": string,"note": string,"settlement_id": string | null,"source": string,"special_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount": number,"apartment_id": string,"building_id"?: string,"created_at"?: string,"ev_reading_id"?: string | null,"id"?: string,"kind": string,"label"?: string,"month": string,"note"?: string,"settlement_id"?: string | null,"source"?: string
+                    "amount": number,"apartment_id": string,"building_id"?: string,"created_at"?: string,"ev_reading_id"?: string | null,"id"?: string,"is_special"?: never,"kind": string,"label"?: string,"month": string,"note"?: string,"settlement_id"?: string | null,"source"?: string,"special_id"?: string | null
                   }
                   Update: {
-                    "amount"?: number,"apartment_id"?: string,"building_id"?: string,"created_at"?: string,"ev_reading_id"?: string | null,"id"?: string,"kind"?: string,"label"?: string,"month"?: string,"note"?: string,"settlement_id"?: string | null,"source"?: string
+                    "amount"?: number,"apartment_id"?: string,"building_id"?: string,"created_at"?: string,"ev_reading_id"?: string | null,"id"?: string,"is_special"?: never,"kind"?: string,"label"?: string,"month"?: string,"note"?: string,"settlement_id"?: string | null,"source"?: string,"special_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -467,14 +467,14 @@ isOneToOne: false
                   ]
                 },"expenses": {
                   Row: {
-                    "amount": number,"building_id": string,"category_id": string,"created_at": string,"id": string,"note": string,"receipt_path": string | null,"source": string,"spent_on": string,"template_id": string | null,"vendor": string
+                    "amount": number,"building_id": string,"category_id": string,"created_at": string,"id": string,"note": string,"receipt_path": string | null,"source": string,"special_id": string | null,"spent_on": string,"template_id": string | null,"vendor": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount": number,"building_id"?: string,"category_id": string,"created_at"?: string,"id"?: string,"note"?: string,"receipt_path"?: string | null,"source"?: string,"spent_on"?: string,"template_id"?: string | null,"vendor"?: string
+                    "amount": number,"building_id"?: string,"category_id": string,"created_at"?: string,"id"?: string,"note"?: string,"receipt_path"?: string | null,"source"?: string,"special_id"?: string | null,"spent_on"?: string,"template_id"?: string | null,"vendor"?: string
                   }
                   Update: {
-                    "amount"?: number,"building_id"?: string,"category_id"?: string,"created_at"?: string,"id"?: string,"note"?: string,"receipt_path"?: string | null,"source"?: string,"spent_on"?: string,"template_id"?: string | null,"vendor"?: string
+                    "amount"?: number,"building_id"?: string,"category_id"?: string,"created_at"?: string,"id"?: string,"note"?: string,"receipt_path"?: string | null,"source"?: string,"special_id"?: string | null,"spent_on"?: string,"template_id"?: string | null,"vendor"?: string
                   }
                   Relationships: [
                     {
@@ -621,14 +621,14 @@ isOneToOne: false
                   ]
                 },"payments": {
                   Row: {
-                    "amount": number,"apartment_id": string,"building_id": string,"created_at": string,"for_month": string | null,"id": string,"method": string,"note": string,"paid_on": string,"settlement_id": string | null,"source": string
+                    "amount": number,"apartment_id": string,"building_id": string,"created_at": string,"for_month": string | null,"id": string,"is_special": boolean | null,"method": string,"note": string,"paid_on": string,"settlement_id": string | null,"source": string,"special_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount": number,"apartment_id": string,"building_id"?: string,"created_at"?: string,"for_month"?: string | null,"id"?: string,"method": string,"note"?: string,"paid_on"?: string,"settlement_id"?: string | null,"source"?: string
+                    "amount": number,"apartment_id": string,"building_id"?: string,"created_at"?: string,"for_month"?: string | null,"id"?: string,"is_special"?: never,"method": string,"note"?: string,"paid_on"?: string,"settlement_id"?: string | null,"source"?: string,"special_id"?: string | null
                   }
                   Update: {
-                    "amount"?: number,"apartment_id"?: string,"building_id"?: string,"created_at"?: string,"for_month"?: string | null,"id"?: string,"method"?: string,"note"?: string,"paid_on"?: string,"settlement_id"?: string | null,"source"?: string
+                    "amount"?: number,"apartment_id"?: string,"building_id"?: string,"created_at"?: string,"for_month"?: string | null,"id"?: string,"is_special"?: never,"method"?: string,"note"?: string,"paid_on"?: string,"settlement_id"?: string | null,"source"?: string,"special_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -939,7 +939,10 @@ isOneToOne: false
                 }
           }
           Functions: {
-            "apartment_fee_at":
+            "add_special_charge":
+{ Args: { "p_amount": number,"p_apartment_id": string,"p_category_id"?: string,"p_date_mode"?: string,"p_expense"?: boolean,"p_label": string,"p_method"?: string,"p_month": string,"p_note"?: string,"p_paid"?: boolean }; Returns: Json
+                           },
+"apartment_fee_at":
 { Args: { "p_apartment_id": string,"p_month": string }; Returns: {
               "amount": number,"fee_mode": string
             }[]
@@ -1144,6 +1147,9 @@ isOneToOne: false
                            },
 "undo_settlement":
 { Args: { "p_settlement_id": string }; Returns: Json
+                           },
+"undo_special_charge":
+{ Args: { "p_special_id": string }; Returns: Json
                            },
 "user_names":
 { Args: { "ids": (string)[] }; Returns: {
