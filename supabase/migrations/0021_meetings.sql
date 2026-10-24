@@ -503,7 +503,9 @@ $$;
 
 -- Invited → in_progress: needs the quorum (or a recorded postponement, and then not before the postponed time),
 -- a chair and a recorder.
-create function public.open_meeting(p_meeting uuid, p_opened_at timestamptz, p_chair text, p_secretary text) returns void
+-- p_opened_at null = now() (the app sends null unless the recorder typed a time).
+create function public.open_meeting(p_meeting uuid, p_opened_at timestamptz default null, p_chair text default '',
+  p_secretary text default '') returns void
 language plpgsql security definer set search_path = ''
 as $$
 declare

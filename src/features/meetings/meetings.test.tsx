@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { MantineProvider } from '@mantine/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { configure, fireEvent, render, screen } from '@testing-library/react'
+import { act, configure, fireEvent, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -124,7 +124,7 @@ describe('"פה אחד"', () => {
 describe('opening after a postponement', () => {
   const q = { total: 5, attending: 3, required: 3, met: true, postponed: true, valid: true }
   // A fixed midday clock (Israel 14:00), so the typed times below never wrap around midnight.
-  beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-11-03T12:00:00Z')) })
+  beforeEach(() => { vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] }); vi.setSystemTime(new Date('2026-11-03T12:00:00Z')) })
   afterEach(() => vi.useRealTimers())
   const at = (minutes: number) => new Date(Date.now() + minutes * 60_000).toISOString()
   const render = (postponed_to: string, onOpen = vi.fn()) =>
@@ -136,6 +136,24 @@ describe('opening after a postponement', () => {
     fireEvent.change(screen.getByLabelText(he.meetings.live.openingTime), { target: { value: '14:03' } })
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: he.meetings.live.open })).toBeDisabled()
+  })
+
+  it('enables itself when the countdown ends, without retyping; sends no time (the server uses now)', () => {
+    const onOpen = vi.fn()
+    render(at(2), onOpen)
+    const open = screen.getByRole('button', { name: he.meetings.live.open })
+    expect(open).toBeDisabled()
+    act(() => { vi.advanceTimersByTime(2 * 60_000 + 1000) })
+    expect(open).toBeEnabled()
+    expect(screen.getByLabelText(he.meetings.live.openingTime)).toHaveValue('14:02')
+    fireEvent.click(open)
+    expect(onOpen).toHaveBeenCalledWith({ openedAt: null, chair: 'א', secretary: 'ב' })
+  })
+
+  it('a postponed time with seconds, passed 5 seconds ago, is open at once', () => {
+    vi.setSystemTime(new Date('2026-11-03T12:00:35Z'))
+    render('2026-11-03T12:00:30Z')
+    expect(screen.getByRole('button', { name: he.meetings.live.open })).toBeEnabled()
   })
 
   it('opens once the time has passed (default time: now); an earlier or future time is refused', () => {

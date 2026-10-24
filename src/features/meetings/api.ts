@@ -138,8 +138,9 @@ export const meetingRpc = {
   invite: async (id: string, confirm: boolean) => rpcDone(await supabase.rpc('invite_meeting', { p_meeting: id, p_confirm_short_notice: confirm })),
   updateInvite: async (id: string) => rpcDone(await supabase.rpc('update_meeting_invitation', { p_meeting: id })),
   postpone: async (id: string) => rpcDone(await supabase.rpc('postpone_meeting', { p_meeting: id })),
-  open: async (id: string, openedAt: string, chair: string, secretary: string) =>
-    rpcDone(await supabase.rpc('open_meeting', { p_meeting: id, p_opened_at: openedAt, p_chair: chair, p_secretary: secretary })),
+  /** openedAt null: the server records now(). */
+  open: async (id: string, openedAt: string | null, chair: string, secretary: string) =>
+    rpcDone(await supabase.rpc('open_meeting', { p_meeting: id, p_chair: chair, p_secretary: secretary, ...(openedAt ? { p_opened_at: openedAt } : {}) })),
   close: async (id: string, closedAt: string) => rpcDone(await supabase.rpc('close_meeting', { p_meeting: id, p_closed_at: closedAt })),
   sign: async (id: string, role: SignatureRole, name: string, path: string, method: 'drawn' | 'scan') =>
     rpcDone(await supabase.rpc('sign_meeting', { p_meeting: id, p_role: role, p_signer_name: name, p_image_path: path, p_method: method })),

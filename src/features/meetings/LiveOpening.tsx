@@ -24,13 +24,14 @@ export function Postponement({ meeting, q, busy, onPostpone }: { meeting: Meetin
   )
 }
 
-/** The current time, refreshed every 15 seconds (drives the countdown). */
-function useNow(): Date {
+/** The current time: every second while counting down to `until`, every 15 seconds otherwise. */
+function useNow(until: string | null): Date {
   const [now, setNow] = useState(() => new Date())
+  const fast = until !== null && now.getTime() < new Date(until).getTime()
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 15_000)
+    const t = setInterval(() => setNow(new Date()), fast ? 1000 : 15_000)
     return () => clearInterval(t)
-  }, [])
+  }, [fast])
   return now
 }
 
@@ -48,27 +49,29 @@ function TimeNotes({ postponedTo, minutes, early, future }: NoteProps) {
   )
 }
 
-export interface OpeningValues { openedAt: string; chair: string; secretary: string }
+/** openedAt null = now, by the server's clock (the recorder didn't type a time). */
+export interface OpeningValues { openedAt: string | null; chair: string; secretary: string }
 
 interface OpeningProps { meeting: Meeting; q: QuorumState; names: string[]; busy: boolean; onOpen: (v: OpeningValues) => void }
 
 /**
- * Opening time (default now), chair and recorder from the attendees or typed. After a postponement the button stays
- * disabled until the postponed time has passed (open_meeting checks the real clock too).
+ * Opening time (live "now" until the recorder types one), chair and recorder from the attendees or typed. After a
+ * postponement the button stays disabled until the postponed time has passed (open_meeting checks the real clock too).
  */
 export function Opening({ meeting, q, names, busy, onOpen }: OpeningProps) {
-  const now = useNow()
-  const [start] = useState(() => toInputs(new Date()))
-  const [time, setTime] = useState(start.time)
+  const now = useNow(meeting.postponed_to)
+  const [day] = useState(() => toInputs(new Date()).date)
+  const [typed, setTyped] = useState<string | null>(null)
   const [chair, setChair] = useState(meeting.chair_name)
   const [secretary, setSecretary] = useState(meeting.secretary_name)
   const [tried, setTried] = useState(false)
   const missing = !chair.trim() || !secretary.trim()
-  const openedAt = fromInputs(start.date, time || start.time)
-  const minutes = meeting.postponed_to ? Math.max(0, Math.ceil((new Date(meeting.postponed_to).getTime() - now.getTime()) / 60_000)) : 0
-  const early = isTooEarly(meeting.postponed_to, openedAt)
-  const future = new Date(openedAt).getTime() > now.getTime() + FUTURE_LEEWAY_MS
-  const blocked = minutes > 0 || early || future
+  const openedAt = typed ? fromInputs(day, typed) : null
+  const left = meeting.postponed_to ? new Date(meeting.postponed_to).getTime() - now.getTime() : 0
+  const minutes = Math.max(0, Math.ceil(left / 60_000))
+  const early = openedAt !== null && isTooEarly(meeting.postponed_to, openedAt)
+  const future = openedAt !== null && new Date(openedAt).getTime() > now.getTime() + FUTURE_LEEWAY_MS
+  const blocked = left > 0 || early || future
   const submit = () => {
     setTried(true)
     if (!missing && !blocked) onOpen({ openedAt, chair: chair.trim(), secretary: secretary.trim() })
@@ -77,7 +80,8 @@ export function Opening({ meeting, q, names, busy, onOpen }: OpeningProps) {
     <Card>
       <Stack gap="sm">
         <Title order={2} size="h4">{L.opening}</Title>
-        <TextInput label={L.openingTime} type="time" dir="ltr" value={time} onChange={(e) => setTime(e.currentTarget.value)} maw={200} />
+        <TextInput label={L.openingTime} type="time" dir="ltr" value={typed ?? meetingTime(now)}
+          onChange={(e) => setTyped(e.currentTarget.value || null)} maw={200} />
         <TimeNotes postponedTo={meeting.postponed_to} minutes={minutes} early={early} future={future} />
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
           <Autocomplete label={L.chair} placeholder={L.roleHint} data={names} value={chair} onChange={setChair} />

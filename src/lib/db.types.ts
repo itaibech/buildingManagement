@@ -1375,7 +1375,7 @@ isOneToOne: false
             }[]
                            },
 "open_meeting":
-{ Args: { "p_chair": string,"p_meeting": string,"p_opened_at": string,"p_secretary": string }; Returns: undefined
+{ Args: { "p_chair"?: string,"p_meeting": string,"p_opened_at"?: string,"p_secretary"?: string }; Returns: undefined
                            },
 "postpone_meeting":
 { Args: { "p_meeting": string }; Returns: string
