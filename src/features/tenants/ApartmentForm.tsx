@@ -124,18 +124,20 @@ function useApartmentForm(apartment: Apartment | undefined, ctx: Context): Form 
 
 /**
  * Once the fee history sheet was opened, a change it makes (the fee data refetches) is copied into the fee field
- * and the committee box, so saving the form doesn't overwrite it with the values the form opened with.
+ * and the committee box, so saving the form doesn't overwrite it with the values the form opened with. A field the
+ * admin has already touched is left as they set it.
  */
 function useSheetSync(form: Form, apartment: Apartment | undefined, ctx: Context): () => void {
   const opened = useRef(false)
   const next = apartment ? rederived(apartment, ctx.row, ctx.row?.timeline ?? [], ctx.month) : null
   const key = next ? `${next.fee}|${next.isCommittee}` : ''
   const applied = useRef(key)
-  const { setValues } = form
+  const { setValues, isTouched } = form
   useEffect(() => {
     if (!opened.current || !next || applied.current === key) return
     applied.current = key
-    setValues(next)
+    // A field the admin already changed keeps their unsaved choice.
+    setValues({ ...(isTouched('fee') ? {} : { fee: next.fee }), ...(isTouched('isCommittee') ? {} : { isCommittee: next.isCommittee }) })
   })
   return () => { opened.current = true }
 }

@@ -3,7 +3,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(48);
+select plan(52);
 
 insert into auth.users (id, email, aud, role) values
   ('a9600000-0000-0000-0000-000000000001', 'form-admin@test.local', 'authenticated', 'authenticated'),
@@ -56,6 +56,16 @@ grant execute on function pg_temp.auto(text), pg_temp.mismatches(text) to authen
 -- Daily idempotent run at 01:15 UTC (03:15 / 04:15 in Israel), so a missed run heals the next day. The local stack and Supabase both ship pg_cron.
 select is((select count(*)::int from cron.job where jobname = 'apply-standing-orders' and schedule = '15 1 * * *'
   and command = 'select public.apply_standing_orders()'), 1, 'standing orders are scheduled daily');
+
+-- Restore columns: only on exempt rows, and an amount only with (and always with) restore_mode 'custom'.
+select throws_ok($$insert into public.apartment_fee_overrides (apartment_id, mode, effective_from, restore_amount)
+  values ('b9600000-0000-0000-0000-00000000000a', 'exempt', '2019-01-01', 100)$$, '23514', null, 'restore_amount needs restore_mode');
+select throws_ok($$insert into public.apartment_fee_overrides (apartment_id, mode, effective_from, restore_mode)
+  values ('b9600000-0000-0000-0000-00000000000a', 'exempt', '2019-01-01', 'custom')$$, '23514', null, 'a custom restore needs its amount');
+select throws_ok($$insert into public.apartment_fee_overrides (apartment_id, mode, effective_from, restore_mode, restore_amount)
+  values ('b9600000-0000-0000-0000-00000000000a', 'exempt', '2019-01-01', 'building', 100)$$, '23514', null, 'a building restore has no amount');
+select throws_ok($$insert into public.apartment_fee_overrides (apartment_id, mode, amount, effective_from, restore_mode)
+  values ('b9600000-0000-0000-0000-00000000000a', 'custom', 5, '2019-01-01', 'building')$$, '23514', null, 'only exempt rows restore');
 
 -- ---------------------------------------------------------------- residents can't call either RPC
 set local role authenticated;

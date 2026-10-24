@@ -179,6 +179,22 @@ describe('ApartmentForm with saved data', () => {
     expect(saves[0]?.args).toMatchObject({ p_fee: 450 })
   })
 
+  it('keeps an unsaved committee choice when the sheet refreshes the fee', async () => {
+    db.onRpc = (name) => {
+      if (name === 'set_apartment_fee') db.tables.apartment_balances = custom(450)
+    }
+    wrap(<ApartmentForm apartment={APT} onDone={() => undefined} />)
+    await waitFor(() => expect(screen.getByLabelText(F.fee, { exact: false })).toHaveValue('₪300'))
+    fireEvent.click(screen.getByLabelText(F.committee))
+    fireEvent.click(screen.getByRole('button', { name: F.feeHistory }))
+    const sheet = await screen.findByRole('dialog', { name: he.fees.open(4) })
+    fireEvent.click(within(sheet).getByRole('button', { name: he.fees.change }))
+    fireEvent.change(within(sheet).getByLabelText(he.fees.amount, { exact: false }), { target: { value: '450' } })
+    fireEvent.click(within(sheet).getByRole('button', { name: he.fees.save }))
+    await waitFor(() => expect(screen.getByLabelText(F.fee, { exact: false })).toHaveValue('₪450'))
+    expect(screen.getByLabelText(F.committee)).toBeChecked()
+  })
+
   it('reads the payment method from apartment_billing and warns when the standing order moves later', async () => {
     db.tables.apartment_billing = [{ apartment_id: 'apt1', payment_method: 'standing_order', standing_order_from: '2026-01-01' }]
     wrap(<ApartmentForm apartment={APT} onDone={() => undefined} />)

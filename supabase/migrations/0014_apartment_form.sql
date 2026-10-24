@@ -75,9 +75,13 @@ $$;
 alter table public.apartment_fee_overrides
   add column restore_mode text check (restore_mode in ('building', 'custom')),
   add column restore_amount numeric(12,2) check (restore_amount >= 0);
+-- Null-safe on purpose: every branch is true or false, so a CHECK can't pass on NULL.
 alter table public.apartment_fee_overrides
   add constraint apartment_fee_overrides_restore check (
-    (restore_mode is null or mode = 'exempt') and ((restore_mode = 'custom') = (restore_amount is not null)));
+    (restore_mode is null or mode = 'exempt')
+    and ((restore_mode is null and restore_amount is null)
+      or (restore_mode is not distinct from 'custom' and restore_amount is not null)
+      or (restore_mode is not distinct from 'building' and restore_amount is null)));
 
 -- Same as 0010, except: an exempt row written over a non-exempt row of the same month keeps that row's mode and
 -- amount in restore_mode / restore_amount ("ביטול פטור" restores them). Any other write clears them.
