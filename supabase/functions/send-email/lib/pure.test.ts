@@ -59,7 +59,7 @@ describe('debt', () => {
     expect(r.debtors.map((d) => d.apartmentId)).toEqual([A1])
     expect(r.skipped).toEqual([A2, 'c'])
   })
-  it('open months: the balance sits on the latest charges, listed oldest first', () => {
+  it('open months: months with charged > paid, oldest first, until the balance is used up (as the app ledger)', () => {
     const rows = [
       { month: '2026-07-01', charged: 300, paid: 300 },
       { month: '2026-08-01', charged: 300, paid: 0 },
@@ -67,9 +67,9 @@ describe('debt', () => {
       { month: '2026-10-01', charged: 300, paid: 0 },
     ]
     expect(openMonths(rows, 650)).toEqual([
-      { month: '2026-08-01', amount: 50 },
-      { month: '2026-09-01', amount: 300 },
-      { month: '2026-10-01', amount: 300 },
+      { month: '2026-08-01', amount: 300 },
+      { month: '2026-09-01', amount: 200 },
+      { month: '2026-10-01', amount: 150 },
     ])
   })
   it('the email lists at most 12 months and says how many more', () => {

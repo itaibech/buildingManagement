@@ -11,18 +11,20 @@ export function splitDebtors(balances: readonly Balance[]): { debtors: Balance[]
 const cents = (n: number): number => Math.round(n * 100)
 
 /**
- * The months the balance is made of, oldest first. Payments settle the oldest charges first, so what is still owed
- * sits on the latest charges: walk back from the newest month until the balance is covered.
+ * The months the balance is made of, oldest first, the same way the app's ledger and debt settlement
+ * (public.settlement_plan, 0017) see them: every month with charged > paid takes its open amount until the balance
+ * is used up (credit from overpaid months is spent first).
  */
 export function openMonths(rows: readonly LedgerRow[], balance: number): { month: string; amount: number }[] {
   let left = cents(balance)
   const out: { month: string; amount: number }[] = []
-  for (const row of [...rows].sort((a, b) => b.month.localeCompare(a.month))) {
+  for (const row of [...rows].sort((a, b) => a.month.localeCompare(b.month))) {
     if (left <= 0) break
-    const take = Math.min(cents(row.charged), left)
-    if (take <= 0) continue
+    const open = cents(row.charged) - cents(row.paid)
+    if (open <= 0) continue
+    const take = Math.min(open, left)
     out.push({ month: row.month, amount: take / 100 })
     left -= take
   }
-  return out.reverse()
+  return out
 }
