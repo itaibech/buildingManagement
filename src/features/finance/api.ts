@@ -30,14 +30,22 @@ export interface ApartmentBalance {
   /** The monthly fee is collected by standing order ("הוראת קבע"). */
   standingOrder: boolean
 }
-export interface Payment { id: string; apartment_id: string; paid_on: string; amount: number; method: PaymentMethod; note: string }
+export interface Payment { id: string; apartment_id: string; paid_on: string; amount: number; method: PaymentMethod; note: string; is_special?: boolean | null }
 export interface PaymentInput { apartment_id: string; paid_on: string; amount: number; method: PaymentMethod; note: string }
-export interface Charge { id: string; apartment_id: string; month: string; amount: number; kind: ChargeKind; label: string; ev_reading_id: string | null }
+export interface Charge { id: string; apartment_id: string; month: string; amount: number; kind: ChargeKind; label: string; ev_reading_id: string | null; special_id?: string | null }
 export interface ChargeInput { apartment_ids: string[]; month: string; amount: number; kind: ChargeKind; label: string }
 /** One apartment's charge for the ledger sheet: EV kWh when the reading is readable, write-off reason and settlement. */
 export interface ApartmentCharge {
   id: string; month: string; amount: number; kind: ChargeKind; label: string; note: string
   settlementId: string | null; ev: boolean; kwh: number | null
+  /** Set on a "חיוב מיוחד" (shared with its payment and expense, undone together). */
+  specialId: string | null
+}
+/** The payment recorded with a special charge ("התשלום כבר התקבל"), in the month it settles. */
+export interface SpecialPayment { id: string; specialId: string; month: string; amount: number }
+export interface SpecialInput {
+  apartmentId: string; month: string; amount: number; label: string; note: string
+  paid: boolean; method: PaymentMethod; dateMode: 'debt_month' | 'today'; expense: boolean; categoryId: string | null
 }
 export interface SettleInput {
   apartmentId: string; months: string[]; mode: SettleMode; method: PaymentMethod; dateMode: 'debt_month' | 'today'; note: string
@@ -47,7 +55,7 @@ export interface Fee { id: string; effective_from: string; amount: number }
 export interface FeeChange { apartment_id: string; effective_from: string; mode: FeeMode; amount: number | null }
 export interface Expense {
   id: string; category_id: string; category: string; spent_on: string; amount: number
-  vendor: string; note: string; receipt_path: string | null; source: string; template_id: string | null
+  vendor: string; note: string; receipt_path: string | null; source: string; template_id: string | null; special_id?: string | null
 }
 export interface ExpenseInput { category_id: string; spent_on: string; amount: number; vendor: string; note: string }
 export interface Template { id: string; category_id: string; category: string; amount: number; vendor: string; label: string }
@@ -203,7 +211,7 @@ export function usePayments(month: string) {
   return useQuery({
     queryKey: [...KEY, 'payments', month],
     queryFn: async (): Promise<Payment[]> =>
-      must(await supabase.from('payments').select('id, apartment_id, paid_on, amount, method, note')
+      must(await supabase.from('payments').select('id, apartment_id, paid_on, amount, method, note, is_special')
         .gte('paid_on', month).lt('paid_on', shiftMonth(month, 1))
         .order('paid_on', { ascending: false }).order('created_at', { ascending: false }))
         .map((p) => ({ ...p, amount: num(p.amount), method: p.method as PaymentMethod })),
@@ -242,7 +250,7 @@ export function useCharges(year: number) {
   return useQuery({
     queryKey: [...KEY, 'charges', year],
     queryFn: async (): Promise<Charge[]> =>
-      must(await supabase.from('charges').select('id, apartment_id, month, amount, kind, label, ev_reading_id')
+      must(await supabase.from('charges').select('id, apartment_id, month, amount, kind, label, ev_reading_id, special_id')
         .gte('month', `${year}-01-01`).lt('month', `${year + 1}-01-01`).order('month', { ascending: false }))
         .map((c) => ({ ...c, amount: num(c.amount), kind: c.kind as ChargeKind })),
   })
@@ -257,13 +265,37 @@ export function useApartmentCharges(apartmentId: string) {
   return useQuery({
     queryKey: [...KEY, 'apartment-charges', apartmentId],
     queryFn: async (): Promise<ApartmentCharge[]> =>
-      must(await supabase.from('charges').select('id, month, amount, kind, label, note, settlement_id, ev_reading_id, ev_readings(kwh)')
+      must(await supabase.from('charges').select('id, month, amount, kind, label, note, settlement_id, special_id, ev_reading_id, ev_readings(kwh)')
         .eq('apartment_id', apartmentId).order('month').order('created_at'))
         .map((c) => ({
           id: c.id, month: c.month, amount: num(c.amount), kind: c.kind as ChargeKind, label: c.label, note: c.note,
-          settlementId: c.settlement_id, ev: isEvCharge(c), kwh: c.ev_readings ? num(c.ev_readings.kwh) : null,
+          settlementId: c.settlement_id, ev: isEvCharge(c), kwh: c.ev_readings ? num(c.ev_readings.kwh) : null, specialId: c.special_id,
         })),
   })
+}
+
+/** The payments recorded with special charges of one apartment (for the ledger's ✦ details). */
+export function useSpecialPayments(apartmentId: string) {
+  return useQuery({
+    queryKey: [...KEY, 'special-payments', apartmentId],
+    queryFn: async (): Promise<SpecialPayment[]> =>
+      must(await supabase.from('payments').select('id, special_id, for_month, paid_on, amount').eq('apartment_id', apartmentId).eq('is_special', true))
+        .flatMap((p) => (p.special_id ? [{ id: p.id, specialId: p.special_id, month: p.for_month ?? `${p.paid_on.slice(0, 7)}-01`, amount: num(p.amount) }] : [])),
+  })
+}
+
+/** rpc('add_special_charge'): the charge, plus its payment and/or building expense when asked, in one go. */
+export function useAddSpecialCharge() {
+  return useFinanceMutation(async (v: SpecialInput) => fail((await supabase.rpc('add_special_charge', {
+    p_apartment_id: v.apartmentId, p_month: v.month, p_amount: v.amount, p_label: v.label, p_note: v.note,
+    p_paid: v.paid, ...(v.paid ? { p_method: v.method } : {}), p_expense: v.expense,
+    ...(v.expense && v.categoryId ? { p_category_id: v.categoryId } : {}), p_date_mode: v.dateMode,
+  })).error))
+}
+
+/** rpc('undo_special_charge'): deletes the special charge and its linked payment and expense. */
+export function useUndoSpecialCharge() {
+  return useFinanceMutation(async (specialId: string) => fail((await supabase.rpc('undo_special_charge', { p_special_id: specialId })).error))
 }
 
 /** One charge row per chosen apartment (a levy to many, or a single extra/opening). */
@@ -343,7 +375,7 @@ export function useExpenses(year: number) {
     queryKey: [...KEY, 'expenses', year],
     queryFn: async (): Promise<Expense[]> =>
       must(await supabase.from('expenses')
-        .select('id, category_id, spent_on, amount, vendor, note, receipt_path, source, template_id, expense_categories(name)')
+        .select('id, category_id, spent_on, amount, vendor, note, receipt_path, source, template_id, special_id, expense_categories(name)')
         .gte('spent_on', `${year}-01-01`).lt('spent_on', `${year + 1}-01-01`)
         .order('spent_on', { ascending: false }).order('created_at', { ascending: false }))
         .map(({ expense_categories, ...e }) => ({ ...e, amount: num(e.amount), category: catName(expense_categories) })),

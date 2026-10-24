@@ -34,10 +34,11 @@ const wrap = (node: ReactNode) =>
   )
 
 const norm = (text: string): string => text.replace(/\s+/g, ' ').trim()
+const S_CHIP = he.finance.special.chip('תיקון נזק')
 const apt = (balance: number): ApartmentBalance =>
   ({ apartmentId: 'a19', number: 19, names: ['דייר לדוגמה'], balance, scheduled: 0, fee: 0, feeMode: 'exempt', isCommittee: false, standingOrder: false })
 const ev = (month: string, id: string) =>
-  ({ id, month, amount: 843.4, kind: 'extra', label: 'טעינת רכב חשמלי', note: '', settlement_id: null, ev_reading_id: `r-${id}`, ev_readings: { kwh: 1370.25 } })
+  ({ id, month, amount: 843.4, kind: 'extra', label: 'טעינת רכב חשמלי', note: '', settlement_id: null, special_id: null, ev_reading_id: `r-${id}`, ev_readings: { kwh: 1370.25 } })
 
 // The screenshot's case: exempt from the fee, the whole debt is EV charging (3 × ₪843.40 = ₪2,530.20), the oldest from 2025.
 const thisYear = new Date().getFullYear()
@@ -103,7 +104,7 @@ describe('apartment ledger sheet', () => {
   it('a write-off is marked on its month, with the reason and an undo', async () => {
     db.tables.apartment_ledger = [{ apartment_id: 'a19', month: `${thisYear}-01-01`, charged: 0, paid: 0, adjusted: -843.4 }]
     db.tables.charges = [ev(`${thisYear}-01-01`, 'c3'),
-      { id: 'w1', month: `${thisYear}-01-01`, amount: -843.4, kind: 'adjustment', label: 'מחיקת חוב', note: 'חוב ישן', settlement_id: 's1', ev_reading_id: null, ev_readings: null }]
+      { id: 'w1', month: `${thisYear}-01-01`, amount: -843.4, kind: 'adjustment', label: 'מחיקת חוב', note: 'חוב ישן', settlement_id: 's1', special_id: null, ev_reading_id: null, ev_readings: null }]
     wrap(<ApartmentLedger apartment={apt(0)} />)
     expect(await screen.findByText(norm(he.finance.writtenOff(formatILS(843.4))))).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: he.finance.monthDetails(`ינואר ${thisYear}`) }))
@@ -112,5 +113,26 @@ describe('apartment ledger sheet', () => {
     // jsdom never finishes the popover's fade-in (display stays none), so the role query includes hidden nodes.
     fireEvent.click(within(details).getByRole('button', { name: he.finance.undoWriteOff, hidden: true }))
     await vi.waitFor(() => expect(db.rpcCalls).toEqual([{ fn: 'undo_settlement', args: { p_settlement_id: 's1' } }]))
+  })
+
+  it('a special charge shows its ✦ chip, its own debt line, the linked payment and an undo', async () => {
+    const special = { id: 'x1', month: `${thisYear}-01-01`, amount: 2006, kind: 'extra', label: 'תיקון נזק', note: 'נזק בלובי', settlement_id: null, special_id: 'sp1', ev_reading_id: null, ev_readings: null }
+    db.tables.apartment_ledger = [{ apartment_id: 'a19', month: `${thisYear}-01-01`, charged: 2006, paid: 1000, adjusted: 0 }]
+    db.tables.charges = [special]
+    db.tables.payments = [{ id: 'p1', special_id: 'sp1', for_month: `${thisYear}-01-01`, paid_on: `${thisYear}-01-01`, amount: 1000 }]
+    wrap(<ApartmentLedger apartment={apt(1006)} />)
+    expect(await screen.findByText(S_CHIP)).toBeInTheDocument()
+    expect(await screen.findByText(new RegExp(he.finance.breakdownLabel))).toHaveTextContent(norm(`${he.finance.breakdown.special} ${formatILS(1006)}`))
+    fireEvent.click(screen.getByRole('button', { name: he.finance.monthDetails(`ינואר ${thisYear}`) }))
+    const details = await screen.findByRole('dialog', { name: he.finance.monthDetails(`ינואר ${thisYear}`) })
+    expect(within(details).getByText(norm(he.finance.special.paidWith(formatILS(1000))))).toBeInTheDocument()
+    fireEvent.click(within(details).getByRole('button', { name: he.finance.special.undo, hidden: true }))
+    await vi.waitFor(() => expect(db.rpcCalls).toEqual([{ fn: 'undo_special_charge', args: { p_special_id: 'sp1' } }]))
+  })
+
+  it('admins add a special charge from the sheet', async () => {
+    wrap(<ApartmentLedger apartment={apt(0)} />)
+    fireEvent.click(screen.getByRole('button', { name: he.finance.special.action }))
+    expect(await screen.findByRole('button', { name: he.finance.special.save })).toBeInTheDocument()
   })
 })

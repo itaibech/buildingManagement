@@ -101,6 +101,8 @@ export function paymentsRows(payments: Payment[], info: ReadonlyMap<string, { nu
     { header: H.amount, value: (p) => p.amount },
     { header: H.method, value: (p) => he.finance.methods[p.method] },
     { header: H.notes, value: (p) => p.note },
+    // A special charge's payment carries its label as the note.
+    { header: he.finance.special.exportColumn, value: (p) => (p.is_special ? p.note : '') },
   ])
 }
 
@@ -111,6 +113,7 @@ export function expensesRows(expenses: Expense[]): Rows {
     { header: H.vendor, value: (e) => e.vendor },
     { header: H.amount, value: (e) => e.amount },
     { header: H.notes, value: (e) => e.note },
+    { header: he.finance.special.exportColumn, value: (e) => (e.special_id ? e.note : '') },
   ])
 }
 

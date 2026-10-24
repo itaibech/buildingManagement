@@ -1,6 +1,6 @@
 import { Button, Group, Stack, Text } from '@mantine/core'
 import { FormModal } from '../tenants/dialogs'
-import { IconCash, IconChecklist } from '@tabler/icons-react'
+import { IconCash, IconChecklist, IconSparkles } from '@tabler/icons-react'
 import { useState } from 'react'
 import { todayISO } from '../../lib/dates'
 import { formatILS } from '../../lib/format'
@@ -15,6 +15,7 @@ import { heroState, type LedgerRow } from './ledger'
 import { PaymentForm } from './PaymentForm'
 import { debtBreakdown, type Breakdown, type PlanRow } from './settlement'
 import { SettleDebtForm } from './SettleDebtForm'
+import { SpecialChargeForm } from './SpecialChargeForm'
 
 const yearOf = (month: string): number => Number(month.slice(0, 4))
 
@@ -38,16 +39,16 @@ export function ApartmentYear({ apartmentId, admin = false }: { apartmentId: str
       )}
       {fin.isLoading && <ListSkeleton rows={4} />}
       {fin.isError && <LoadFailed onRetry={fin.refetch} />}
-      {fin.ready && <LedgerGrid year={year} rows={fin.rows} charges={fin.charges} open={fin.open} admin={admin} />}
+      {fin.ready && <LedgerGrid year={year} rows={fin.rows} charges={fin.charges} specialPayments={fin.specialPayments} open={fin.open} admin={admin} />}
     </Stack>
   )
 }
 
-const BREAKDOWN_KEYS: readonly (keyof Breakdown)[] = ['fee', 'ev', 'levy', 'other']
+const BREAKDOWN_KEYS: readonly (keyof Breakdown)[] = ['fee', 'ev', 'special', 'levy', 'other']
 
 /** "הרכב החוב: דמי ועד ₪0 · טעינת רכב ₪2,530.20": the fee always, the rest when they're part of the debt. */
 function BreakdownLine({ open, rows, charges }: { open: PlanRow[]; rows: readonly LedgerRow[]; charges: ApartmentCharge[] }) {
-  const b = debtBreakdown(open, rows, charges)
+  const b = debtBreakdown(open, rows, charges.map((c) => ({ month: c.month, amount: c.amount, kind: c.kind, ev: c.ev, special: c.specialId !== null })))
   const parts = BREAKDOWN_KEYS.filter((k) => k === 'fee' || b[k] > 0).map((k) => `${he.finance.breakdown[k]} ${formatILS(b[k])}`)
   return <Text size="sm" c="dimmed" className="bm-num">{`${he.finance.breakdownLabel}: ${parts.join(' · ')}`}</Text>
 }
@@ -70,25 +71,40 @@ function Hero({ apartment, fin }: { apartment: ApartmentBalance; fin: ReturnType
   )
 }
 
-/** Admin sheet for one apartment: balance, the year grid, and sticky "רישום תשלום" / "הסדרת חוב" (while it owes). */
+type Sheet = 'pay' | 'settle' | 'special'
+
+/** The sheet's sticky actions: "רישום תשלום", "הסדרת חוב" (while it owes) and "חיוב מיוחד". */
+function Actions({ owes, onOpen }: { owes: boolean; onOpen: (s: Sheet) => void }) {
+  return (
+    <div className="bm-sheet-actions">
+      <Group gap="sm" wrap="wrap">
+        <Button style={{ flex: '1 1 100%' }} leftSection={<IconCash size={20} stroke={1.75} />} onClick={() => onOpen('pay')}>{he.finance.recordPayment}</Button>
+        {owes && (
+          <Button variant="default" style={{ flex: '1 1 0' }} leftSection={<IconChecklist size={20} stroke={1.75} />} onClick={() => onOpen('settle')}>
+            {he.finance.settle.action}
+          </Button>
+        )}
+        <Button variant="default" style={{ flex: '1 1 0' }} leftSection={<IconSparkles size={20} stroke={1.75} />} onClick={() => onOpen('special')}>
+          {he.finance.special.action}
+        </Button>
+      </Group>
+    </div>
+  )
+}
+
+/** Admin sheet for one apartment: balance, the year grid, and the sticky actions. */
 export function ApartmentLedger({ apartment }: { apartment: ApartmentBalance }) {
-  const [sheet, setSheet] = useState<'pay' | 'settle' | null>(null)
+  const [sheet, setSheet] = useState<Sheet | null>(null)
   const fin = useApartmentFinance(apartment.apartmentId)
   const close = () => setSheet(null)
   if (sheet === 'pay') return <PaymentForm apartmentId={apartment.apartmentId} onDone={close} />
+  if (sheet === 'special') return <SpecialChargeForm apartmentId={apartment.apartmentId} onDone={close} />
   if (sheet === 'settle') return fin.ready ? <SettleDebtForm apartmentId={apartment.apartmentId} rows={fin.rows} onDone={close} /> : <ListSkeleton rows={4} />
   return (
     <Stack gap="md">
       <Hero apartment={apartment} fin={fin} />
       <ApartmentYear apartmentId={apartment.apartmentId} admin />
-      <div className="bm-sheet-actions">
-        <Group grow gap="sm" wrap="nowrap">
-          <Button leftSection={<IconCash size={20} stroke={1.75} />} onClick={() => setSheet('pay')}>{he.finance.recordPayment}</Button>
-          {apartment.balance > 0 && (
-            <Button variant="default" leftSection={<IconChecklist size={20} stroke={1.75} />} onClick={() => setSheet('settle')}>{he.finance.settle.action}</Button>
-          )}
-        </Group>
-      </div>
+      <Actions owes={apartment.balance > 0} onOpen={setSheet} />
     </Stack>
   )
 }

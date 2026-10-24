@@ -54,11 +54,16 @@ describe('debtBreakdown', () => {
     // Jan: fee 0 (exempt) + EV 843.40. Feb: fee 300 + levy 200 + extra 50, paid 300 (covers the fee first).
     const rows = [row('2026-01-01', 843.4, 0), row('2026-02-01', 550, 300)]
     const plan = settlementPlan(rows, ledgerBalance(rows))
-    expect(debtBreakdown(plan, rows, charges)).toEqual({ fee: 0, ev: 843.4, levy: 200, other: 50 })
+    expect(debtBreakdown(plan, rows, charges)).toEqual({ fee: 0, ev: 843.4, special: 0, levy: 200, other: 50 })
   })
   it('an unpaid fee shows as fee', () => {
     const rows = [row('2026-03-01', 300, 0)]
-    expect(debtBreakdown(settlementPlan(rows, 300), rows, [])).toEqual({ fee: 300, ev: 0, levy: 0, other: 0 })
+    expect(debtBreakdown(settlementPlan(rows, 300), rows, [])).toEqual({ fee: 300, ev: 0, special: 0, levy: 0, other: 0 })
+  })
+  it('a special charge has its own line', () => {
+    const rows = [row('2026-09-01', 2336, 330)]
+    const lines: ChargeLine[] = [{ month: '2026-09-01', amount: 2006, kind: 'extra', ev: false, special: true }]
+    expect(debtBreakdown(settlementPlan(rows, 2006), rows, lines)).toEqual({ fee: 0, ev: 0, special: 2006, levy: 0, other: 0 })
   })
 })
 

@@ -15,7 +15,7 @@ import { monthOf } from './ledger'
 import { PaymentForm } from './PaymentForm'
 
 function meta(p: Payment): string {
-  return [formatDate(p.paid_on), he.finance.methods[p.method], p.note].filter(Boolean).join(' · ')
+  return [formatDate(p.paid_on), he.finance.methods[p.method], p.is_special ? he.finance.special.chip(p.note) : p.note].filter(Boolean).join(' · ')
 }
 
 /** Admin "תשלומים": the month's payments with a total; add via the page FAB, remove a mistaken one. */

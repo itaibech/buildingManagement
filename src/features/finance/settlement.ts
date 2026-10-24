@@ -17,10 +17,10 @@ export interface PlanRow {
 
 export interface PlanSummary { months: number; total: number; after: number }
 
-/** A charge as the breakdown needs it. `ev`: it came from an EV meter reading. */
-export interface ChargeLine { month: string; amount: number; kind: string; ev: boolean }
+/** A charge as the breakdown needs it. `ev`: EV charging. `special`: a "חיוב מיוחד". */
+export interface ChargeLine { month: string; amount: number; kind: string; ev: boolean; special?: boolean }
 
-export interface Breakdown { fee: number; ev: number; levy: number; other: number }
+export interface Breakdown { fee: number; ev: number; special: number; levy: number; other: number }
 
 export type LedgerGroup = { type: 'month'; month: string } | { type: 'empty'; from: string; to: string }
 
@@ -62,15 +62,16 @@ function monthParts(row: LedgerRow, charges: readonly ChargeLine[]): [keyof Brea
   const own = charges.filter((c) => c.month === row.month && c.kind !== 'adjustment')
   const sum = (pick: (c: ChargeLine) => boolean): number => own.filter(pick).reduce((t, c) => t + ag(c.amount), 0)
   const ev = sum((c) => c.ev)
-  const levy = sum((c) => !c.ev && c.kind === 'levy')
-  const other = sum((c) => !c.ev && c.kind !== 'levy')
+  const special = sum((c) => !c.ev && !!c.special)
+  const levy = sum((c) => !c.ev && !c.special && c.kind === 'levy')
+  const other = sum((c) => !c.ev && !c.special && c.kind !== 'levy')
   const gross = ag(row.charged) - ag(row.adjusted ?? 0)
-  return [['ev', ev], ['other', other], ['levy', levy], ['fee', gross - ev - levy - other]]
+  return [['ev', ev], ['special', special], ['other', other], ['levy', levy], ['fee', gross - ev - special - levy - other]]
 }
 
 /** What the open amount is made of: "דמי ועד ₪0 · טעינת רכב ₪2,530.20 · היטלים ₪0". */
 export function debtBreakdown(plan: readonly PlanRow[], rows: readonly LedgerRow[], charges: readonly ChargeLine[]): Breakdown {
-  const out = { fee: 0, ev: 0, levy: 0, other: 0 }
+  const out = { fee: 0, ev: 0, special: 0, levy: 0, other: 0 }
   for (const p of plan) {
     const row = rows.find((r) => r.month === p.month)
     if (!row) continue
@@ -82,7 +83,7 @@ export function debtBreakdown(plan: readonly PlanRow[], rows: readonly LedgerRow
     }
     out.fee += left
   }
-  return { fee: ils(out.fee), ev: ils(out.ev), levy: ils(out.levy), other: ils(out.other) }
+  return { fee: ils(out.fee), ev: ils(out.ev), special: ils(out.special), levy: ils(out.levy), other: ils(out.other) }
 }
 
 /** The balance at the end of each of `months` (ascending), carrying everything before the first one. */

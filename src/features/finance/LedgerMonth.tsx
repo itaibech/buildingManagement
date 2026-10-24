@@ -1,9 +1,9 @@
-import { Button, Divider, Group, Popover, Stack, Text, UnstyledButton } from '@mantine/core'
+import { Badge, Button, Divider, Group, Popover, Stack, Text, UnstyledButton } from '@mantine/core'
 import { IconBolt } from '@tabler/icons-react'
 import { formatILS, formatKwh, monthLabel } from '../../lib/format'
 import { he } from '../../lib/he'
 import { notifySuccess } from '../../ui'
-import { useUndoSettlement, type ApartmentCharge } from './api'
+import { useUndoSettlement, useUndoSpecialCharge, type ApartmentCharge, type SpecialPayment } from './api'
 import { monthName } from './ledger'
 
 /** One month of an apartment's ledger, as the grid shows it. */
@@ -18,6 +18,7 @@ export interface MonthView {
   /** The balance at the end of the month (earlier years included). */
   balance: number
   charges: ApartmentCharge[]
+  specialPayments: SpecialPayment[]
 }
 
 const kwhOf = (v: MonthView): number => v.charges.reduce((t, c) => t + (c.kwh ?? 0), 0)
@@ -50,6 +51,24 @@ function WriteOff({ charge, admin }: { charge: ApartmentCharge; admin: boolean }
   )
 }
 
+/** A "חיוב מיוחד": its label and note, the payment recorded with it, and (admins) "ביטול חיוב מיוחד". */
+function Special({ charge, paid, admin }: { charge: ApartmentCharge; paid: SpecialPayment | undefined; admin: boolean }) {
+  const undo = useUndoSpecialCharge()
+  const id = charge.specialId
+  return (
+    <Stack gap={4}>
+      <Line label={he.finance.special.chip(charge.label)} amount={charge.amount} sub={charge.note || undefined} />
+      {paid && <Text size="xs" c="paid.7" className="bm-num">{he.finance.special.paidWith(formatILS(paid.amount))}</Text>}
+      {admin && id && (
+        <Button variant="subtle" color="debt" mih={44} loading={undo.isPending} style={{ alignSelf: 'flex-start' }}
+          onClick={() => undo.mutate(id, { onSuccess: () => notifySuccess(he.finance.special.undone) })}>
+          {he.finance.special.undo}
+        </Button>
+      )}
+    </Stack>
+  )
+}
+
 /** The month's lines: the fee (what the charges don't explain), each charge (EV with kWh), write-offs with the reason. */
 function MonthDetails({ v, admin }: { v: MonthView; admin: boolean }) {
   const regular = v.charges.filter((c) => c.kind !== 'adjustment')
@@ -57,7 +76,10 @@ function MonthDetails({ v, admin }: { v: MonthView; admin: boolean }) {
   return (
     <Stack gap="xs" miw={220}>
       {fee !== 0 && <Line label={he.finance.feeLine} amount={fee} />}
-      {regular.map((c) => (
+      {regular.filter((c) => c.specialId).map((c) => (
+        <Special key={c.id} charge={c} paid={v.specialPayments.find((p) => p.specialId === c.specialId)} admin={admin} />
+      ))}
+      {regular.filter((c) => !c.specialId).map((c) => (
         <Line key={c.id} label={c.label || he.finance.kinds[c.kind]} amount={c.amount} sub={c.kwh !== null ? he.finance.kwh(formatKwh(c.kwh)) : undefined} />
       ))}
       {v.charges.filter((c) => c.kind === 'adjustment').map((c) => (
@@ -88,6 +110,11 @@ export function MonthCell({ v, admin }: { v: MonthView; admin: boolean }) {
           <IconBolt size={12} stroke={1.75} aria-hidden="true" />{he.finance.kwh(formatKwh(kwh))}
         </Text>
       )}
+      {v.charges.filter((c) => c.specialId).map((c) => (
+        <Badge key={c.id} variant="light" color="enamel" radius="sm" size="sm" style={{ alignSelf: 'flex-start', maxWidth: '100%' }}>
+          {he.finance.special.chip(c.label)}
+        </Badge>
+      ))}
       {v.adjusted < 0 && <Text size="xs" c="stone.7" className="bm-num">{he.finance.writtenOff(formatILS(-v.adjusted))}</Text>}
       {v.open > 0 && <Text size="xs" c="debt.6" fw={600} className="bm-num">{he.finance.openAmount(formatILS(v.open))}</Text>}
     </Stack>
