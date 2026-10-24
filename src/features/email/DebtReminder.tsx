@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { he } from '../../lib/he'
 import { AptPlate, Money } from '../../ui'
 import type { ApartmentBalance } from '../finance/api'
-import { useEmailPreview, useSendEmail } from './api'
+import { useEmailPreview, useSendEmail, useSplitSend } from './api'
 import { PreviewInfo, SendActions } from './parts'
 
 /** One apartment's reminder: its balance, the recipients count, send. */
@@ -46,7 +46,7 @@ export function DebtBulkForm({ debtors, onDone }: { debtors: ApartmentBalance[];
   const [debounced] = useDebouncedValue(picked, 300)
   const req = debounced.length ? { kind: 'debt' as const, apartmentIds: debounced } : null
   const preview = useEmailPreview(req)
-  const send = useSendEmail()
+  const send = useSplitSend()
   const toggle = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]))
   const all = picked.length === debtors.length
   const settled = debounced === picked
@@ -61,7 +61,7 @@ export function DebtBulkForm({ debtors, onDone }: { debtors: ApartmentBalance[];
       </Stack>
       {picked.length === 0 ? <Text size="sm" c="debt.7">{he.mail.debt.noneSelected}</Text> : <PreviewInfo q={preview} />}
       <SendActions count={picked.length && settled ? preview.data?.recipients ?? 0 : 0} loading={send.isPending} onCancel={onDone}
-        onSend={() => send.mutate({ kind: 'debt', apartmentIds: picked }, { onSuccess: onDone })} />
+        progress={send.progress} onSend={() => send.start({ kind: 'debt', apartmentIds: picked }, preview.data, onDone)} />
     </Stack>
   )
 }

@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { corsHeaders } from './lib/cors.ts'
 import { callerFrom, dataSource } from './lib/db.ts'
 import { handle } from './lib/handler.ts'
+import { readBody } from './lib/http.ts'
 import { createTransport } from './lib/transport.ts'
 
 const env = Deno.env.toObject()
@@ -22,8 +23,9 @@ Deno.serve(async (req) => {
     auth: { persistSession: false },
   })
   try {
-    const body: unknown = await req.json().catch(() => null)
-    const r = await handle(body, {
+    const read = await readBody(req)
+    if (!read.ok) return json(read.status, { error: read.error }, cors)
+    const r = await handle(read.body, {
       caller: () => callerFrom(user),
       data: dataSource(service),
       transport: createTransport(env),

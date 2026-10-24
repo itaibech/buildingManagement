@@ -1,7 +1,7 @@
 import { Alert, Anchor, Button, Group, Loader, Text } from '@mantine/core'
 import type { UseQueryResult } from '@tanstack/react-query'
 import { he } from '../../lib/he'
-import type { EmailPreview } from './api'
+import type { EmailPreview, SendProgress } from './api'
 
 /** Shown while the function runs in dry run (no provider secrets yet): nothing is really sent. */
 export function DryRunNotice() {
@@ -32,10 +32,13 @@ export function PreviewInfo({ q, idle = false }: { q: UseQueryResult<EmailPrevie
   )
 }
 
-/** Cancel + send. Send is enabled only once there is someone to send to. */
-export function SendActions({ count, loading, onSend, onCancel }: { count: number; loading: boolean; onSend: () => void; onCancel: () => void }) {
+interface SendActionsProps { count: number; loading: boolean; onSend: () => void; onCancel: () => void; progress?: SendProgress | null }
+
+/** Cancel + send. Send is enabled only once there is someone to send to; a split send shows "נשלחו X מתוך Y". */
+export function SendActions({ count, loading, onSend, onCancel, progress }: SendActionsProps) {
   return (
     <Group justify="flex-end" gap="sm">
+      {progress && <Text size="sm" c="dimmed" className="bm-num" aria-live="polite" me="auto">{he.mail.progress(progress.done, progress.total)}</Text>}
       <Button variant="default" onClick={onCancel}>{he.mail.cancel}</Button>
       <Button onClick={onSend} loading={loading} disabled={count === 0}>{he.mail.confirm}</Button>
     </Group>

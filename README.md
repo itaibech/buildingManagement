@@ -231,11 +231,18 @@ Secrets take effect on the next call; no redeploy is needed.
 - A consumer Gmail account sends to about **100 recipients a day** through Apps Script; Resend's free tier allows
   100 a day and 3,000 a month. The app stops at `EMAIL_DAILY_CAP` (default 90) and answers with how many emails
   remain today, so a large send never fails halfway because of the provider quota.
-- Each recipient is one email, sent about every half second, so a send to 40 residents takes about 20 seconds.
+- Each recipient is one email, sent about every half second. One call to the function sends at most 40 emails (about
+  20 seconds); the app splits a larger send into several calls by apartment and shows "נשלחו X מתוך Y". Each call
+  reserves its share of the daily cap before sending, so two admins sending at once can't pass it.
 - Debt reminders skip apartments that owe nothing (the dialog lists them) and residents without an email address.
 
 ### Troubleshooting
 
+- **Every call returns 401 after deploy** (even the test email, while signed in as an admin): the platform's JWT check
+  (`verify_jwt`) doesn't accept the project's tokens, which happens with the newer asymmetric JWT signing keys. Set
+  `verify_jwt = false` under `[functions.send-email]` in `supabase/config.toml` and redeploy (merge to `main`, or
+  `npx supabase functions deploy send-email --project-ref kttyozquueaoacrwbnmx`). This is safe: the function still
+  verifies the session itself (`auth.getUser()`) and requires `is_admin()`.
 - **Still "מצב בדיקה" after setup:** a secret is missing or misspelled (`secrets list`), or `EMAIL_PROVIDER` doesn't
   match the secrets you set, or `EMAIL_DRY_RUN=true` is set.
 - **Every email fails after you edited the script:** a **New deployment** gets a new URL. Either update

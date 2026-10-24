@@ -15,6 +15,7 @@ create table public.email_log (
   failed int not null default 0 check (failed >= 0),
   skipped int not null default 0 check (skipped >= 0),
   dry_run boolean not null default false,
+  status text not null default 'done' check (status in ('pending', 'done')),
   error text check (char_length(error) <= 1000),
   created_at timestamptz not null default now()
 );
@@ -27,14 +28,41 @@ grant select on public.email_log to authenticated;
 create policy email_log_admin_select on public.email_log for select to authenticated
   using ((select public.is_admin()));
 
--- Real (non dry-run) emails sent since midnight, Israel time. The provider quota is per sending account,
--- so the count spans the whole table.
-create function public.email_sent_today() returns int
+-- Real (non dry-run) emails used since midnight, Israel time, for one building: 'done' rows count what was sent,
+-- 'pending' rows (a send in progress, or one that died midway, however old) count every recipient reserved.
+-- Conservative: a crashed send never frees quota that may already have been spent.
+create function public.email_sent_today(p_building uuid) returns int
 language sql stable security invoker set search_path = ''
 as $$
-  select coalesce(sum(sent), 0)::int from public.email_log
-  where not dry_run
+  select coalesce(sum(case when status = 'pending' then recipients else sent end), 0)::int from public.email_log
+  where building_id = p_building and not dry_run
     and created_at >= (date_trunc('day', now() at time zone 'Asia/Jerusalem') at time zone 'Asia/Jerusalem');
 $$;
-revoke execute on function public.email_sent_today() from public, anon, authenticated;
-grant execute on function public.email_sent_today() to service_role;
+revoke execute on function public.email_sent_today(uuid) from public, anon, authenticated;
+grant execute on function public.email_sent_today(uuid) to service_role;
+
+-- Atomically reserves p_count emails under today's cap: serialized per building by an advisory lock, so two
+-- concurrent sends can't both pass the check. Room → inserts a 'pending' email_log row (recipients = p_count) and
+-- returns its id; no room → null. The caller updates the row to 'done' with sent / failed / skipped after delivery.
+create function public.reserve_email_quota(p_building uuid, p_count int, p_cap int, p_kind text, p_sent_by uuid,
+  p_ref_id uuid default null, p_apartment_ids uuid[] default null) returns uuid
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_id uuid;
+begin
+  if p_count is null or p_count < 1 or p_cap is null or p_cap < 1 then
+    raise exception 'p_count and p_cap must be positive' using errcode = '22023';
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended('email_quota:' || p_building::text, 0));
+  if public.email_sent_today(p_building) + p_count > p_cap then
+    return null;
+  end if;
+  insert into public.email_log (building_id, sent_by, kind, ref_id, apartment_ids, recipients, status)
+  values (p_building, p_sent_by, p_kind, p_ref_id, p_apartment_ids, p_count, 'pending')
+  returning id into v_id;
+  return v_id;
+end;
+$$;
+revoke execute on function public.reserve_email_quota(uuid, int, int, text, uuid, uuid, uuid[]) from public, anon, authenticated;
+grant execute on function public.reserve_email_quota(uuid, int, int, text, uuid, uuid, uuid[]) to service_role;

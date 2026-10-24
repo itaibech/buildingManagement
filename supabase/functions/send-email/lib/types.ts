@@ -57,9 +57,26 @@ export interface DataSource {
   ticket(id: string, buildingId: string): Promise<TicketInfo | null>
   balances(apartmentIds: string[]): Promise<Balance[]>
   ledger(apartmentIds: string[]): Promise<(LedgerRow & { apartmentId: string })[]>
-  sentToday(): Promise<number>
+  /** Real emails used today in the building (pending reservations count in full). */
+  sentToday(buildingId: string): Promise<number>
+  /** Atomically reserves `count` under `cap` as a pending log row: its id, or null when there is no room. */
+  reserve(r: Reservation): Promise<string | null>
+  /** Finalizes a reservation with the outcome. */
+  finish(id: string, outcome: Outcome): Promise<void>
+  /** A finished row in one go (dry runs, nothing to send). */
   log(row: LogRow): Promise<void>
 }
+
+export interface Reservation {
+  building_id: string
+  sent_by: string
+  kind: EmailKind
+  ref_id: string | null
+  apartment_ids: string[] | null
+  count: number
+  cap: number
+}
+export interface Outcome { sent: number; failed: number; skipped: number; error: string | null }
 
 /** The signed-in caller, from their own JWT. */
 export interface Caller { userId: string; isAdmin: boolean }

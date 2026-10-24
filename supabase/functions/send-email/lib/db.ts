@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Balance, Caller, Context, DataSource, LedgerRow, LogRow, Resident, TicketInfo } from './types.ts'
+import type { Balance, Caller, Context, DataSource, LedgerRow, LogRow, Reservation, Resident, TicketInfo } from './types.ts'
 
 /** The slice of a supabase-js client (built with the caller's JWT) used to identify the caller. */
 export interface AuthClient {
@@ -65,6 +65,15 @@ async function ledger(db: SupabaseClient, ids: string[]): Promise<(LedgerRow & {
   return rows.map((r) => ({ apartmentId: r.apartment_id, month: r.month, charged: Number(r.charged), paid: Number(r.paid) }))
 }
 
+/** reserve_email_quota (0020): a pending row id, or null when the cap has no room. */
+async function reserve(db: SupabaseClient, r: Reservation): Promise<string | null> {
+  const id = maybe<string>(await db.rpc('reserve_email_quota', {
+    p_building: r.building_id, p_count: r.count, p_cap: r.cap, p_kind: r.kind, p_sent_by: r.sent_by,
+    p_ref_id: r.ref_id, p_apartment_ids: r.apartment_ids,
+  }))
+  return typeof id === 'string' ? id : null
+}
+
 /** Reads and the audit insert, with the service-role client (server only; never exposed to the browser). */
 export function dataSource(db: SupabaseClient): DataSource {
   return {
@@ -76,7 +85,9 @@ export function dataSource(db: SupabaseClient): DataSource {
     ticket: (id, b) => ticket(db, id, b),
     balances: (ids) => balances(db, ids),
     ledger: (ids) => ledger(db, ids),
-    sentToday: async () => Number(must<number>(await db.rpc('email_sent_today'))),
+    sentToday: async (b) => Number(must<number>(await db.rpc('email_sent_today', { p_building: b }))),
+    reserve: (r) => reserve(db, r),
+    finish: async (id, o) => { maybe(await db.from('email_log').update({ ...o, status: 'done' }).eq('id', id)) },
     log: async (row: LogRow) => { maybe(await db.from('email_log').insert(row)) },
   }
 }

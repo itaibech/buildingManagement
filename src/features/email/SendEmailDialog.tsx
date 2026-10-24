@@ -4,7 +4,7 @@ import { he } from '../../lib/he'
 import { AptPlate } from '../../ui'
 import { useApartments } from '../tenants/api'
 import { FormModal } from '../tenants/dialogs'
-import { useEmailPreview, useSendEmail, type EmailRequest } from './api'
+import { useEmailPreview, useSplitSend, type EmailRequest } from './api'
 import { PreviewInfo, SendActions } from './parts'
 
 type Scope = 'all' | 'selected' | 'opener'
@@ -39,8 +39,8 @@ function SendEmailForm({ kind, refId, subject, onClose }: Omit<SendEmailDialogPr
   const apartmentIds = scope === 'all' ? 'all' : scope === 'selected' ? selected : undefined
   const req: EmailRequest | null = ready ? { kind, id: refId, ...(apartmentIds ? { apartmentIds } : {}) } : null
   const preview = useEmailPreview(req)
-  const send = useSendEmail()
-  const onSend = () => req && send.mutate({ ...req, ...(note.trim() ? { note: note.trim() } : {}) }, { onSuccess: onClose })
+  const send = useSplitSend()
+  const onSend = () => req && send.start({ ...req, ...(note.trim() ? { note: note.trim() } : {}) }, preview.data, onClose)
   return (
     <Stack>
       <Text fw={600} style={{ overflowWrap: 'anywhere' }}>{subject}</Text>
@@ -54,7 +54,7 @@ function SendEmailForm({ kind, refId, subject, onClose }: Omit<SendEmailDialogPr
           value={note} onChange={(e) => setNote(e.currentTarget.value)} />
       )}
       <PreviewInfo q={preview} idle={!ready} />
-      <SendActions count={ready ? preview.data?.recipients ?? 0 : 0} loading={send.isPending} onSend={onSend} onCancel={onClose} />
+      <SendActions count={ready ? preview.data?.recipients ?? 0 : 0} loading={send.isPending} progress={send.progress} onSend={onSend} onCancel={onClose} />
     </Stack>
   )
 }

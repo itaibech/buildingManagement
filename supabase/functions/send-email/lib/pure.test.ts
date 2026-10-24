@@ -3,7 +3,8 @@ import { checkCap, readCap } from './cap.ts'
 import { corsHeaders } from './cors.ts'
 import { openMonths, splitDebtors } from './debt.ts'
 import { buildRecipients } from './recipients.ts'
-import { escapeHtml, render } from './template.ts'
+import { cleanSubject, escapeHtml, render } from './template.ts'
+import { MAX_BODY_BYTES, readBody } from './http.ts'
 import { debtContent } from './content.ts'
 import { parseRequest } from './validate.ts'
 
@@ -138,5 +139,25 @@ describe('cors', () => {
     expect(corsHeaders('http://localhost:5173')['Access-Control-Allow-Origin']).toBe('http://localhost:5173')
     expect(corsHeaders('https://evil.example')['Access-Control-Allow-Origin']).toBe('https://itaibech.github.io')
     expect(corsHeaders(null)['Access-Control-Allow-Headers']).toContain('authorization')
+  })
+})
+
+describe('readBody', () => {
+  const post = (body: string, headers: Record<string, string> = {}) => new Request('https://f.test', { method: 'POST', body, headers })
+  it('parses JSON, and gives null for invalid JSON', async () => {
+    expect(await readBody(post('{"kind":"test"}'))).toEqual({ ok: true, body: { kind: 'test' } })
+    expect(await readBody(post('{nope'))).toEqual({ ok: true, body: null })
+  })
+  it('refuses bodies over 64 KB with 413, by header or by actual size', async () => {
+    const big = JSON.stringify({ note: 'x'.repeat(MAX_BODY_BYTES) })
+    expect(await readBody(post(big))).toMatchObject({ ok: false, status: 413 })
+    expect(await readBody(post('{}', { 'Content-Length': String(MAX_BODY_BYTES + 1) }))).toMatchObject({ ok: false, status: 413 })
+  })
+})
+
+describe('cleanSubject', () => {
+  it('strips CR/LF, collapses whitespace, trims to 250', () => {
+    expect(cleanSubject('  a\r\n\tb   c  ')).toBe('a b c')
+    expect(cleanSubject('x'.repeat(300))).toHaveLength(250)
   })
 })

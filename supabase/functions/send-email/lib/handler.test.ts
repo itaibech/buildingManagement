@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { callerFrom, type AuthClient } from './db.ts'
-import { handle, type Deps } from './handler.ts'
-import type { DataSource, LogRow } from './types.ts'
+import { handle, MAX_PER_CALL, type Deps } from './handler.ts'
+import type { DataSource, LogRow, Outcome, Reservation } from './types.ts'
 import type { MailMessage, Transport } from './transport.ts'
 
 const A1 = '11111111-1111-4111-8111-111111111111'
@@ -9,10 +9,14 @@ const A2 = '22222222-2222-4222-8222-222222222222'
 const A3 = '33333333-3333-4333-8333-333333333333'
 const T1 = '44444444-4444-4444-8444-444444444444'
 
-function fakeData(over: Partial<DataSource> = {}): DataSource & { logs: LogRow[] } {
+type Fake = DataSource & { logs: LogRow[]; reserved: Reservation[]; finished: [string, Outcome][] }
+
+function fakeData(over: Partial<DataSource> = {}, used = 0): Fake {
   const logs: LogRow[] = []
+  const reserved: Reservation[] = []
+  const finished: [string, Outcome][] = []
   return {
-    logs,
+    logs, reserved, finished,
     context: async () => ({ building: { id: 'b1', name: 'הבניין', payment_instructions: 'ביט', committee_contact: null }, email: 'admin@example.test', name: 'מנהלת' }),
     apartments: async () => [{ id: A1, number: 1 }, { id: A2, number: 2 }, { id: A3, number: 3 }],
     residents: async () => [
@@ -25,7 +29,13 @@ function fakeData(over: Partial<DataSource> = {}): DataSource & { logs: LogRow[]
     ticket: async () => ({ id: T1, title: 'נזילה', status: 'in_progress', location: 'לובי', latestComment: null, openerApartmentId: A2 }),
     balances: async () => [{ apartmentId: A1, balance: 300 }, { apartmentId: A2, balance: 0 }, { apartmentId: A3, balance: 50 }],
     ledger: async () => [{ apartmentId: A1, month: '2026-10-01', charged: 300, paid: 0 }],
-    sentToday: async () => 0,
+    sentToday: async () => used + reserved.reduce((t, r) => t + r.count, 0),
+    reserve: async (r) => {
+      if (used + reserved.reduce((t, x) => t + x.count, 0) + r.count > r.cap) return null
+      reserved.push(r)
+      return `log-${reserved.length}`
+    },
+    finish: async (id, o) => { finished.push([id, o]) },
     log: async (row) => { logs.push(row) },
     ...over,
   }
@@ -36,9 +46,9 @@ function fakeTransport(dryRun: boolean): Transport & { sent: MailMessage[] } {
   return { provider: 'appsscript', dryRun, reason: dryRun ? 'not_configured' : null, sent, send: async (m) => { sent.push(m); return { ok: true } } }
 }
 
-function deps(over: Partial<Deps> = {}): Deps & { data: ReturnType<typeof fakeData>; transport: ReturnType<typeof fakeTransport> } {
+function deps(over: Partial<Deps> = {}): Deps & { data: Fake; transport: ReturnType<typeof fakeTransport> } {
   return { caller: async () => ({ userId: 'u1', isAdmin: true }), data: fakeData(), transport: fakeTransport(true), env: {}, sleep: async () => undefined, ...over } as Deps & {
-    data: ReturnType<typeof fakeData>; transport: ReturnType<typeof fakeTransport>
+    data: Fake; transport: ReturnType<typeof fakeTransport>
   }
 }
 
@@ -73,7 +83,8 @@ describe('handle: announcement', () => {
   it('preview counts recipients without sending or logging', async () => {
     const d = deps()
     const r = await handle({ kind: 'announcement', id: T1, preview: true }, d)
-    expect(r).toEqual({ status: 200, body: { preview: true, recipients: 3, skipped: [], dryRun: true, reason: 'not_configured', remainingToday: 90 } })
+    expect(r).toEqual({ status: 200, body: { preview: true, recipients: 3, skipped: [], dryRun: true, reason: 'not_configured', remainingToday: 90,
+      perApartment: { [A1]: 1, [A2]: 2 }, maxPerCall: 40 } })
     expect(d.transport.sent).toHaveLength(0)
     expect(d.data.logs).toHaveLength(0)
   })
@@ -116,11 +127,13 @@ describe('handle: ticket, debt, test', () => {
 
 describe('handle: sending', () => {
   it('beyond the daily cap: 429 with how many remain, nothing sent', async () => {
-    const d = deps({ transport: fakeTransport(false), env: { EMAIL_DAILY_CAP: '3' }, data: fakeData({ sentToday: async () => 2 }) })
+    const d = deps({ transport: fakeTransport(false), env: { EMAIL_DAILY_CAP: '3' }, data: fakeData({}, 2) })
     const r = await handle({ kind: 'announcement', id: T1 }, d)
     expect(r.status).toBe(429)
-    expect(JSON.stringify(r.body)).toContain('1')
+    expect(r.body).toMatchObject({ remainingToday: 1 })
+    expect(String(r.body.error)).toContain('נותרו היום 1')
     expect(d.transport.sent).toHaveLength(0)
+    expect(d.data.reserved).toHaveLength(0)
   })
   it('throttles real sends ~500 ms apart and counts failures', async () => {
     const sleep = vi.fn(async () => undefined)
@@ -131,6 +144,33 @@ describe('handle: sending', () => {
     expect(sleep).toHaveBeenCalledTimes(2)
     expect(sleep).toHaveBeenCalledWith(500)
     expect(r.body).toMatchObject({ sent: 2, failed: 1, dryRun: false })
-    expect(d.data.logs[0]).toMatchObject({ sent: 2, failed: 1, error: 'quota', dry_run: false })
+    expect(d.data.reserved).toEqual([{ building_id: 'b1', sent_by: 'u1', kind: 'announcement', ref_id: T1, apartment_ids: null, count: 3, cap: 90 }])
+    expect(d.data.finished).toEqual([['log-1', { sent: 2, failed: 1, skipped: 0, error: 'quota' }]])
+    expect(d.data.logs).toHaveLength(0)
+  })
+
+  it('reservations are sequential: a second send that would pass the cap gets 429 (the DB lock makes it atomic)', async () => {
+    const data = fakeData({}, 0)
+    const d = deps({ transport: fakeTransport(false), env: { EMAIL_DAILY_CAP: '5' }, data })
+    expect((await handle({ kind: 'announcement', id: T1 }, d)).status).toBe(200)
+    expect((await handle({ kind: 'announcement', id: T1 }, d)).status).toBe(429)
+    expect(d.transport.sent).toHaveLength(3)
+  })
+
+  it(`refuses more than ${MAX_PER_CALL} emails in one call (413); preview still counts them`, async () => {
+    const many = Array.from({ length: 41 }, (_, i) => ({ apartment_id: A1, full_name: `דייר ${i}`, email: `r${i}@example.test` }))
+    const d = deps({ data: fakeData({ residents: async () => many }) })
+    expect((await handle({ kind: 'announcement', id: T1 }, d)).status).toBe(413)
+    expect(d.transport.sent).toHaveLength(0)
+    expect((await handle({ kind: 'announcement', id: T1, preview: true }, d)).body).toMatchObject({ recipients: 41, perApartment: { [A1]: 41 } })
+  })
+
+  it('subjects are cleaned: no CR/LF, whitespace collapsed, at most 250 characters', async () => {
+    const d = deps({ data: fakeData({ announcement: async () => ({ title: `שלום\r\nBcc: x@evil.test   ${'א'.repeat(300)}`, body: 'b' }) }) })
+    await handle({ kind: 'announcement', id: T1, apartmentIds: [A1] }, d)
+    const subject = d.transport.sent[0].subject
+    expect(subject).not.toMatch(/[\r\n]/)
+    expect(subject.startsWith('שלום Bcc: x@evil.test א')).toBe(true)
+    expect(subject.length).toBe(250)
   })
 })

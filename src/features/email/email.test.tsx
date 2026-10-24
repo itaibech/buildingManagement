@@ -16,6 +16,7 @@ const m = vi.hoisted(() => ({
   calls: [] as Record<string, unknown>[],
   dryRun: false,
   failWith: null as { status: number; error: string } | null,
+  big: false,
 }))
 const notify = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }))
 
@@ -32,6 +33,13 @@ vi.mock('../../lib/supabase', () => {
           if (m.failWith && !body.preview) {
             const res = new Response(JSON.stringify({ error: m.failWith.error }), { status: m.failWith.status })
             return { data: null, error: new FunctionsHttpError(res) }
+          }
+          if (m.big) {
+            const per: Record<string, number> = { a1: 30, a2: 20 }
+            const sent = Array.isArray(body.apartmentIds) ? body.apartmentIds.reduce((t: number, id: string) => t + (per[id] ?? 0), 0) : 50
+            return body.preview
+              ? { data: { preview: true, recipients: 50, skipped: [], dryRun: false, remainingToday: 90, perApartment: per, maxPerCall: 40 }, error: null }
+              : { data: { sent, failed: 0, skipped: [], recipients: sent, dryRun: false }, error: null }
           }
           const ids = Array.isArray(body.apartmentIds) ? body.apartmentIds.length : 3
           return body.preview
@@ -55,6 +63,7 @@ beforeEach(() => {
   m.calls = []
   m.dryRun = false
   m.failWith = null
+  m.big = false
   vi.clearAllMocks()
 })
 
@@ -92,6 +101,17 @@ describe('SendEmailDialog', () => {
     m.dryRun = true
     wrap(<SendEmailDialog opened onClose={() => undefined} kind="announcement" refId="n1" subject="ניקיון" />)
     expect(await screen.findByText(he.mail.notConfigured)).toBeInTheDocument()
+  })
+
+  it('a send larger than the per-call limit goes out in apartment chunks, one call each', async () => {
+    m.big = true
+    const onClose = vi.fn()
+    wrap(<SendEmailDialog opened onClose={onClose} kind="announcement" refId="n1" subject="ניקיון" />)
+    await screen.findByText(he.mail.willSend(50))
+    fireEvent.click(screen.getByRole('button', { name: he.mail.confirm }))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(sends()).toEqual([{ kind: 'announcement', id: 'n1', apartmentIds: ['a1'] }, { kind: 'announcement', id: 'n1', apartmentIds: ['a2'] }])
+    expect(notify.success).toHaveBeenCalledWith(he.mail.sent(50))
   })
 
   it("a refused send (daily cap) shows the function's Hebrew message", async () => {

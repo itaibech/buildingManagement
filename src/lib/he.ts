@@ -1040,6 +1040,7 @@ export const he = {
     setupLink: 'להוראות ההגדרה',
     setupUrl: 'https://github.com/itaibech/buildingManagement#email-setup',
     failed: 'שליחת המייל נכשלה. נסו שוב.',
+    progress: (done: number, total: number) => `נשלחו ${done.toLocaleString('he-IL')} מתוך ${total.toLocaleString('he-IL')}`,
     previewFailed: 'לא הצלחנו לבדוק את הנמענים.',
     skipped: (numbers: string) => `ללא חוב, לא יקבלו תזכורת: דירות ${numbers}`,
     debt: {

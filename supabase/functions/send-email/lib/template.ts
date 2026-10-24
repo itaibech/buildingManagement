@@ -64,7 +64,12 @@ function text(b: Brand, c: EmailContent): string {
     `${footerText(b)} · ${b.appUrl}`].join('\n')
 }
 
-/** Renders the content into the subject, HTML (all text escaped) and plain text. */
+export const MAX_SUBJECT = 250
+
+/** A header-safe subject: CR/LF and runs of whitespace collapse to one space, trimmed, at most 250 characters. */
+export const cleanSubject = (s: string): string => s.replace(/\s+/g, ' ').trim().slice(0, MAX_SUBJECT).trim()
+
+/** Renders the content into the subject (cleaned), HTML (all text escaped) and plain text. */
 export function render(b: Brand, c: EmailContent): Rendered {
-  return { subject: c.subject, html: html(b, c), text: text(b, c) }
+  return { subject: cleanSubject(c.subject), html: html(b, c), text: text(b, c) }
 }
