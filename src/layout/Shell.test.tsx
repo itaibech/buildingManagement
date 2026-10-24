@@ -9,6 +9,7 @@ import Shell from './Shell'
 const auth = vi.hoisted(() => ({ release: (): void => undefined, loginShownAtCall: null as boolean | null }))
 const signOut = vi.hoisted(() => vi.fn())
 const unread = vi.hoisted(() => ({ count: 0, tickets: 0, realtime: vi.fn() }))
+const perms = vi.hoisted(() => ({ granted: [] as string[], admin: false }))
 vi.mock('../features/announcements/api', () => ({ useUnreadCount: () => unread.count }))
 vi.mock('../features/notifications/api', () => ({ useUnseenTicketCount: () => unread.tickets }))
 vi.mock('../features/notifications/useRealtimeNotifications', () => ({ useRealtimeNotifications: unread.realtime }))
@@ -16,7 +17,10 @@ vi.mock('../features/notifications/NotificationCenter', () => ({
   NotificationBell: ({ sheet }: { sheet?: boolean }) => <button>{sheet ? 'BELL-SHEET' : 'BELL-POPOVER'}</button>,
 }))
 vi.mock('../auth/AuthProvider', () => ({
-  useAuth: () => ({ signOut, profile: { resident_id: 'r1' }, isAdmin: false }),
+  useAuth: () => ({
+    signOut, profile: { resident_id: 'r1' }, isAdmin: perms.admin,
+    can: (need: string | string[]) => perms.admin || (typeof need === 'string' ? [need] : need).some((k) => perms.granted.includes(k)),
+  }),
 }))
 vi.mock('./useShellInfo', () => ({
   useShellInfo: () => ({ buildingName: 'הבניין שלי', apartmentNumber: 7 }),
@@ -67,6 +71,8 @@ async function exitWith(control: () => HTMLElement): Promise<void> {
 
 describe('Shell', () => {
   beforeEach(() => {
+    perms.granted = ['home', 'announcements', 'tickets', 'finance_own', 'directory', 'maintenance']
+    perms.admin = false
     unread.count = 0
     unread.tickets = 0
     signOut.mockReset()
@@ -125,12 +131,53 @@ describe('Shell', () => {
   })
 })
 
+const tabLabels = () => within(screen.getByRole('contentinfo')).getAllByRole('link').map((a) => a.textContent)
+const sideNav = () => screen.getAllByRole('navigation', { name: 'ניווט ראשי' }).find((n) => !screen.getByRole('contentinfo').contains(n)) as HTMLElement
+
+describe('Shell nav by permission', () => {
+  beforeEach(() => {
+    unread.count = 0
+    unread.tickets = 0
+    perms.admin = false
+  })
+
+  it('default group: the tab bar is בית / הודעות / תקלות / עוד, with no empty slots', () => {
+    perms.granted = ['home', 'announcements', 'tickets']
+    renderShell()
+    expect(tabLabels()).toEqual(['בית', 'הודעות', 'תקלות', 'עוד'])
+  })
+
+  it('default group: the side nav hides finance, the general pages and admin pages', () => {
+    perms.granted = ['home', 'announcements', 'tickets']
+    renderShell()
+    const links = within(sideNav()).getAllByRole('link').map((a) => a.textContent)
+    expect(links).toEqual(['בית', 'הודעות', 'תקלות', 'עוד'])
+  })
+
+  it('finance shows for any finance key, and general pages per key', () => {
+    perms.granted = ['home', 'finance_reports', 'maintenance']
+    renderShell()
+    expect(tabLabels()).toEqual(['בית', 'כספים', 'עוד'])
+    const links = within(sideNav()).getAllByRole('link').map((a) => a.textContent)
+    expect(links).toContain('תחזוקה')
+    expect(links).not.toContain('דיירים')
+  })
+
+  it('admins see every page, including permissions', () => {
+    perms.granted = []
+    perms.admin = true
+    renderShell()
+    expect(tabLabels()).toEqual(['בית', 'הודעות', 'תקלות', 'כספים', 'עוד'])
+    expect(within(sideNav()).getByRole('link', { name: 'הרשאות וקבוצות' })).toBeInTheDocument()
+  })
+})
+
 describe('activeTab', () => {
   it('keeps "עוד" active on secondary and admin pages, and the tab itself on main pages', async () => {
     const { activeTab } = await import('./nav')
     expect(activeTab('/')).toBe('/')
     expect(activeTab('/tickets/abc')).toBe('/tickets')
-    for (const p of ['/directory', '/maintenance', '/ev', '/ev/123', '/apartments/1', '/users', '/import', '/settings']) {
+    for (const p of ['/directory', '/maintenance', '/ev', '/ev/123', '/apartments/1', '/users', '/import', '/settings', '/settings/permissions']) {
       expect(activeTab(p)).toBe('/more')
     }
   })

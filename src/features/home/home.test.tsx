@@ -10,6 +10,7 @@ import HomePage from './HomePage'
 
 const m = vi.hoisted(() => ({
   isAdmin: false,
+  granted: [] as string[],
   tickets: [] as unknown[],
   tasks: [] as unknown[],
   loading: false,
@@ -23,7 +24,10 @@ const m = vi.hoisted(() => ({
 
 vi.mock('../../lib/supabase', () => ({ supabase: {} }))
 vi.mock('../../auth/AuthProvider', () => ({
-  useAuth: () => ({ isAdmin: m.isAdmin, profile: { full_name: 'דנה' }, session: { user: { id: 'me' } } }),
+  useAuth: () => ({
+    isAdmin: m.isAdmin, profile: { full_name: 'דנה' }, session: { user: { id: 'me' } },
+    can: (need: string | string[]) => m.isAdmin || (typeof need === 'string' ? [need] : need).some((k) => m.granted.includes(k)),
+  }),
 }))
 vi.mock('../announcements/api', () => ({
   useAnnouncements: () => ({ data: [{ id: 'a1', title: 'הודעה ראשונה', body: 'גוף', created_at: '2026-10-01T00:00:00Z', isRead: false }], isLoading: false, isError: false, refetch: vi.fn() }),
@@ -61,6 +65,7 @@ const renderHome = () =>
 
 beforeEach(() => {
   m.isAdmin = false
+  m.granted = ['home', 'announcements', 'tickets', 'finance_own']
   m.loading = false
   m.failed = false
   m.refetch.mockClear()
@@ -169,5 +174,29 @@ describe('HomePage', () => {
     expect(screen.getByText(he.home.setFeesFirst)).toBeTruthy()
     expect(screen.getByRole('button', { name: he.home.setFeesAction })).toBeTruthy()
     expect(screen.queryByText(he.home.collected(4, 6))).toBeNull()
+  })
+
+  it('default group: only the announcement and calls sections, no balance or how-to-pay', () => {
+    m.granted = ['home', 'announcements', 'tickets']
+    m.balance = 500
+    renderHome()
+    expect(screen.getByText(he.home.latestAnnouncement)).toBeInTheDocument()
+    expect(screen.getByText(he.home.myTickets)).toBeInTheDocument()
+    expect(screen.queryByText(he.home.myBalance)).not.toBeInTheDocument()
+    expect(screen.queryByText(he.pay.title)).not.toBeInTheDocument()
+  })
+
+  it('a group without announcements or tickets sees neither section (and no report button)', () => {
+    m.granted = ['home', 'finance_own']
+    renderHome()
+    expect(screen.getByText(he.home.myBalance)).toBeInTheDocument()
+    expect(screen.queryByText(he.home.latestAnnouncement)).not.toBeInTheDocument()
+    expect(screen.queryByText(he.home.reportTicket)).not.toBeInTheDocument()
+  })
+
+  it('a group with nothing but home gets a plain empty state', () => {
+    m.granted = ['home']
+    renderHome()
+    expect(screen.getByText(he.permissions.homeEmpty)).toBeInTheDocument()
   })
 })

@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { useAuth } from '../../auth/AuthProvider'
 import { useExit } from '../../auth/useExit'
-import { ADMIN_NAV, GENERAL_NAV, type NavItem } from '../../layout/nav'
+import { ADMIN_NAV, GENERAL_NAV, permitted, type NavItem } from '../../layout/nav'
 import { he } from '../../lib/he'
 import { PageHeader } from '../../ui'
 import { YearExport } from '../export/YearExport'
@@ -25,14 +25,15 @@ function NavCard({ title, items, children }: { title: string; items: NavItem[]; 
   )
 }
 
-/** "עוד": the secondary pages, grouped, with the exit at the bottom on mobile (desktop has it in the side nav). */
+/** "עוד": the secondary pages the user may open, grouped, with the exit at the bottom on mobile (desktop has it in the side nav). */
 export default function MorePage() {
-  const { isAdmin } = useAuth()
+  const { isAdmin, can } = useAuth()
   const exit = useExit()
+  const general = permitted(GENERAL_NAV, can)
   return (
     <Stack gap="md">
       <PageHeader title={he.nav.more} />
-      <NavCard title={he.nav.general} items={GENERAL_NAV} />
+      {general.length > 0 && <NavCard title={he.nav.general} items={general} />}
       {isAdmin && (
         <NavCard title={he.nav.admin} items={ADMIN_NAV}>
           <YearExport />
