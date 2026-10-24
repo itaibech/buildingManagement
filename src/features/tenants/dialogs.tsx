@@ -3,11 +3,15 @@ import { useMediaQuery } from '@mantine/hooks'
 import type { ReactNode } from 'react'
 import { he } from '../../lib/he'
 
-/** A form sheet: full screen on mobile, a centered modal from 768px up. `compact`: a short sheet, never full screen. */
+/**
+ * A form sheet: full screen on mobile, a centered modal from 768px up. `compact`: a short sheet, never full screen.
+ * A click outside never closes it (that loses typed input by accident); only ✕, the form's cancel, or Esc do.
+ */
 export function FormModal({ opened, title, onClose, children, compact = false }: { opened: boolean; title: string; onClose: () => void; children: ReactNode; compact?: boolean }) {
   const mobile = useMediaQuery('(max-width: 767px)')
   return (
     <Modal opened={opened} onClose={onClose} title={title} fullScreen={mobile && !compact} centered radius="lg"
+      size={compact ? 'md' : 'lg'} closeOnClickOutside={false}
       styles={{ title: { fontFamily: 'var(--bm-heading-font)', fontSize: '1.375rem' } }}>
       {children}
     </Modal>

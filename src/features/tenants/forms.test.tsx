@@ -8,7 +8,7 @@ import { he } from '../../lib/he'
 import { theme } from '../../ui/theme'
 import { ResidentForm } from './ResidentForm'
 import { DbFailure, isMoneyHistoryError } from './api'
-import { ConfirmDialog } from './dialogs'
+import { ConfirmDialog, FormModal } from './dialogs'
 
 const db = vi.hoisted(() => ({ inserts: [] as { table: string; values: unknown }[] }))
 
@@ -69,5 +69,18 @@ describe('apartment delete with money history', () => {
     wrap(<ConfirmDialog opened title="t" body="b" confirmLabel="מחיקה" loading={false} failed failedMessage={he.tenants.errors.hasMoney}
       onClose={() => undefined} onConfirm={() => undefined} />)
     expect(screen.getByText('לא ניתן למחוק דירה עם היסטוריה כספית')).toBeInTheDocument()
+  })
+})
+
+describe('FormModal', () => {
+  it('a click outside the sheet does not close it', async () => {
+    const onClose = vi.fn()
+    render(<MantineProvider><FormModal opened title="טופס" onClose={onClose}><p>תוכן</p></FormModal></MantineProvider>)
+    await screen.findByText('תוכן')
+    const overlay = document.querySelector('.mantine-Modal-overlay')
+    expect(overlay).not.toBeNull()
+    fireEvent.mouseDown(overlay as Element)
+    fireEvent.click(overlay as Element)
+    expect(onClose).not.toHaveBeenCalled()
   })
 })
