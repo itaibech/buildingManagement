@@ -1,5 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { he } from '../../lib/he'
 import { supabase } from '../../lib/supabase'
+import { notifyError } from '../../ui'
+import { receiptsOf, removeReceiptFiles } from '../finance/api'
 import type { ExistingCharge, ExistingPayment, ImportPayload } from './buildImport'
 
 const COUNT_KEYS = ['apartments', 'residents', 'fees', 'payments', 'charges', 'categories', 'expenses', 'budgets', 'ev_skipped'] as const
@@ -15,13 +18,17 @@ function toCounts(data: unknown): ImportCounts {
   return out
 }
 
-/** rpc('import_year'): one transaction on the server; replaces that year's previously imported rows. */
+/**
+ * rpc('import_year'): one transaction on the server; replaces that year's previously imported rows. Then removes the
+ * receipt files of the imported expenses it deleted (the rows are gone either way; the admin hears if files stayed).
+ */
 export function useImportYear() {
   const client = useQueryClient()
   return useMutation({
     mutationFn: async (payload: ImportPayload): Promise<ImportCounts> => {
       const { data, error } = await supabase.rpc('import_year', { payload })
       if (error) throw new Error(error.message)
+      if (await removeReceiptFiles(receiptsOf(data))) notifyError(he.finance.receiptRemoveFailed)
       return toCounts(data)
     },
     onSettled: () => client.invalidateQueries(),

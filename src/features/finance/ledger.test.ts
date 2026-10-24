@@ -122,6 +122,9 @@ describe('receipt files (Task 22)', () => {
     expect(receiptMime(file('scan.jpeg', 'application/octet-stream'))).toBe('image/jpeg')
     expect(receiptMime(file('invoice.docx', ''))).toBe('application/vnd.openxmlformats-officedocument.wordprocessingml.document')
     expect(receiptMime(file('setup.exe', ''))).toBeNull()
+    // No dot: the whole name is not an extension.
+    expect(receiptMime(file('pdf', ''))).toBeNull()
+    expect(receiptMime(file('docx', 'application/octet-stream'))).toBeNull()
     // A real type wins over the name.
     expect(receiptMime(file('fake.pdf', 'application/x-msdownload'))).toBeNull()
   })

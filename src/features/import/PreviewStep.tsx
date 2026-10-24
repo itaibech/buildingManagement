@@ -183,6 +183,12 @@ export function PriorNotice({ prior, keep, onKeep }: { prior: { levy: number; ev
   )
 }
 
+/** Imported expenses being replaced carry receipts: those files go with them. */
+export function ReceiptsNotice({ count }: { count: number }) {
+  if (count === 0) return null
+  return <Alert color="signal" title={he.import.receiptsDeleted(count)}><Text size="sm">{he.import.receiptsDeletedBody}</Text></Alert>
+}
+
 /** The year has debt settlements: a re-import can reopen or over-credit those months (README, הסדרת חוב). */
 export function SettledNotice({ count }: { count: number }) {
   if (count === 0) return null

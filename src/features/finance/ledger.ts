@@ -163,7 +163,9 @@ const MIME_BY_EXT: Readonly<Record<string, string>> = {
 export function receiptMime(file: Pick<File, 'name' | 'type'>): string | null {
   if (Object.hasOwn(RECEIPT_EXT, file.type)) return file.type
   if (file.type !== '' && file.type !== 'application/octet-stream') return null
-  const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
+  const dot = file.name.lastIndexOf('.')
+  if (dot < 0) return null
+  const ext = file.name.slice(dot + 1).toLowerCase()
   return Object.hasOwn(MIME_BY_EXT, ext) ? (MIME_BY_EXT[ext] ?? null) : null
 }
 

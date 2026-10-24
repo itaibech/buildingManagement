@@ -33,7 +33,7 @@ function builder(table: string) {
   for (const op of ['select', 'eq', 'lt', 'gte', 'order', 'in', 'insert', 'upsert', 'update', 'delete', 'limit']) {
     chain[op] = (...args: unknown[]) => { db.calls.push({ table, op, args }); ops.push(op); return chain }
   }
-  chain.single = () => Promise.resolve({ data: { id: 'new' }, error: null })
+  chain.single = () => Promise.resolve(ops.some((op) => db.fail.has(`${table}.${op}`)) ? { data: null, error: { message: 'boom' } } : { data: { id: 'new' }, error: null })
   chain.then = (resolve: (v: unknown) => unknown) => Promise.resolve(result()).then(resolve)
   return chain
 }
@@ -45,7 +45,7 @@ vi.mock('../../lib/supabase', () => ({
     storage: {
       from: () => ({
         upload: () => Promise.resolve({ error: null }),
-        remove: (paths: string[]) => { db.removed.push(paths); return Promise.resolve({ error: db.removeError }) },
+        remove: (paths: string[]) => { db.removed.push(paths); return Promise.resolve({ data: db.removeError ? null : paths.map((name) => ({ name })), error: db.removeError }) },
       }),
     },
   },

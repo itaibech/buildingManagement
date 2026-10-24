@@ -20,6 +20,10 @@ const db = vi.hoisted(() => ({
   log: [] as string[],
   uploadError: null as { message: string } | null,
   coarse: false,
+  /** The expense update matches no row (deleted meanwhile, or RLS). */
+  updateMissing: false,
+  /** Storage answers a remove without removing anything (e.g. RLS). */
+  removeNothing: false,
 }))
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 
@@ -27,6 +31,7 @@ function builder(table: string) {
   const chain: Record<string, unknown> = {}
   for (const op of ['select', 'eq', 'lt', 'gte', 'order', 'in', 'limit', 'delete', 'insert']) chain[op] = () => chain
   chain.update = (values: unknown) => { db.log.push(`update:${JSON.stringify(values)}`); return chain }
+  chain.single = () => Promise.resolve(db.updateMissing ? { data: null, error: { message: 'no rows' } } : { data: { id: 'e1' }, error: null })
   chain.then = (resolve: (v: unknown) => unknown) => Promise.resolve({ data: db.tables[table] ?? [], error: null }).then(resolve)
   return chain
 }
@@ -38,7 +43,10 @@ vi.mock('../../lib/supabase', () => ({
     storage: {
       from: () => ({
         upload: (path: string) => { db.log.push(`upload:${path}`); return Promise.resolve({ error: db.uploadError }) },
-        remove: (paths: string[]) => { db.log.push(`remove:${paths.join(',')}`); return Promise.resolve({ error: null }) },
+        remove: (paths: string[]) => {
+          db.log.push(`remove:${paths.join(',')}`)
+          return Promise.resolve({ data: db.removeNothing ? [] : paths.map((name) => ({ name })), error: null })
+        },
         createSignedUrl: () => Promise.resolve({ data: { signedUrl: 'https://signed.example.test/r' }, error: null }),
       }),
     },
@@ -79,6 +87,8 @@ beforeEach(() => {
   db.log = []
   db.uploadError = null
   db.coarse = false
+  db.updateMissing = false
+  db.removeNothing = false
   toast.success.mockReset()
   toast.error.mockReset()
 })
@@ -152,6 +162,27 @@ describe('ReceiptControl', () => {
     pick(fileInput(container), pdf)
     await waitFor(() => expect(toast.error).toHaveBeenCalled())
     expect(db.log.some((l) => l.startsWith('remove') || l.startsWith('update'))).toBe(false)
+  })
+
+  it('a replace whose update matches no row removes the new upload and keeps the old object', async () => {
+    db.updateMissing = true
+    const { container } = wrap(<ReceiptControl expense={expense({ receipt_path: 'e1/old.pdf', receipt_name: 'ישן.pdf' })} />)
+    pick(fileInput(container), pdf)
+    await waitFor(() => expect(toast.error).toHaveBeenCalled())
+    expect(db.log.map((l) => l.split(':')[0])).toEqual(['upload', 'update', 'remove'])
+    expect(db.log[2]).toMatch(/^remove:e1\/[0-9a-f-]{36}\.pdf$/)
+    expect(db.log.some((l) => l.includes('old.pdf'))).toBe(false)
+    expect(toast.success).not.toHaveBeenCalled()
+  })
+
+  it('storage removing nothing counts as the file staying behind', async () => {
+    db.removeNothing = true
+    wrap(<ReceiptControl expense={expense({ receipt_path: 'e1/old.pdf', receipt_name: 'ישן.pdf' })} />)
+    fireEvent.click(screen.getByRole('button', { name: R.actions('ישן.pdf') }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: R.remove, hidden: true }))
+    fireEvent.click(within(await screen.findByRole('dialog', { name: R.removeConfirm })).getByRole('button', { name: R.remove }))
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(R.fileStayed))
+    expect(toast.success).not.toHaveBeenCalled()
   })
 
   it('remove asks for confirmation, then clears the link and deletes the object', async () => {

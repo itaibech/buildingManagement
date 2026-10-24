@@ -3,7 +3,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(24);
+select plan(28);
 
 insert into auth.users (id, email, aud, role) values
   ('a9800000-0000-0000-0000-000000000001', 'rcpt-admin@test.local', 'authenticated', 'authenticated'),
@@ -80,6 +80,29 @@ select is((select count(*) from storage.objects where bucket_id = 'receipts' and
 select lives_ok($$delete from storage.objects where bucket_id = 'receipts' and name = (select v from paths where k = 'doc')$$,
   'admin: removes a receipt');
 select is((select count(*) from storage.objects where bucket_id = 'receipts' and name like 'e98%'), 1::bigint, 'admin: the removed receipt is gone');
+
+-- ---------------------------------------------------------------- re-import returns the deleted rows' receipts (0019)
+reset role;
+insert into public.expenses (category_id, spent_on, amount, source, receipt_path) values
+  ((select id from public.expense_categories order by sort_order limit 1), '2031-02-01', 10, 'import', 'e9810000-0000-0000-0000-000000000001/a.pdf'),
+  ((select id from public.expense_categories order by sort_order limit 1), '2031-03-01', 20, 'import', 'e9810000-0000-0000-0000-000000000002/b.jpg'),
+  ((select id from public.expense_categories order by sort_order limit 1), '2031-04-01', 30, 'import', null),
+  ((select id from public.expense_categories order by sort_order limit 1), '2031-05-01', 40, 'manual', 'e9810000-0000-0000-0000-000000000003/c.pdf'),
+  ((select id from public.expense_categories order by sort_order limit 1), '2030-05-01', 50, 'import', 'e9810000-0000-0000-0000-000000000004/d.pdf');
+create temp table empty_import (j jsonb) on commit drop;
+insert into empty_import values ('{"year": 2031, "budget_year": 2031, "apartments": [], "residents": [], "fees": [], "payments": [],
+  "charges": [], "categories": [], "expenses": [], "budgets": []}');
+grant select on empty_import to authenticated;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"a9800000-0000-0000-0000-000000000001","role":"authenticated"}';
+create temp table import_out on commit drop as select public.import_year((select j from empty_import)) as r;
+select is((select array(select jsonb_array_elements_text(r -> 'receipts') order by 1) from import_out),
+  array['e9810000-0000-0000-0000-000000000001/a.pdf', 'e9810000-0000-0000-0000-000000000002/b.jpg'],
+  're-import returns the receipt paths of the imported expenses it deleted (that year only)');
+select is((select count(*) from public.expenses where receipt_path in ('e9810000-0000-0000-0000-000000000003/c.pdf',
+  'e9810000-0000-0000-0000-000000000004/d.pdf')), 2::bigint, 'manual expenses and other years keep their receipts');
+select is(public.import_year((select j from empty_import)) -> 'receipts', '[]'::jsonb, 'nothing deleted: an empty receipts list');
+select is(public.import_year((select j from empty_import)) ->> 'expenses', '0', 'the usual counts are still returned');
 
 select * from finish();
 rollback;

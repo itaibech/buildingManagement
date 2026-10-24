@@ -320,11 +320,8 @@ export function useUndoSpecialCharge() {
   return useFinanceMutation(async (specialId: string) => {
     const { data, error } = await supabase.rpc('undo_special_charge', { p_special_id: specialId })
     fail(error)
-    const paths = receiptsOf(data)
-    if (paths.length === 0) return
     // The rows are gone either way; only tell the admin that the receipt file stayed behind.
-    const removed = await supabase.storage.from(RECEIPT_BUCKET).remove(paths)
-    if (removed.error) notifyError(he.finance.receiptRemoveFailed)
+    if (await removeReceiptFiles(receiptsOf(data))) notifyError(he.finance.receiptRemoveFailed)
   })
 }
 
@@ -435,18 +432,23 @@ async function attachReceipt(expenseId: string, file: File): Promise<boolean> {
   const up = await supabase.storage.from(RECEIPT_BUCKET).upload(path, file, { contentType: mime })
   if (up.error) return false
   const receipt = { receipt_path: path, receipt_name: file.name.slice(0, 255) || null }
-  const { error } = await supabase.from('expenses').update(receipt).eq('id', expenseId)
+  // .single(): an update that matched no row (deleted meanwhile, or RLS) is a failure too.
+  const { error } = await supabase.from('expenses').update(receipt).eq('id', expenseId).select('id').single()
   // Don't leave an orphaned object behind when the link couldn't be saved.
   if (error) await supabase.storage.from(RECEIPT_BUCKET).remove([path])
   return !error
 }
 
-/** Removes receipt objects; true when they stayed behind (the caller tells the admin). */
-async function removeReceiptFile(path: string | null): Promise<boolean> {
-  if (!path) return false
-  const { error } = await supabase.storage.from(RECEIPT_BUCKET).remove([path])
-  return !!error
+/**
+ * Removes receipt objects; true when any stayed behind (the caller tells the admin). Storage answers a refused
+ * or missing object with fewer (or no) removed entries rather than an error, so that counts as staying behind.
+ */
+export async function removeReceiptFiles(paths: string[]): Promise<boolean> {
+  if (paths.length === 0) return false
+  const { data, error } = await supabase.storage.from(RECEIPT_BUCKET).remove(paths)
+  return !!error || (data?.length ?? 0) < paths.length
 }
+const removeReceiptFile = (path: string | null): Promise<boolean> => removeReceiptFiles(path ? [path] : [])
 
 type ReceiptOwner = Pick<Expense, 'id' | 'receipt_path'>
 
@@ -478,10 +480,8 @@ export function useSaveExpense() {
 export function useDeleteExpense() {
   return useFinanceMutation(async (expense: Pick<Expense, 'id' | 'receipt_path'>) => {
     fail((await supabase.from('expenses').delete().eq('id', expense.id)).error)
-    if (!expense.receipt_path) return
     // The expense is gone either way; only tell the admin that its receipt file stayed behind.
-    const { error } = await supabase.storage.from(RECEIPT_BUCKET).remove([expense.receipt_path])
-    if (error) notifyError(he.finance.receiptRemoveFailed)
+    if (await removeReceiptFile(expense.receipt_path)) notifyError(he.finance.receiptRemoveFailed)
   })
 }
 

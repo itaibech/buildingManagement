@@ -13,7 +13,11 @@ import ImportPage from './ImportPage'
 import { ImportError } from './parseWorkbook'
 import { readWorkbook, SHEETS } from './readWorkbook'
 
-const db = vi.hoisted(() => ({ rpcCalls: [] as { fn: string; args: unknown }[], tables: {} as Record<string, unknown[]> }))
+const db = vi.hoisted(() => ({
+  rpcCalls: [] as { fn: string; args: unknown }[], tables: {} as Record<string, unknown[]>,
+  /** Receipt paths import_year answers with, what storage was asked to remove, and whether it removes nothing. */
+  rpcReceipts: [] as string[], removed: [] as string[][], removeNothing: false,
+}))
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 
 vi.mock('../../lib/supabase', () => {
@@ -28,7 +32,15 @@ vi.mock('../../lib/supabase', () => {
       from: (table: string) => chain(table),
       rpc: (fn: string, args: unknown) => {
         db.rpcCalls.push({ fn, args })
-        return Promise.resolve({ data: { apartments: 3, residents: 4, payments: 30, expenses: 8 }, error: null })
+        return Promise.resolve({ data: { apartments: 3, residents: 4, payments: 30, expenses: 8, receipts: db.rpcReceipts }, error: null })
+      },
+      storage: {
+        from: () => ({
+          remove: (paths: string[]) => {
+            db.removed.push(paths)
+            return Promise.resolve({ data: db.removeNothing ? [] : paths.map((name) => ({ name })), error: null })
+          },
+        }),
       },
     },
   }
@@ -47,6 +59,9 @@ beforeEach(() => {
   // jsdom has no scrollIntoView; Mantine's searchable Select calls it on the selected option.
   Element.prototype.scrollIntoView ??= () => undefined
   db.rpcCalls = []
+  db.rpcReceipts = []
+  db.removed = []
+  db.removeNothing = false
   db.tables = { expense_categories: [{ id: 'c1', name: 'חברת ניהול' }, { id: 'c2', name: 'ניקיון' }, { id: 'c3', name: 'בנק' }] }
   toast.success.mockClear()
   toast.error.mockClear()
@@ -247,5 +262,50 @@ describe('ImportPage', () => {
     next()
     await screen.findByText(he.import.paidTitle(1))
     expect(screen.queryByText(he.import.settledHint(1))).toBeNull()
+  })
+
+  describe('receipts on previously imported expenses (Task 22)', () => {
+    const imported = (id: string, receipt: string | null, source = 'import') =>
+      ({ id, category_id: 'c1', spent_on: '2026-03-01', amount: 10, vendor: '', note: '', receipt_path: receipt, source, template_id: null, expense_categories: { name: 'בנק' } })
+    async function toPreview(): Promise<void> {
+      await upload(renderPage())
+      await pick(he.import.monthFor('אוקטובר'), 'אוקטובר')
+      next()
+      await screen.findByText(he.import.feesIntro)
+      next()
+      next()
+      await screen.findByText(he.import.replaceNote(2026))
+    }
+
+    it('warns before confirming that the imported expenses\' receipts will be deleted', async () => {
+      db.tables.expenses = [imported('e1', 'e1/a.pdf'), imported('e2', 'e2/b.jpg'), imported('e3', null), imported('e4', 'e4/c.pdf', 'manual')]
+      await toPreview()
+      expect(screen.getByText(he.import.receiptsDeleted(2))).toBeInTheDocument()
+      expect(he.import.receiptsDeleted(2)).toBe('2 קבלות יימחקו')
+    })
+
+    it('no receipt warning when no imported expense has one', async () => {
+      db.tables.expenses = [imported('e3', null), imported('e4', 'e4/c.pdf', 'manual')]
+      await toPreview()
+      expect(screen.queryByText(he.import.receiptsDeleted(1))).toBeNull()
+    })
+
+    it('removes the deleted rows\' receipt files after a successful import', async () => {
+      db.rpcReceipts = ['e1/a.pdf', 'e2/b.jpg']
+      await toPreview()
+      fireEvent.click(screen.getByRole('button', { name: he.import.confirm }))
+      expect(await screen.findByText(he.import.doneTitle)).toBeInTheDocument()
+      expect(db.removed).toEqual([['e1/a.pdf', 'e2/b.jpg']])
+      expect(toast.error).not.toHaveBeenCalled()
+    })
+
+    it('tells the admin when the files stayed behind; no storage call when there are none', async () => {
+      db.rpcReceipts = ['e1/a.pdf']
+      db.removeNothing = true
+      await toPreview()
+      fireEvent.click(screen.getByRole('button', { name: he.import.confirm }))
+      expect(await screen.findByText(he.import.doneTitle)).toBeInTheDocument()
+      expect(toast.error).toHaveBeenCalledWith(he.finance.receiptRemoveFailed)
+    })
   })
 })
