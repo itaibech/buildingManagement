@@ -38,6 +38,13 @@ describe('Money', () => {
     expect(el).toHaveAttribute('data-tone', 'paid')
   })
 
+  it('sets the ₪ sign in Assistant (Secular One has no ₪ glyph)', () => {
+    const { container } = wrap(<Money amount={2530.2} size="xl" />)
+    const sign = container.querySelector('.bm-currency')
+    expect(sign).toHaveTextContent(/^₪$/)
+    expect(sign?.closest('[data-tone]')).toHaveTextContent('2,530.20')
+  })
+
   it('stays neutral when asked', () => {
     wrap(<Money amount={660} tone="neutral" />)
     expect(screen.getByText(/660/)).toHaveAttribute('data-tone', 'neutral')

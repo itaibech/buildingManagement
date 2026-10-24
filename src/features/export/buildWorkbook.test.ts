@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { he } from '../../lib/he'
 import { parseBudgetSheet, parseExpensesSheet, parseIncomeSheet } from '../import/parseWorkbook'
 import { SHEETS } from '../import/readWorkbook'
-import { apartmentsRows, balancesRows, buildYearWorkbook, toSheetRows, type YearData } from './buildWorkbook'
+import { apartmentsRows, balancesRows, buildYearWorkbook, expensesRows, paymentsRows, toSheetRows, type YearData } from './buildWorkbook'
 
 const apartments = [
   { id: 'a2', number: 2, floor: 1, notes: null, building_id: 'b', created_at: '', is_committee: false },
@@ -55,6 +55,21 @@ describe('toSheetRows', () => {
     ], [], (id) => ({ standingOrder: id === 'a2', ev: id === 'a1' }))
     expect(rows[0].slice(-3)).toEqual(['אמצעי תשלום', 'נציג ועד', 'עמדת טעינה'])
     expect(rows.slice(1).map((r) => r.slice(-3))).toEqual([['רגיל', 'כן', 'כן'], ['הוראת קבע', '', '']])
+  })
+})
+
+describe('special charges in exports', () => {
+  it('payments and expenses carry a "חיוב מיוחד" column with the label', () => {
+    const info = new Map([['a2', { number: 2, names: 'יוסי כהן' }]])
+    const payments = paymentsRows([
+      { id: 'p1', apartment_id: 'a2', paid_on: '2026-09-01', amount: 2006, method: 'transfer', note: 'תיקון נזק', is_special: true },
+      { id: 'p2', apartment_id: 'a2', paid_on: '2026-09-10', amount: 330, method: 'transfer', note: 'ספטמבר', is_special: false },
+    ], info)
+    expect(payments[0]?.at(-1)).toBe(he.finance.special.exportColumn)
+    expect(payments.slice(1).map((r) => r.at(-1))).toEqual(['תיקון נזק', ''])
+    const expenses = expensesRows([{ id: 'e1', category_id: 'c', category: 'שונות', spent_on: '2026-09-01', amount: 2006, vendor: '', note: 'תיקון נזק',
+      receipt_path: null, source: 'manual', template_id: null, special_id: 'sp1' }])
+    expect(expenses[1]?.at(-1)).toBe('תיקון נזק')
   })
 })
 

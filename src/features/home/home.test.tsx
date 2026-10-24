@@ -51,6 +51,8 @@ vi.mock('../maintenance/api', () => ({ useTasks: () => ({ data: m.tasks, isLoadi
 
 /** Testing Library collapses whitespace (Intl puts a no-break space before ₪). */
 const norm = (text: string): string => text.replace(/\s+/g, ' ')
+/** A <Money> amount: its ₪ sign sits in its own span (Assistant), so match the whole element's text. */
+const money = (text: string) => (_: string, el: Element | null): boolean => !!el?.hasAttribute('data-tone') && norm(el.textContent ?? '') === norm(text)
 
 const ticket = (id: string, title: string, opened_by: string) => ({
   id, title, opened_by, status: 'open', location: '', description: '', created_at: '2026-10-01T00:00:00Z', photoCount: 0,
@@ -140,7 +142,7 @@ describe('HomePage', () => {
     m.balance = 660
     renderHome()
     expect(screen.getByText(he.home.owed)).toBeTruthy()
-    expect(screen.getByText(norm(formatILS(660)))).toBeTruthy()
+    expect(screen.getByText(money(formatILS(660)))).toBeTruthy()
   })
 
   it('resident with a balance to pay sees how to pay: instructions, copy and tap-to-call', () => {
@@ -163,7 +165,7 @@ describe('HomePage', () => {
     cleanup()
     m.balance = -330
     renderHome()
-    expect(screen.getByText(norm(`${formatILS(330)} ${he.credit}`))).toBeTruthy()
+    expect(screen.getByText(money(`${formatILS(330)} ${he.credit}`))).toBeTruthy()
     expect(screen.getByText(he.home.allPaid)).toBeTruthy()
   })
 

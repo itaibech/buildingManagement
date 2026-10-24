@@ -2,9 +2,11 @@ import { useMediaQuery } from '@mantine/hooks'
 import { useMemo } from 'react'
 import { he } from '../../lib/he'
 import { useApartments, useResidents } from '../tenants/api'
-import { useBalances, useBudgets, useExpenseReport, useExpenses, useFeeTimeline, type ApartmentBalance } from './api'
+import { todayISO } from '../../lib/dates'
+import { useApartmentCharges, useSpecialPayments, useBalances, useBudgets, useExpenseReport, useExpenses, useFeeTimeline, useLedger, type ApartmentBalance } from './api'
 import { currentMonth, nextChange, type TimelineRow } from './feeTimeline'
 import { budgetVsActual } from './ledger'
+import { ledgerBalance, settlementPlan } from './settlement'
 
 /** Desktop (≥768px) gets tables; mobile gets lists. */
 export function useDesktop(): boolean {
@@ -81,4 +83,19 @@ export function useApartmentFees() {
   }, [balances.data, timeline.data])
   const refetch = () => { balances.refetch(); void timeline.refetch() }
   return { data, isLoading: balances.isLoading || timeline.isLoading, isError: balances.isError || timeline.isError, refetch }
+}
+
+/**
+ * One apartment's whole ledger (every month through now), its charges, its balance and its open months
+ * (settlementPlan of everything: what "הסדרת חוב" would settle, oldest first).
+ */
+export function useApartmentFinance(apartmentId: string) {
+  const ledger = useLedger(Number(todayISO().slice(0, 4)), apartmentId)
+  const charges = useApartmentCharges(apartmentId)
+  const specials = useSpecialPayments(apartmentId)
+  const rows = useMemo(() => (ledger.data ?? []).filter((r) => r.apartment_id === apartmentId), [ledger.data, apartmentId])
+  const balance = ledgerBalance(rows)
+  const open = useMemo(() => settlementPlan(rows, balance), [rows, balance])
+  const refetch = () => { void ledger.refetch(); void charges.refetch(); void specials.refetch() }
+  return { rows, balance, open, charges: charges.data ?? [], specialPayments: specials.data ?? [], ready: !!ledger.data, isLoading: ledger.isLoading, isError: ledger.isError, refetch }
 }

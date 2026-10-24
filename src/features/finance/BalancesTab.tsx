@@ -1,4 +1,5 @@
-import { Card, Divider, Group, Stack, Text } from '@mantine/core'
+import { Card, Divider, Group, SegmentedControl, Stack, Text } from '@mantine/core'
+import { useLocalStorage } from '@mantine/hooks'
 import { Fragment, useState } from 'react'
 import { formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
@@ -10,7 +11,7 @@ import { useBalances, type ApartmentBalance } from './api'
 import { ApartmentLedger } from './ApartmentLedger'
 import { useRegisterExport } from './exportSlot'
 import { BalanceBadges, LoadFailed } from './cards'
-import { hasBadges } from './ledger'
+import { BALANCE_SORTS, hasBadges, isBalanceSort, sortBalances, type BalanceSort } from './ledger'
 import { Row } from './fields'
 import { PaymentForm } from './PaymentForm'
 
@@ -31,6 +32,14 @@ function Summary({ rows }: { rows: ApartmentBalance[] }) {
   )
 }
 
+const SORT_DATA = BALANCE_SORTS.map((value) => ({ value, label: he.finance.sorts[value] }))
+
+/** The list order, remembered on this device: by apartment number (default) or by amount. */
+function useBalanceSort(): [BalanceSort, (v: string) => void] {
+  const [stored, setStored] = useLocalStorage<string>({ key: 'bm.finance.balances.sort', defaultValue: 'number' })
+  return [isBalanceSort(stored) ? stored : 'number', (v) => isBalanceSort(v) && setStored(v)]
+}
+
 /** One apartment: plate, residents, balance (debt in red); tap opens its ledger. */
 export function BalanceRow({ row, onOpen }: { row: ApartmentBalance; onOpen?: (id: string) => void }) {
   const meta = row.scheduled > 0 ? he.finance.scheduled(formatILS(row.scheduled)) : undefined
@@ -41,12 +50,13 @@ export function BalanceRow({ row, onOpen }: { row: ApartmentBalance; onOpen?: (i
   )
 }
 
-/** Admin "יתרות": every apartment, largest debt first. `paying` opens the payment form (the page FAB). */
+/** Admin "יתרות": every apartment, by number or by amount. `paying` opens the payment form (the page FAB). */
 export function BalancesTab({ paying, onPayingClose }: { paying: boolean; onPayingClose: () => void }) {
   const q = useBalances()
   const [openId, setOpenId] = useState<string | null>(null)
   const open = q.data?.find((r) => r.apartmentId === openId)
   const chargers = useChargers()
+  const [sort, setSort] = useBalanceSort()
   useRegisterExport(he.export.files.balances, () => balancesRows(q.data ?? [], (id) => (chargers.data ?? []).some((c) => c.apartment_id === id)), !!q.data && !!chargers.data)
   return (
     <Card padding={0}>
@@ -54,7 +64,10 @@ export function BalancesTab({ paying, onPayingClose }: { paying: boolean; onPayi
       {q.isError && <Stack p="md"><LoadFailed onRetry={q.refetch} /></Stack>}
       {q.data?.length === 0 && <EmptyState title={he.finance.noApartments} body={he.finance.noApartmentsBody} />}
       {q.data && q.data.length > 0 && <Summary rows={q.data} />}
-      {q.data?.map((row) => (
+      {q.data && q.data.length > 1 && (
+        <SegmentedControl mx="md" mb="sm" data={SORT_DATA} value={sort} onChange={setSort} aria-label={he.finance.sortLabel} />
+      )}
+      {sortBalances(q.data ?? [], sort).map((row) => (
         <Fragment key={row.apartmentId}>
           <Divider color="stone.1" />
           <BalanceRow row={row} onOpen={setOpenId} />

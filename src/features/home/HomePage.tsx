@@ -10,7 +10,7 @@ import { AptPlate, EmptyState, ListSkeleton, Money, PageHeader, StatusBadge } fr
 import { useAnnouncements } from '../announcements/api'
 import { useBalances, useCollectionSummary, useFeeSchedule } from '../finance/api'
 import { HowToPay, MyBalanceHero } from '../finance/cards'
-import { monthOf } from '../finance/ledger'
+import { monthOf, sortBalances } from '../finance/ledger'
 import { useTasks } from '../maintenance/api'
 import { dueBucket } from '../maintenance/nextDue'
 import { useTickets } from '../tickets/api'
@@ -71,10 +71,10 @@ function CollectionHero() {
   )
 }
 
-/** Admin: the five largest debts. */
+/** Admin: the five largest debts (ties by apartment number). */
 function Debtors() {
   const q = useBalances()
-  const debtors = (q.data ?? []).filter((b) => b.balance > 0).slice(0, MAX_DEBTORS)
+  const debtors = sortBalances((q.data ?? []).filter((b) => b.balance > 0), 'amount').slice(0, MAX_DEBTORS)
   return (
     <Section title={he.home.debtors} to="/finance" linkLabel={he.home.allBalances}>
       {q.isLoading && <ListSkeleton rows={3} />}

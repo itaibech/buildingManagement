@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { balanceState, budgetVsActual, monthOf, receiptPath, shiftMonth, sortByDebt, toLedgerGrid } from './ledger'
+import { balanceState, budgetVsActual, isBalanceSort, monthOf, receiptPath, shiftMonth, sortBalances, toLedgerGrid } from './ledger'
 
 describe('toLedgerGrid', () => {
   it('fills 12 months with zeros for months without rows', () => {
@@ -65,8 +65,19 @@ describe('budgetVsActual', () => {
 })
 
 describe('small helpers', () => {
-  it('sortByDebt puts the largest debt first', () => {
-    expect(sortByDebt([{ balance: 10 }, { balance: -5 }, { balance: 300 }]).map((r) => r.balance)).toEqual([300, 10, -5])
+  const apts = [{ number: 12, balance: 10 }, { number: 2, balance: 0 }, { number: 7, balance: -5 }, { number: 3, balance: 300 }, { number: 1, balance: 10 }]
+
+  it('sortBalances by apartment number, ascending (the default)', () => {
+    expect(sortBalances(apts, 'number').map((r) => r.number)).toEqual([1, 2, 3, 7, 12])
+  })
+
+  it('sortBalances by amount: largest debt first, ties by apartment number, credits last', () => {
+    expect(sortBalances(apts, 'amount').map((r) => r.number)).toEqual([3, 1, 12, 2, 7])
+    expect(apts.map((r) => r.number)).toEqual([12, 2, 7, 3, 1])
+  })
+
+  it('isBalanceSort accepts only the two orders (a stored value may be anything)', () => {
+    expect(['number', 'amount', 'balance', null].map(isBalanceSort)).toEqual([true, true, false, false])
   })
 
   it('monthOf and shiftMonth work on first-of-month dates', () => {

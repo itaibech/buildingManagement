@@ -8,6 +8,7 @@ import { EmptyState, ListSkeleton, Money, notifySuccess } from '../../ui'
 import { ConfirmDialog, FormModal } from '../tenants/dialogs'
 import { ApartmentFeesSection } from './ApartmentFees'
 import { useCharges, useDeleteCharge, useFeeSchedule, type Charge } from './api'
+import { UndoSpecialDialog } from './UndoConfirms'
 import { LoadFailed } from './cards'
 import { ChargeForm, FeeForm, LevyForm } from './ChargeForms'
 import { DeleteButton, Row, YearStepper } from './fields'
@@ -71,8 +72,8 @@ function ChargeList({ onDelete }: { onDelete: (c: Charge) => void }) {
       {rows.map((c) => (
         <Fragment key={c.id}>
           <Divider color="stone.1" />
-          <Row plate={info.get(c.apartment_id)?.number} title={c.label || he.finance.kinds[c.kind]}
-            meta={`${he.finance.kinds[c.kind]} · ${monthLabel(c.month)}`} end={<Money amount={c.amount} />}
+          <Row plate={info.get(c.apartment_id)?.number} title={c.special_id ? he.finance.special.chip(c.label) : c.label || he.finance.kinds[c.kind]}
+            meta={`${c.special_id ? he.finance.special.action : he.finance.kinds[c.kind]} · ${monthLabel(c.month)}`} end={<Money amount={c.amount} />}
             trailing={c.ev_reading_id ? <Locked /> : <DeleteButton label={he.finance.deleteCharge} onClick={() => onDelete(c)} />} />
         </Fragment>
       ))}
@@ -91,12 +92,17 @@ function Choice({ title, body, onClick }: { title: string; body: string; onClick
   )
 }
 
+/** A special charge is removed with its linked payment and expense (undo_special_charge), never on its own. */
 function RemoveDialog({ removing, onClose }: { removing: Charge | null; onClose: () => void }) {
   const del = useDeleteCharge()
+  const specialId = removing?.special_id ?? null
   return (
-    <ConfirmDialog opened={!!removing} title={he.finance.deleteChargeConfirm(formatILS(removing?.amount ?? 0))}
-      body={he.finance.deleteChargeBody} confirmLabel={he.finance.delete} loading={del.isPending} failed={del.isError} onClose={onClose}
-      onConfirm={() => removing && del.mutate(removing.id, { onSuccess: () => { notifySuccess(he.finance.chargeDeleted); onClose() } })} />
+    <>
+      <UndoSpecialDialog specialId={specialId} amount={removing?.amount ?? 0} onClose={onClose} doneMessage={he.finance.chargeDeleted} />
+      <ConfirmDialog opened={!!removing && !specialId} title={he.finance.deleteChargeConfirm(formatILS(removing?.amount ?? 0))}
+        body={he.finance.deleteChargeBody} confirmLabel={he.finance.delete} loading={del.isPending} failed={del.isError} onClose={onClose}
+        onConfirm={() => removing && del.mutate(removing.id, { onSuccess: () => { notifySuccess(he.finance.chargeDeleted); onClose() } })} />
+    </>
   )
 }
 

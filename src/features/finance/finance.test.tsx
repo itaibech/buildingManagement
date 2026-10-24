@@ -6,13 +6,14 @@ import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { todayISO } from '../../lib/dates'
+import { formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
 import { theme } from '../../ui/theme'
 import { LevyForm } from './ChargeForms'
 import { ApplyTemplates } from './ExpenseForms'
 import FinancePage from './FinancePage'
 import { PaymentForm } from './PaymentForm'
-import { useDeleteExpense, useSaveExpense, type Template } from './api'
+import { receiptsOf, useDeleteExpense, useSaveExpense, useUndoSpecialCharge, type Template } from './api'
 
 interface Call { table: string; op: string; args: unknown[] }
 const db = vi.hoisted(() => ({
@@ -68,6 +69,7 @@ const wrap = (node: ReactNode, at = '/') =>
   )
 
 const year = todayISO().slice(0, 4)
+const norm = (text: string): string => text.replace(/\s+/g, ' ').trim()
 const APARTMENTS = [{ id: 'a1', number: 1 }, { id: 'a2', number: 2 }, { id: 'a3', number: 3 }]
 const RESIDENTS = [{ id: 'r1', apartment_id: 'a1', full_name: 'דנה' }, { id: 'r2', apartment_id: 'a2', full_name: 'יוסי' }]
 const inserts = (table: string) => db.calls.filter((c) => c.table === table && c.op === 'insert').map((c) => c.args[0])
@@ -148,18 +150,46 @@ describe('resident finance by permission', () => {
 })
 
 describe('admin balances', () => {
-  it('sorts by debt and marks debtors with the debt tone', async () => {
+  it('lists by apartment number, sorts by amount on request (remembered), and marks debtors with the debt tone', async () => {
+    localStorage.clear()
     db.admin = true
     db.tables.apartment_balances = [
       { apartment_id: 'a1', balance: -100, scheduled_charges: 0 },
       { apartment_id: 'a2', balance: 50, scheduled_charges: 0 },
       { apartment_id: 'a3', balance: 900, scheduled_charges: 0 },
     ]
-    wrap(<FinancePage />)
+    const { unmount } = wrap(<FinancePage />)
+    const labels = async () => (await screen.findAllByRole('button', { name: /פתיחת הכרטסת/ })).map((r) => r.getAttribute('aria-label'))
+    expect(await labels()).toEqual([he.finance.openLedger(1), he.finance.openLedger(2), he.finance.openLedger(3)])
+    fireEvent.click(screen.getByRole('radio', { name: he.finance.sorts.amount }))
+    expect(await labels()).toEqual([he.finance.openLedger(3), he.finance.openLedger(2), he.finance.openLedger(1)])
     const rows = await screen.findAllByRole('button', { name: /פתיחת הכרטסת/ })
-    expect(rows.map((r) => r.getAttribute('aria-label'))).toEqual([he.finance.openLedger(3), he.finance.openLedger(2), he.finance.openLedger(1)])
     expect(within(rows[0]!).getByText(/900/)).toHaveAttribute('data-tone', 'debt')
     expect(within(rows[2]!).getByText(/100/)).toHaveAttribute('data-tone', 'paid')
+    unmount()
+    wrap(<FinancePage />)
+    expect(await labels()).toEqual([he.finance.openLedger(3), he.finance.openLedger(2), he.finance.openLedger(1)])
+    localStorage.clear()
+  })
+})
+
+describe('admin charges', () => {
+  it('deleting a special charge confirms with its linked payment and expense, then undoes them together', async () => {
+    db.admin = true
+    db.tables.charges = [{ id: 'x1', apartment_id: 'a2', month: `${year}-01-01`, amount: 2006, kind: 'extra', label: 'תיקון נזק', ev_reading_id: null, special_id: 'sp1' }]
+    db.tables.payments = [{ amount: 2006 }]
+    db.tables.expenses = [{ amount: 2006, expense_categories: { name: 'שונות' } }]
+    wrap(<FinancePage />)
+    fireEvent.click(await screen.findByRole('tab', { name: he.finance.tabs.charges }))
+    expect(await screen.findByText(he.finance.special.chip('תיקון נזק'))).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: he.finance.deleteCharge }))
+    const S = he.finance.special
+    const amt = formatILS(2006)
+    const dialog = await screen.findByRole('dialog', { name: he.finance.deleteChargeConfirm(amt) })
+    expect(await within(dialog).findByText(norm(S.undoBody([S.partCharge(amt), S.partPayment(amt), S.partExpense(amt, 'שונות')])))).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: S.undo }))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith(he.finance.chargeDeleted))
+    expect(db.calls.some((c) => c.table === 'charges' && c.op === 'delete')).toBe(false)
   })
 })
 
@@ -240,6 +270,27 @@ describe('receipt cleanup', () => {
     expect(out.receiptFailed).toBe(true)
     expect(db.removed).toHaveLength(1)
     expect(db.removed[0]?.[0]).toMatch(/^new\/[0-9a-f-]+\.pdf$/)
+  })
+
+  it('undoing a special charge removes its expense\'s receipt file', async () => {
+    db.rpc.undo_special_charge = { charges: 1, payments: 0, expenses: 1, receipts: ['e1/r.pdf'] }
+    const { result } = renderHook(() => useUndoSpecialCharge(), { wrapper: hookWrap })
+    await act(() => result.current.mutateAsync('sp1'))
+    expect(db.removed).toEqual([['e1/r.pdf']])
+    expect(toast.error).not.toHaveBeenCalled()
+  })
+
+  it('a receipt that stays behind after a special undo is reported; no receipt, no storage call', async () => {
+    db.rpc.undo_special_charge = { receipts: ['e1/r.pdf'] }
+    db.removeError = { message: 'nope' }
+    const { result } = renderHook(() => useUndoSpecialCharge(), { wrapper: hookWrap })
+    await act(() => result.current.mutateAsync('sp1'))
+    expect(toast.error).toHaveBeenCalledWith(he.finance.receiptRemoveFailed)
+    db.removed = []
+    db.rpc.undo_special_charge = { receipts: [] }
+    await act(() => result.current.mutateAsync('sp2'))
+    expect(db.removed).toEqual([])
+    expect(receiptsOf({ receipts: ['a', 3, null] })).toEqual(['a'])
   })
 })
 

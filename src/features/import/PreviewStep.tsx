@@ -183,6 +183,12 @@ export function PriorNotice({ prior, keep, onKeep }: { prior: { levy: number; ev
   )
 }
 
+/** The year has debt settlements: a re-import can reopen or over-credit those months (README, הסדרת חוב). */
+export function SettledNotice({ count }: { count: number }) {
+  if (count === 0) return null
+  return <Alert color="signal"><Text size="sm">{he.import.settledHint(count)}</Text></Alert>
+}
+
 export function ReplaceNotes({ fees, budgets }: { fees: number; budgets: number }) {
   if (fees === 0 && budgets === 0) return null
   return (

@@ -19,6 +19,21 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.bm-currency {
+  font-family: Assistant, system-ui, sans-serif;
+  font-weight: 600;
+}
+
+/* A sheet's main actions stay in reach while its content scrolls (apartment ledger). */
+.bm-sheet-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: var(--mantine-color-body);
+  border-top: 1px solid rgba(107, 116, 128, 0.15);
+  padding: 12px 0 calc(12px + var(--bm-safe-bottom));
+}
+
 .bm-display {
   font-family: var(--bm-heading-font);
   font-weight: 400;

@@ -224,4 +224,28 @@ describe('ImportPage', () => {
     await screen.findByText(he.import.doneTitle)
     expect(sentPayload().payments.filter((x) => x.apartment === 1 && x.paid_on === '2026-01-01')).toEqual([])
   })
+
+  it('warns in the preview when the year has debt settlements (a re-import may reopen them)', async () => {
+    db.tables.charges = [{ month: '2026-02-01', kind: 'adjustment', source: 'manual', apartments: { number: 2 } }]
+    db.tables.payments = [{ paid_on: '2026-10-24', amount: 390, source: 'manual', apartments: { number: 3 }, settlement_id: 's1' }]
+    await upload(renderPage())
+    await pick(he.import.monthFor('אוקטובר'), 'אוקטובר')
+    next()
+    await screen.findByText(he.import.feesIntro)
+    next()
+    next()
+    expect(await screen.findByText(he.import.settledHint(2))).toBeInTheDocument()
+  })
+
+  it('no settlement hint for a year without settlements', async () => {
+    db.tables.payments = [{ paid_on: '2026-01-15', amount: 100, source: 'manual', apartments: { number: 1 } }]
+    await upload(renderPage())
+    await pick(he.import.monthFor('אוקטובר'), 'אוקטובר')
+    next()
+    await screen.findByText(he.import.feesIntro)
+    next()
+    next()
+    await screen.findByText(he.import.paidTitle(1))
+    expect(screen.queryByText(he.import.settledHint(1))).toBeNull()
+  })
 })
