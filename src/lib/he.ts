@@ -177,7 +177,16 @@ export const he = {
     directoryEmpty: 'אין עדיין דיירים',
     directoryEmptyBody: 'מנהלי הוועד יוסיפו כאן את דיירי הבניין.',
     noMatches: 'לא נמצאו דיירים',
+    directoryExport: {
+      excel: 'ייצוא לאקסל',
+      print: 'PDF / הדפסה',
+      excelFiltered: (n: number) => `ייצוא ${n} התוצאות המסוננות`,
+      printFiltered: (n: number) => `PDF / הדפסת ${n} התוצאות המסוננות`,
+      ownerOrTenant: 'בעלים/שוכר',
+      printTitle: 'רשימת דיירים',
+    },
     call: (name: string) => `התקשרות אל ${name}`,
+    emailAction: (name: string) => `שליחת מייל ל${name}`,
     loadError: 'לא הצלחנו לטעון את הנתונים. בדקו את החיבור ונסו שוב.',
     errors: {
       required: 'שדה חובה',

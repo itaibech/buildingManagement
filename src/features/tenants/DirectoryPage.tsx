@@ -1,5 +1,5 @@
 import { ActionIcon, Button, Card, Divider, Group, Menu, Stack, Text, TextInput } from '@mantine/core'
-import { IconDots, IconPencil, IconPhone, IconPlus, IconSearch, IconTrash } from '@tabler/icons-react'
+import { IconDots, IconMail, IconPencil, IconPhone, IconPlus, IconSearch, IconTrash } from '@tabler/icons-react'
 import { Fragment, useMemo, useState } from 'react'
 import { useAuth } from '../../auth/AuthProvider'
 import { he } from '../../lib/he'
@@ -7,7 +7,9 @@ import { AptPlate, EmptyState, ListSkeleton, notifySuccess, PageHeader } from '.
 import { ApartmentForm } from './ApartmentForm'
 import { useApartments, type Apartment, useDeleteResident, useDirectory, type DirectoryEntry } from './api'
 import { ConfirmDialog, FormModal } from './dialogs'
+import { DirectoryPrintView } from './DirectoryPrintView'
 import { ResidentForm } from './ResidentForm'
+import { useDirectoryExport } from './useDirectoryExport'
 
 interface Group {
   number: number
@@ -65,20 +67,51 @@ function ResidentMenu({ r, open }: { r: DirectoryEntry; open: Actions['open'] })
   )
 }
 
+function EmailLine({ email }: { email: string }) {
+  return (
+    <Text size="xs" c="dimmed" hiddenFrom="sm" truncate title={email}>
+      <bdi dir="ltr">{email}</bdi>
+    </Text>
+  )
+}
+
+/** Phone and email actions: full buttons on desktop; on mobile the phone stays full and the email is an icon. */
+function ContactActions({ r }: { r: DirectoryEntry }) {
+  return (
+    <>
+      {r.phone && (
+        <Button component="a" href={`tel:${r.phone}`} variant="subtle" aria-label={he.tenants.call(r.full_name)}
+          leftSection={<IconPhone size={18} stroke={1.75} />} className="bm-num" dir="ltr" px="xs" style={{ whiteSpace: 'nowrap' }}>
+          {r.phone}
+        </Button>
+      )}
+      {r.email && (
+        <>
+          <Button component="a" href={`mailto:${r.email}`} visibleFrom="sm" variant="subtle" title={r.email} px="xs"
+            aria-label={he.tenants.emailAction(r.full_name)} leftSection={<IconMail size={18} stroke={1.75} />}
+            styles={{ label: { maxWidth: '16rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }}>
+            <bdi dir="ltr">{r.email}</bdi>
+          </Button>
+          <ActionIcon component="a" href={`mailto:${r.email}`} hiddenFrom="sm" variant="subtle" size={44} title={r.email}
+            aria-label={he.tenants.emailAction(r.full_name)}>
+            <IconMail size={20} stroke={1.75} aria-hidden="true" />
+          </ActionIcon>
+        </>
+      )}
+    </>
+  )
+}
+
 function ResidentLine({ r, actions }: { r: DirectoryEntry; actions: Actions }) {
   return (
     <Group justify="space-between" wrap="wrap" gap="xs" mih={44}>
       <Stack gap={0} style={{ flex: '1 1 8rem', minWidth: 0 }}>
         <Text fw={600}>{r.full_name}</Text>
         <Text size="sm" c="dimmed">{r.is_owner ? he.tenants.owner : he.tenants.tenant}</Text>
+        {r.email && <EmailLine email={r.email} />}
       </Stack>
-      <Group wrap="nowrap" gap={0} style={{ flexShrink: 0 }}>
-        {r.phone && (
-          <Button component="a" href={`tel:${r.phone}`} variant="subtle" aria-label={he.tenants.call(r.full_name)}
-            leftSection={<IconPhone size={18} stroke={1.75} />} className="bm-num" dir="ltr" px="xs" style={{ whiteSpace: 'nowrap' }}>
-            {r.phone}
-          </Button>
-        )}
+      <Group wrap="nowrap" gap={0} style={{ flexShrink: 0, maxWidth: '100%' }}>
+        <ContactActions r={r} />
         {actions.admin && <ResidentMenu r={r} open={actions.open} />}
       </Group>
     </Group>
@@ -162,10 +195,11 @@ export default function DirectoryPage() {
     const found = groupByApartment((directory.data ?? []).filter((e) => matches(e, q)))
     return isAdmin ? withEmptyApartments(found, apartments.data ?? [], q) : found
   }, [directory.data, apartments.data, isAdmin, q])
+  const { action: exportAction, lines } = useDirectoryExport(groups, apartments.data ?? [], q !== '', Boolean(directory.data && apartments.data))
   const empty = directory.data?.length === 0 && !(isAdmin && apartments.data?.length)
   return (
     <Stack gap="md">
-      <PageHeader title={he.nav.directory} />
+      <PageHeader title={he.nav.directory} secondaryAction={exportAction} />
       <TextInput aria-label={he.tenants.search} placeholder={he.tenants.searchPlaceholder} value={query}
         onChange={(e) => setQuery(e.currentTarget.value)} leftSection={<IconSearch size={18} stroke={1.75} />} type="search" />
       <Card padding="md">
@@ -180,6 +214,7 @@ export default function DirectoryPage() {
           </Fragment>
         ))}
       </Card>
+      {isAdmin && <DirectoryPrintView lines={lines} />}
       {isAdmin && <DirectoryDialogs dialog={dialog} close={() => setDialog(null)} />}
     </Stack>
   )
