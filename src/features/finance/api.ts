@@ -407,7 +407,7 @@ export const expensesQuery = (year: number) => ({
   queryFn: async (): Promise<Expense[]> =>
     must(await supabase.from('expenses').select(EXPENSE_COLUMNS)
       .gte('spent_on', `${year}-01-01`).lt('spent_on', `${year + 1}-01-01`)
-      .order('spent_on', { ascending: false }).order('created_at', { ascending: false }))
+      .order('spent_on', { ascending: false }).order('created_at', { ascending: false }).order('id'))
       .map(({ expense_categories, ...e }) => ({ ...e, amount: num(e.amount), category: catName(expense_categories) })),
 })
 
