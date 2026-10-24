@@ -102,3 +102,16 @@ describe('live draft', () => {
     expect(itemPatchFrom({ votes_for: 2, votes_against: 1 })).toMatchObject({ votes_for: null, votes_against: null, votes_abstain: null })
   })
 })
+
+describe('held votes', () => {
+  it('only held items whose votes now fit are released', async () => {
+    const { releasable, heldIds } = await import('./liveDraft')
+    const { meetingFixture } = await import('./fixture')
+    const [a, b] = meetingFixture().items
+    const items = [{ ...a!, votes_for: 4, votes_against: 0, votes_abstain: 0 }, { ...b!, votes_for: 2, votes_against: 0, votes_abstain: 0 }]
+    expect(releasable(new Set([a!.id]), items, 3)).toEqual([])
+    expect(releasable(new Set([a!.id]), items, 4).map((i) => i.id)).toEqual([a!.id])
+    expect(releasable(new Set(), items, 9)).toEqual([])
+    expect([...heldIds({ 'item:x': { __held: true }, 'item:y': {}, 'att:z': { __held: true } })]).toEqual(['x'])
+  })
+})

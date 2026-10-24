@@ -511,8 +511,11 @@ declare
 begin
   perform public.meeting_require(m.status = 'invited', 'state');
   perform public.meeting_require(m.postponed_at is not null or (select q.met from public.meeting_quorum(p_meeting) q), 'no_quorum');
-  -- After a postponement the meeting opens no earlier than the postponed time.
-  perform public.meeting_require(m.postponed_at is null or coalesce(p_opened_at, now()) >= m.postponed_to, 'too_early');
+  -- After a postponement the meeting opens no earlier than the postponed time, by the real clock and by the
+  -- recorded opening time; an opening time may not be in the future (5 minutes' leeway for clock drift).
+  perform public.meeting_require(m.postponed_at is null or (now() >= m.postponed_to
+    and coalesce(p_opened_at, now()) >= m.postponed_to), 'too_early');
+  perform public.meeting_require(coalesce(p_opened_at, now()) <= now() + interval '5 minutes', 'future');
   perform public.meeting_require(trim(coalesce(p_chair, '')) <> '' and trim(coalesce(p_secretary, '')) <> '', 'roles');
   update public.meetings set status = 'in_progress', opened_at = coalesce(p_opened_at, now()),
     chair_name = left(trim(p_chair), 120), secretary_name = left(trim(p_secretary), 120)

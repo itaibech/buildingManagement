@@ -4,7 +4,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(116);
+select plan(119);
 
 -- ---------------------------------------------------------------- fixtures (as postgres)
 insert into auth.users (id, email, aud, role) values
@@ -157,13 +157,24 @@ select ok((select postponed_at is not null and postponed_to = greatest(scheduled
   from public.meetings where id = 'e2400000-0000-0000-0000-000000000001'), 'postpone: the new opening time is +1 hour');
 select throws_like($$select public.postpone_meeting('e2400000-0000-0000-0000-000000000001')$$, 'meeting:already_postponed%', 'postpone: once');
 select throws_like($$select public.open_meeting('e2400000-0000-0000-0000-000000000001', now(), 'יו"ר', 'מזכירה')$$,
-  'meeting:too_early%', 'open: not before the postponed time');
+  'meeting:too_early%', 'open: not right after the postponement (real clock)');
 select throws_like($$select public.open_meeting('e2400000-0000-0000-0000-000000000001',
-  (select postponed_to from public.meetings where id = 'e2400000-0000-0000-0000-000000000001'), ' ', 'מזכירה')$$,
+  (select postponed_to from public.meetings where id = 'e2400000-0000-0000-0000-000000000001'), 'יו"ר', 'מזכירה')$$,
+  'meeting:too_early%', 'open: a future opening time doesn''t get around the postponement');
+-- An hour has passed: backdate the postponement (as postgres; the guard binds API users only).
+reset role;
+update public.meetings set postponed_at = now() - interval '61 minutes', postponed_to = now() - interval '1 minute'
+  where id = 'e2400000-0000-0000-0000-000000000001';
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"a2400000-0000-0000-0000-000000000001","role":"authenticated"}';
+select throws_like($$select public.open_meeting('e2400000-0000-0000-0000-000000000001', now() - interval '2 minutes', 'יו"ר', 'מזכירה')$$,
+  'meeting:too_early%', 'open: the opening time can''t be before the postponed time');
+select throws_like($$select public.open_meeting('e2400000-0000-0000-0000-000000000001', now() + interval '1 hour', 'יו"ר', 'מזכירה')$$,
+  'meeting:future%', 'open: the opening time can''t be in the future');
+select throws_like($$select public.open_meeting('e2400000-0000-0000-0000-000000000001', now(), ' ', 'מזכירה')$$,
   'meeting:roles%', 'open: a chair and a recorder are required');
-select lives_ok($$select public.open_meeting('e2400000-0000-0000-0000-000000000001',
-  (select postponed_to from public.meetings where id = 'e2400000-0000-0000-0000-000000000001'), 'יו"ר האסיפה', 'רושמת הפרוטוקול')$$,
-  'open: at the postponed time, any attendance is valid');
+select lives_ok($$select public.open_meeting('e2400000-0000-0000-0000-000000000001', now(), 'יו"ר האסיפה', 'רושמת הפרוטוקול')$$,
+  'open: once the postponed time has passed, any attendance is valid');
 select is((select row(status, chair_name, secretary_name)::text from public.meetings where id = 'e2400000-0000-0000-0000-000000000001'),
   '(in_progress,"יו""ר האסיפה","רושמת הפרוטוקול")', 'open: in progress, with the roles');
 

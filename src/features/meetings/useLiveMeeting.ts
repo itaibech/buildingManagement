@@ -1,8 +1,8 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { saveAttendance, saveItem, type AttendanceValue, type ItemPatch } from './api'
 import { useAutosave } from './autosave'
 import { voteError } from './votes'
-import { ABSENT, attKey, attendanceFrom, itemKey, itemPatchFrom, itemPatchOf, mergeAttendance, mergeItems } from './liveDraft'
+import { ABSENT, attKey, attendanceFrom, heldIds, itemKey, itemPatchFrom, itemPatchOf, mergeAttendance, mergeItems, releasable } from './liveDraft'
 import { attendingCount } from './quorum'
 import { votesOf, type AgendaItem, type MeetingDetail } from './types'
 
@@ -18,6 +18,8 @@ export function useLiveMeeting(meeting: MeetingDetail) {
   // Local edits by item id over the server's items (items added during the meeting appear as they are fetched).
   const [edited, setEdited] = useState<Record<string, AgendaItem>>(() =>
     Object.fromEntries(mergeItems(meeting.items, restored).filter((i) => restored[itemKey(i.id)]).map((i) => [i.id, i])))
+  // Items whose votes are held on the device (over the attendee count), so a later attendance change can send them.
+  const held = useRef<Set<string>>(heldIds(restored))
   const items = useMemo(() => meeting.items.map((i) => edited[i.id] ?? i), [meeting.items, edited])
   const attending = useMemo(() => attendingCount(Object.values(attendance)), [attendance])
 
@@ -26,10 +28,9 @@ export function useLiveMeeting(meeting: MeetingDetail) {
     setAttendance(next)
     push(attKey(apartmentId), { ...v })
     // A held vote that now fits the attendee count goes to the server.
-    const count = attendingCount(Object.values(next))
-    for (const i of Object.values(edited)) {
-      const votes = votesOf(i)
-      if (votes && !voteError(votes, count)) push(itemKey(i.id), { ...itemPatchOf(i) })
+    for (const i of releasable(held.current, items, attendingCount(Object.values(next)))) {
+      held.current.delete(i.id)
+      push(itemKey(i.id), { ...itemPatchOf(i) })
     }
   }
   const setItem = (id: string, patch: ItemPatch) => {
@@ -39,8 +40,14 @@ export function useLiveMeeting(meeting: MeetingDetail) {
     setEdited((cur) => ({ ...cur, [id]: next }))
     const votes = votesOf(next)
     // Always kept on the device; sent once the vote fits the attendee count (the server would refuse it).
-    const save = votes && voteError(votes, attending) ? hold : push
-    save(itemKey(id), { ...itemPatchOf(next) })
+    const over = !!votes && !!voteError(votes, attending)
+    if (over) {
+      held.current.add(id)
+      hold(itemKey(id), { ...itemPatchOf(next) })
+    } else {
+      held.current.delete(id)
+      push(itemKey(id), { ...itemPatchOf(next) })
+    }
   }
   return { attendance, items, attending, setApartment, setItem, flush, status, absent: ABSENT }
 }

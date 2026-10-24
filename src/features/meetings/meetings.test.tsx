@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { configure, fireEvent, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { he } from '../../lib/he'
 import { theme } from '../../ui'
 import { ClosedMeeting } from './ClosedMeeting'
@@ -123,14 +123,34 @@ describe('"פה אחד"', () => {
 
 describe('opening after a postponement', () => {
   const q = { total: 5, attending: 3, required: 3, met: true, postponed: true, valid: true }
-  it('shows the earliest time and refuses an earlier opening time', () => {
+  // A fixed midday clock (Israel 14:00), so the typed times below never wrap around midnight.
+  beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-11-03T12:00:00Z')) })
+  afterEach(() => vi.useRealTimers())
+  const at = (minutes: number) => new Date(Date.now() + minutes * 60_000).toISOString()
+  const render = (postponed_to: string, onOpen = vi.fn()) =>
+    wrap(<Opening meeting={withStatus('invited', { chair_name: 'א', secretary_name: 'ב', postponed_to })} q={q} names={[]} busy={false} onOpen={onOpen} />)
+
+  it('stays disabled, with a countdown, until the postponed time has passed (even with the postponed time typed)', () => {
+    render(at(3))
+    expect(screen.getByText(he.meetings.live.opensIn(3))).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText(he.meetings.live.openingTime), { target: { value: '14:03' } })
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: he.meetings.live.open })).toBeDisabled()
+  })
+
+  it('opens once the time has passed (default time: now); an earlier or future time is refused', () => {
     const onOpen = vi.fn()
-    wrap(<Opening meeting={withStatus('invited')} q={q} names={[]} busy={false} onOpen={onOpen} />)
-    expect(screen.getByText(he.meetings.live.earliest('20:00'))).toBeInTheDocument()
+    render(at(-2), onOpen)
     const open = screen.getByRole('button', { name: he.meetings.live.open })
     expect(open).toBeEnabled()
-    fireEvent.change(screen.getByLabelText(he.meetings.live.openingTime), { target: { value: '19:30' } })
-    expect(screen.getByRole('alert')).toHaveTextContent(he.meetings.live.tooEarly('20:00'))
+    fireEvent.click(open)
+    expect(onOpen).toHaveBeenCalledTimes(1)
+    const time = screen.getByLabelText(he.meetings.live.openingTime)
+    fireEvent.change(time, { target: { value: '13:50' } })
+    expect(screen.getByRole('alert')).toHaveTextContent(he.meetings.live.tooEarly('13:58'))
+    expect(open).toBeDisabled()
+    fireEvent.change(time, { target: { value: '15:00' } })
+    expect(screen.getByRole('alert')).toHaveTextContent(he.meetings.live.future)
     expect(open).toBeDisabled()
   })
 })

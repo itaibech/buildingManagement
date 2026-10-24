@@ -55,3 +55,15 @@ export function mergeAttendance(rows: readonly Attendance[], draft: Draft): Reco
 /** Items with the device's drafts applied. */
 export const mergeItems = (items: readonly AgendaItem[], draft: Draft): AgendaItem[] =>
   items.map((i) => (draft[itemKey(i.id)] ? { ...i, ...itemPatchFrom(draft[itemKey(i.id)] ?? {}) } : i))
+
+/** Held items (votes over the attendee count, kept on the device) whose votes now fit: these may be sent. */
+export function releasable(held: ReadonlySet<string>, items: readonly AgendaItem[], attending: number): AgendaItem[] {
+  return items.filter((i) => {
+    const v = held.has(i.id) && i.votes_for !== null ? { for: i.votes_for, against: i.votes_against ?? 0, abstain: i.votes_abstain ?? 0 } : null
+    return v !== null && v.for + v.against + v.abstain <= attending
+  })
+}
+
+/** Item ids a stored draft holds back (marked by the autosaver's hold). */
+export const heldIds = (draft: Draft): Set<string> =>
+  new Set(Object.entries(draft).filter(([k, v]) => k.startsWith('item:') && v.__held === true).map(([k]) => k.slice(5)))
