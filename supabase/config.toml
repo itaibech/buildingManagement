@@ -424,3 +424,7 @@ enabled = true
 # formatted with uppercase keywords, indent 2, max width 180, trailing commas,
 # and column/key alignment. Set to "null" to emit raw, unformatted SQL.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":180,\"commaStyle\":\"trailing\"}"
+
+# The email function: callers must send a valid user JWT (the function then checks is_admin()).
+[functions.send-email]
+verify_jwt = true

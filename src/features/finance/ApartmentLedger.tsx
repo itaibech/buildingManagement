@@ -1,11 +1,12 @@
 import { Button, Group, Stack, Text } from '@mantine/core'
 import { FormModal } from '../tenants/dialogs'
-import { IconCash, IconChecklist, IconSparkles } from '@tabler/icons-react'
+import { IconCash, IconChecklist, IconMail, IconSparkles } from '@tabler/icons-react'
 import { useState } from 'react'
 import { todayISO } from '../../lib/dates'
 import { formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
 import { AptPlate, ListSkeleton, Money } from '../../ui'
+import { DebtReminderForm } from '../email/DebtReminder'
 import { useBalances, type ApartmentBalance, type ApartmentCharge } from './api'
 import { BalanceBadges, LoadFailed } from './cards'
 import { YearStepper } from './fields'
@@ -71,9 +72,9 @@ function Hero({ apartment, fin }: { apartment: ApartmentBalance; fin: ReturnType
   )
 }
 
-type Sheet = 'pay' | 'settle' | 'special'
+type Sheet = 'pay' | 'settle' | 'special' | 'remind'
 
-/** The sheet's sticky actions: "רישום תשלום", "הסדרת חוב" (while it owes) and "חיוב מיוחד". */
+/** The sheet's sticky actions: "רישום תשלום", "הסדרת חוב" and "שליחת תזכורת חוב" (while it owes), "חיוב מיוחד". */
 function Actions({ owes, onOpen }: { owes: boolean; onOpen: (s: Sheet) => void }) {
   return (
     <div className="bm-sheet-actions">
@@ -87,6 +88,11 @@ function Actions({ owes, onOpen }: { owes: boolean; onOpen: (s: Sheet) => void }
         <Button variant="default" style={{ flex: '1 1 0' }} leftSection={<IconSparkles size={20} stroke={1.75} />} onClick={() => onOpen('special')}>
           {he.finance.special.action}
         </Button>
+        {owes && (
+          <Button variant="default" style={{ flex: '1 1 100%' }} leftSection={<IconMail size={20} stroke={1.75} />} onClick={() => onOpen('remind')}>
+            {he.mail.debt.action}
+          </Button>
+        )}
       </Group>
     </div>
   )
@@ -98,6 +104,7 @@ export function ApartmentLedger({ apartment }: { apartment: ApartmentBalance }) 
   const fin = useApartmentFinance(apartment.apartmentId)
   const close = () => setSheet(null)
   if (sheet === 'pay') return <PaymentForm apartmentId={apartment.apartmentId} onDone={close} />
+  if (sheet === 'remind') return <DebtReminderForm apartment={apartment} onDone={close} />
   if (sheet === 'special') return <SpecialChargeForm apartmentId={apartment.apartmentId} onDone={close} />
   if (sheet === 'settle') return fin.ready ? <SettleDebtForm apartmentId={apartment.apartmentId} rows={fin.rows} onDone={close} /> : <ListSkeleton rows={4} />
   return (

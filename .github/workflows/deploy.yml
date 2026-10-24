@@ -47,6 +47,9 @@ jobs:
           version: 2.122.0
       - run: supabase link --project-ref "$SUPABASE_PROJECT_REF" -p "$SUPABASE_DB_PASSWORD"
       - run: supabase db push -p "$SUPABASE_DB_PASSWORD"
+      # After the migrations (it writes email_log). JWT verification stays on (supabase/config.toml). Its secrets are
+      # set once by hand (README → Email setup); without them the function runs in dry run.
+      - run: supabase functions deploy send-email --project-ref "$SUPABASE_PROJECT_REF"
   deploy:
     needs: [build, migrate]
     runs-on: ubuntu-latest

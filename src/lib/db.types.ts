@@ -305,6 +305,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"email_log": {
+                  Row: {
+                    "apartment_ids": (string)[] | null,"building_id": string,"created_at": string,"dry_run": boolean,"error": string | null,"failed": number,"id": string,"kind": string,"recipients": number,"ref_id": string | null,"sent": number,"sent_by": string | null,"skipped": number,"status": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "apartment_ids"?: (string)[] | null,"building_id": string,"created_at"?: string,"dry_run"?: boolean,"error"?: string | null,"failed"?: number,"id"?: string,"kind": string,"recipients"?: number,"ref_id"?: string | null,"sent"?: number,"sent_by"?: string | null,"skipped"?: number,"status"?: string
+                  }
+                  Update: {
+                    "apartment_ids"?: (string)[] | null,"building_id"?: string,"created_at"?: string,"dry_run"?: boolean,"error"?: string | null,"failed"?: number,"id"?: string,"kind"?: string,"recipients"?: number,"ref_id"?: string | null,"sent"?: number,"sent_by"?: string | null,"skipped"?: number,"status"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "email_log_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "email_log_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"ev_chargers": {
                   Row: {
                     "active": boolean,"apartment_id": string,"building_id": string,"created_at": string,"id": string,"initial_reading": number,"label": string
@@ -987,6 +1013,9 @@ isOneToOne: false
 "delete_ev_reading":
 { Args: { "p_reading_id": string }; Returns: undefined
                            },
+"email_sent_today":
+{ Args: { "p_building": string }; Returns: number
+                           },
 "ev_charge_reading":
 { Args: { "p_reading_id": string }; Returns: Json
                            },
@@ -1116,6 +1145,9 @@ isOneToOne: false
                            },
 "record_ev_reading":
 { Args: { "p_charger_id": string,"p_month": string,"p_note"?: string,"p_read_on"?: string,"p_reading": number }; Returns: Json
+                           },
+"reserve_email_quota":
+{ Args: { "p_apartment_ids"?: (string)[],"p_building": string,"p_cap": number,"p_count": number,"p_kind": string,"p_ref_id"?: string,"p_sent_by": string }; Returns: string
                            },
 "save_apartment":
 { Args: { "p_ev"?: boolean,"p_ev_initial"?: number,"p_fee"?: number,"p_floor"?: number,"p_id"?: string,"p_is_committee"?: boolean,"p_notes"?: string,"p_number"?: number,"p_payment_method"?: string,"p_standing_order_from"?: string }; Returns: string

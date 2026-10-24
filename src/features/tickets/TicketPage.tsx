@@ -1,5 +1,5 @@
 import { ActionIcon, Card, Group, Menu, Stack, Text, Title } from '@mantine/core'
-import { IconDots, IconPencil, IconTrash } from '@tabler/icons-react'
+import { IconDots, IconMail, IconPencil, IconTrash } from '@tabler/icons-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { useAuth } from '../../auth/AuthProvider'
@@ -7,6 +7,7 @@ import { formatDate } from '../../lib/format'
 import { he } from '../../lib/he'
 import { BackLink, ListSkeleton, notifySuccess, StatusBadge } from '../../ui'
 import { useMarkTicketsSeen } from '../notifications/api'
+import { SendEmailDialog } from '../email/SendEmailDialog'
 import { ConfirmDialog, FormModal } from '../tenants/dialogs'
 import { AdminControls } from './AdminControls'
 import { useDeleteTicket, useTicket, type TicketDetail } from './api'
@@ -14,9 +15,10 @@ import { TicketComments } from './TicketComments'
 import { TicketForm } from './TicketForm'
 import { TicketPhotos } from './TicketPhotos'
 
-type Dialog = 'edit' | 'delete' | null
+type Dialog = 'edit' | 'delete' | 'email' | null
 const ICON = { size: 18, stroke: 1.75 } as const
 
+/** canDelete = admin: delete and "שליחה במייל". */
 function ActionsMenu({ canEdit, canDelete, setDialog }: { canEdit: boolean; canDelete: boolean; setDialog: (d: Dialog) => void }) {
   if (!canEdit && !canDelete) return null
   return (
@@ -28,6 +30,7 @@ function ActionsMenu({ canEdit, canDelete, setDialog }: { canEdit: boolean; canD
       </Menu.Target>
       <Menu.Dropdown>
         {canEdit && <Menu.Item leftSection={<IconPencil {...ICON} />} onClick={() => setDialog('edit')}>{he.tickets.edit}</Menu.Item>}
+        {canDelete && <Menu.Item leftSection={<IconMail {...ICON} />} onClick={() => setDialog('email')}>{he.mail.send}</Menu.Item>}
         {canDelete && <Menu.Item color="debt" leftSection={<IconTrash {...ICON} />} onClick={() => setDialog('delete')}>{he.tickets.delete}</Menu.Item>}
       </Menu.Dropdown>
     </Menu>
@@ -69,6 +72,7 @@ function Dialogs({ ticket, dialog, close }: { ticket: TicketDetail; dialog: Dial
       </FormModal>
       <ConfirmDialog opened={dialog === 'delete'} title={he.tickets.deleteConfirm(ticket.title)} body={he.tickets.deleteBody}
         confirmLabel={he.tickets.delete} loading={del.isPending} failed={del.isError} onClose={close} onConfirm={onDelete} />
+      <SendEmailDialog opened={dialog === 'email'} onClose={close} kind="ticket" refId={ticket.id} subject={ticket.title} />
     </>
   )
 }

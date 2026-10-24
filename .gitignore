@@ -7,3 +7,6 @@ coverage
 .DS_Store
 supabase/.env
 supabase/seed.local.sql
+
+# Local Edge Function env (dry run); real secrets live only in Supabase (supabase secrets set)
+supabase/functions/.env

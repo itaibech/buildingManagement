@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 import { useForm, type UseFormReturnType } from '@mantine/form'
 import { he } from '../../lib/he'
 import { focusFirstError, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
+import { EmailSettings } from '../email/EmailSettings'
 import { LoadFailed } from '../finance/cards'
 import { useBuilding, useSaveBuilding, type Building } from './api'
 
@@ -75,7 +76,7 @@ const permissionsLink = (
   </Button>
 )
 
-/** Admin "הגדרות בניין": building name and address, and the "how to pay" text residents see. */
+/** Admin "הגדרות בניין": building name and address, the "how to pay" text residents see, and email (test + history). */
 export default function SettingsPage() {
   const q = useBuilding()
   return (
@@ -83,7 +84,10 @@ export default function SettingsPage() {
       <PageHeader title={he.nav.settings} extra={permissionsLink} />
       {q.isLoading && <ListSkeleton rows={4} />}
       {q.isError && <LoadFailed onRetry={() => void q.refetch()} />}
-      {q.data && <SettingsForm key={q.data.id} building={q.data} />}
+      <Stack gap="lg">
+        {q.data && <SettingsForm key={q.data.id} building={q.data} />}
+        <EmailSettings />
+      </Stack>
     </>
   )
 }

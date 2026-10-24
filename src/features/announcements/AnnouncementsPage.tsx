@@ -3,12 +3,13 @@ import { useState } from 'react'
 import { useAuth } from '../../auth/AuthProvider'
 import { he } from '../../lib/he'
 import { EmptyState, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
+import { SendEmailDialog } from '../email/SendEmailDialog'
 import { ConfirmDialog, FormModal } from '../tenants/dialogs'
 import { AnnouncementForm } from './AnnouncementForm'
 import { AnnouncementItem, type AdminActions } from './AnnouncementItem'
 import { useAnnouncements, useDeleteAnnouncement, useExpiredAnnouncements, useMarkRead, type Announcement } from './api'
 
-type Dialog = { kind: 'add' } | { kind: 'edit' | 'delete'; item: Announcement } | null
+type Dialog = { kind: 'add' } | { kind: 'edit' | 'delete' | 'email'; item: Announcement } | null
 
 function ExpiredSection({ actions }: { actions?: AdminActions }) {
   const { data } = useExpiredAnnouncements()
@@ -33,6 +34,7 @@ function Dialogs({ dialog, close }: { dialog: Dialog; close: () => void }) {
       </FormModal>
       <ConfirmDialog opened={dialog?.kind === 'delete'} title={he.announcements.deleteConfirm(item?.title ?? '')} body={he.announcements.deleteBody}
         confirmLabel={he.announcements.delete} loading={del.isPending} failed={del.isError} onClose={close} onConfirm={onDelete} />
+      <SendEmailDialog opened={dialog?.kind === 'email'} onClose={close} kind="announcement" refId={item?.id ?? ''} subject={item?.title ?? ''} />
     </>
   )
 }
@@ -45,7 +47,10 @@ export default function AnnouncementsPage() {
   const [dialog, setDialog] = useState<Dialog>(null)
   const add = isAdmin ? { label: he.announcements.add, onClick: () => setDialog({ kind: 'add' }) } : undefined
   const actions: AdminActions | undefined = isAdmin
-    ? { onEdit: (item) => setDialog({ kind: 'edit', item }), onDelete: (item) => setDialog({ kind: 'delete', item }) }
+    ? {
+      onEdit: (item) => setDialog({ kind: 'edit', item }), onDelete: (item) => setDialog({ kind: 'delete', item }),
+      onEmail: (item) => setDialog({ kind: 'email', item }),
+    }
     : undefined
   return (
     <Stack gap="md">
