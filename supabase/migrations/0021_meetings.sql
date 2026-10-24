@@ -571,7 +571,8 @@ begin
 end;
 $$;
 
--- Closed → published (the archive): needs the chair's and the recorder's signatures; announces the protocol.
+-- Closed → published (the archive): needs the chair's and the recorder's signatures; announces the protocol and
+-- unpins the invitation.
 create function public.publish_meeting(p_meeting uuid) returns uuid
 language plpgsql security definer set search_path = ''
 as $$
@@ -584,6 +585,7 @@ begin
     where meeting_id = p_meeting and role in ('chair', 'secretary')) = 2, 'signatures');
   v_ann := public.meeting_announce(m, 'פורסם פרוטוקול ' || m.title || ' מתאריך ' || public.meeting_local(coalesce(m.opened_at, m.scheduled_at), 'DD/MM/YYYY'),
     'פרוטוקול ה' || public.meeting_kind_label(m.kind) || ' פורסם וזמין לכל הדיירים באפליקציה, כולל מי שלא נכח.', false);
+  update public.announcements set pinned = false where id = m.invite_announcement_id;
   update public.meetings set status = 'published', published_at = now(), publish_announcement_id = v_ann where id = p_meeting;
   insert into public.meeting_events (meeting_id, kind, details) values (p_meeting, 'published', jsonb_build_object('announcement_id', v_ann));
   return v_ann;

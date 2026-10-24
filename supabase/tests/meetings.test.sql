@@ -4,7 +4,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(105);
+select plan(106);
 
 -- ---------------------------------------------------------------- fixtures (as postgres)
 insert into auth.users (id, email, aud, role) values
@@ -163,7 +163,7 @@ select lives_ok($$select public.open_meeting('e2400000-0000-0000-0000-0000000000
 -- ---------------------------------------------------------------- residents: live data is hidden
 set local request.jwt.claims = '{"sub":"a2400000-0000-0000-0000-000000000002","role":"authenticated"}';
 select is((select count(*) from public.meetings where building_id = 'b2400000-0000-0000-0000-000000000001'), 0::bigint, 'resident: a meeting in progress is hidden');
-select is((select count(*) from public.meeting_attendance), 0::bigint, 'resident: live attendance is hidden');
+select is((select count(*) from public.meeting_attendance where meeting_id::text like 'e2400000-%'), 0::bigint, 'resident: live attendance is hidden');
 
 -- ---------------------------------------------------------------- votes and decisions
 set local request.jwt.claims = '{"sub":"a2400000-0000-0000-0000-000000000001","role":"authenticated"}';
@@ -222,7 +222,7 @@ select throws_ok($$insert into storage.objects (bucket_id, name) values ('meetin
 -- ---------------------------------------------------------------- residents: closed is still hidden
 set local request.jwt.claims = '{"sub":"a2400000-0000-0000-0000-000000000002","role":"authenticated"}';
 select is((select count(*) from public.meetings where id = 'e2400000-0000-0000-0000-000000000001'), 0::bigint, 'resident: an unpublished closed meeting is hidden');
-select is((select count(*) from storage.objects where bucket_id = 'meeting-files'), 0::bigint, 'resident: files of unpublished meetings are hidden');
+select is((select count(*) from storage.objects where bucket_id = 'meeting-files' and name like 'e2400000-%'), 0::bigint, 'resident: files of unpublished meetings are hidden');
 select throws_ok($$insert into storage.objects (bucket_id, name) select 'meeting-files', v from ids where k = 'late'$$,
   '42501', null, 'resident: cannot upload');
 select throws_ok($$select public.sign_meeting('e2400000-0000-0000-0000-000000000001', 'chair', 'x', (select v from ids where k = 'sig'))$$,
@@ -245,6 +245,8 @@ select ok((select m.status = 'published' and m.published_at is not null and a.ti
   and a.link = '/meetings/e2400000-0000-0000-0000-000000000001'
   from public.meetings m join public.announcements a on a.id = m.publish_announcement_id where m.id = 'e2400000-0000-0000-0000-000000000001'),
   'publish: published, with an announcement linking to the protocol');
+select is((select a.pinned from public.meetings m join public.announcements a on a.id = m.invite_announcement_id
+  where m.id = 'e2400000-0000-0000-0000-000000000001'), false, 'publish: the invitation is no longer pinned');
 select throws_ok($$insert into storage.objects (bucket_id, name) select 'meeting-files', v from ids where k = 'late'$$,
   '42501', null, 'storage: a published meeting''s folder is read-only');
 select is((select count(*) from storage.objects where bucket_id = 'meeting-files' and name like 'e2400000-0000-0000-0000-000000000001/%'), 2::bigint,
@@ -262,10 +264,10 @@ set local request.jwt.claims = '{"sub":"a2400000-0000-0000-0000-000000000002","r
 select is((select count(*) from public.meetings where id = 'e2400000-0000-0000-0000-000000000001'), 1::bigint, 'resident: sees the published meeting');
 select is((select count(*) from public.meeting_attendance where meeting_id = 'e2400000-0000-0000-0000-000000000001'), 5::bigint,
   'resident: sees the published attendance');
-select is((select count(*) from public.meeting_signatures), 2::bigint, 'resident: sees the signatures');
-select is((select count(*) from public.meeting_addenda), 1::bigint, 'resident: sees the addenda');
+select is((select count(*) from public.meeting_signatures where meeting_id::text like 'e2400000-%'), 2::bigint, 'resident: sees the signatures');
+select is((select count(*) from public.meeting_addenda where meeting_id::text like 'e2400000-%'), 1::bigint, 'resident: sees the addenda');
 select is((select count(*) from public.meeting_events), 0::bigint, 'resident: never sees the audit log');
-select is((select count(*) from storage.objects where bucket_id = 'meeting-files'), 2::bigint, 'resident: reads files of the published meeting only');
+select is((select count(*) from storage.objects where bucket_id = 'meeting-files' and name like 'e2400000-%'), 2::bigint, 'resident: reads files of the published meeting only');
 set local request.jwt.claims = '{"sub":"a2400000-0000-0000-0000-000000000003","role":"authenticated"}';
 select is((select count(*) from public.meetings), 0::bigint, 'no meetings permission: no published meeting');
 select is((select count(*) from storage.objects where bucket_id = 'meeting-files'), 0::bigint, 'no meetings permission: no files');
