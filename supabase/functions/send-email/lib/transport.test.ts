@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createTransport, type FetchFn } from './transport.ts'
+import { createTransport, gmailSafeName, type FetchFn } from './transport.ts'
 
 const msg = { to: 'dana@example.test', subject: 'נושא', html: '<p>שלום</p>', text: 'שלום' }
 const TOKEN = 'super-secret-token-123'
@@ -29,7 +29,7 @@ describe('createTransport', () => {
     expect(await t.send(msg)).toEqual({ ok: true })
     const [url, init] = f.calls[0]
     expect(url).toBe('https://script.google.test/exec')
-    expect(JSON.parse(String(init.body))).toEqual({ token: TOKEN, ...msg, fromName: 'ועד הבית' })
+    expect(JSON.parse(String(init.body))).toEqual({ token: TOKEN, ...msg, fromName: 'ועד\u00a0הבית' })
     for (const s of spies) for (const call of s.mock.calls) expect(JSON.stringify(call)).not.toContain(TOKEN)
   })
 
@@ -76,5 +76,20 @@ describe('createTransport', () => {
 
   it('an unknown provider is treated as not configured', () => {
     expect(createTransport({ EMAIL_PROVIDER: 'smtp' }, mockFetch(200, {}))).toMatchObject({ dryRun: true, reason: 'not_configured' })
+  })
+})
+
+describe('gmailSafeName', () => {
+  it('uses no-break spaces in Hebrew names so every 16-byte slice ends between letters', () => {
+    const safe = gmailSafeName('ועד הבית חבצלת השרון 6')
+    expect(safe).toBe('ועד\u00a0הבית\u00a0חבצלת\u00a0השרון\u00a06')
+    const bytes = new TextEncoder().encode(safe)
+    const starts = new Set<number>()
+    let i = 0
+    for (const ch of safe) { starts.add(i); i += new TextEncoder().encode(ch).length }
+    for (let k = 16; k < bytes.length; k += 16) expect(starts.has(k)).toBe(true)
+  })
+  it('leaves ASCII names alone', () => {
+    expect(gmailSafeName('Building Committee')).toBe('Building Committee')
   })
 })

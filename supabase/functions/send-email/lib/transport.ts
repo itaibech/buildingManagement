@@ -44,11 +44,20 @@ async function post(fetchFn: FetchFn, url: string, init: RequestInit, secrets: s
   }
 }
 
+/**
+ * Gmail (MailApp/GmailApp) RFC-2047-encodes a non-ASCII sender name in 16-byte slices without respecting character
+ * boundaries. Hebrew letters are 2 UTF-8 bytes and a space is 1, so after an odd number of spaces a slice cuts a letter
+ * in half ("הש��ון"). A no-break space is 2 bytes and looks the same, which keeps every letter on an even offset.
+ */
+export function gmailSafeName(name: string): string {
+  return /[\u0080-\uffff]/.test(name) ? name.replace(/ /g, '\u00a0') : name
+}
+
 /** Google Apps Script web app (docs/email/apps-script.gs): {token, to, subject, html, text, fromName} → {ok}. */
 function appsScript(env: Env, fetchFn: FetchFn): (m: MailMessage) => Promise<SendResult> {
   const url = env.APPS_SCRIPT_URL ?? ''
   const token = env.APPS_SCRIPT_TOKEN ?? ''
-  const fromName = env.EMAIL_FROM_NAME || DEFAULT_FROM_NAME
+  const fromName = gmailSafeName(env.EMAIL_FROM_NAME || DEFAULT_FROM_NAME)
   return (m) => post(fetchFn, url, {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ token, ...m, fromName }),
