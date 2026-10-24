@@ -118,6 +118,16 @@ export function shiftMonth(month: string, delta: number): string {
   return `${Math.floor(total / 12)}-${pad((total % 12) + 1)}-01`
 }
 
+/** Month options for a month-name select: value "01"…"12". */
+export const MONTH_DATA = HEBREW_MONTHS.map((name, i) => ({ value: String(i + 1).padStart(2, '0'), label: name }))
+
+/** Years to offer, newest first: back to the earliest expense, always including this year and the month on screen. */
+export function exportYears(firstYear: number | null, currentYear: number, shownYear: number): number[] {
+  const from = Math.min(firstYear ?? currentYear, currentYear, shownYear)
+  const to = Math.max(currentYear, shownYear)
+  return Array.from({ length: to - from + 1 }, (_, i) => to - i)
+}
+
 export type BalanceState = 'owed' | 'settled' | 'credit'
 
 /** Design-system balance rule: > 0 owed, 0 settled, < 0 credit. */
@@ -129,12 +139,34 @@ export function balanceState(balance: number): BalanceState {
 export const RECEIPT_BUCKET = 'receipts'
 export const MAX_RECEIPT_BYTES = 10 * 1024 * 1024
 
-/** Receipt mimetypes we accept and the extension each is stored under. */
+/** Receipt mimetypes we accept and the extension each is stored under (0018's path rule whitelists the same set). */
 export const RECEIPT_EXT: Readonly<Record<string, string>> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
   'image/webp': 'webp',
+  'image/heic': 'heic',
+  'image/heif': 'heif',
+  'image/gif': 'gif',
   'application/pdf': 'pdf',
+  'application/msword': 'doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+}
+
+/** The file picker's `accept`: any image (unsupported ones get a Hebrew error), PDF and Word. */
+export const RECEIPT_ACCEPT = 'image/*,application/pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+
+const MIME_BY_EXT: Readonly<Record<string, string>> = {
+  jpeg: 'image/jpeg', ...Object.fromEntries(Object.entries(RECEIPT_EXT).map(([mime, ext]) => [ext, mime])),
+}
+
+/** The whitelisted mimetype to store the file under, or null. Some systems give HEIC and Word files no type: use the name then. */
+export function receiptMime(file: Pick<File, 'name' | 'type'>): string | null {
+  if (Object.hasOwn(RECEIPT_EXT, file.type)) return file.type
+  if (file.type !== '' && file.type !== 'application/octet-stream') return null
+  const dot = file.name.lastIndexOf('.')
+  if (dot < 0) return null
+  const ext = file.name.slice(dot + 1).toLowerCase()
+  return Object.hasOwn(MIME_BY_EXT, ext) ? (MIME_BY_EXT[ext] ?? null) : null
 }
 
 /** `<expense_id>/<uuid>.<ext>` inside the receipts bucket, or null for a mimetype we don't accept. */
@@ -157,7 +189,7 @@ export function heroState(balance: number): string {
 
 /** Hebrew error for a receipt we won't accept, or null. */
 export function receiptError(file: File): string | null {
-  if (!Object.hasOwn(RECEIPT_EXT, file.type)) return he.finance.errors.receiptType
+  if (!receiptMime(file)) return he.finance.errors.receiptType
   return file.size > MAX_RECEIPT_BYTES ? he.finance.errors.receiptSize : null
 }
 

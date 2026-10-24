@@ -1,10 +1,10 @@
 import { ActionIcon, Group, Input, NumberInput, Select, Text, UnstyledButton, type NumberInputProps } from '@mantine/core'
 import { IconChevronLeft, IconChevronRight, IconTrash } from '@tabler/icons-react'
 import type { ReactNode } from 'react'
-import { HEBREW_MONTHS, monthLabel } from '../../lib/format'
+import { monthLabel } from '../../lib/format'
 import { he } from '../../lib/he'
 import { AptPlate } from '../../ui'
-import { shiftMonth } from './ledger'
+import { MONTH_DATA, shiftMonth } from './ledger'
 
 /** ₪ amount input: LTR digits, two decimals, thousands separators. */
 export function MoneyInput(props: NumberInputProps) {
@@ -37,7 +37,6 @@ export function YearStepper({ value, onChange }: { value: number; onChange: (yea
     prevLabel={he.finance.prevYear} nextLabel={he.finance.nextYear} />
 }
 
-const MONTH_DATA = HEBREW_MONTHS.map((name, i) => ({ value: String(i + 1).padStart(2, '0'), label: name }))
 
 /** A month picker for forms: month name + year, value as a first-of-month date. */
 export function MonthField({ label, value, onChange, error }: { label: string; value: string; onChange: (month: string) => void; error?: ReactNode }) {

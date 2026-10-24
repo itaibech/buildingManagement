@@ -467,14 +467,14 @@ isOneToOne: false
                   ]
                 },"expenses": {
                   Row: {
-                    "amount": number,"building_id": string,"category_id": string,"created_at": string,"id": string,"note": string,"receipt_path": string | null,"source": string,"special_id": string | null,"spent_on": string,"template_id": string | null,"vendor": string
+                    "amount": number,"building_id": string,"category_id": string,"created_at": string,"id": string,"note": string,"receipt_name": string | null,"receipt_path": string | null,"source": string,"special_id": string | null,"spent_on": string,"template_id": string | null,"vendor": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount": number,"building_id"?: string,"category_id": string,"created_at"?: string,"id"?: string,"note"?: string,"receipt_path"?: string | null,"source"?: string,"special_id"?: string | null,"spent_on"?: string,"template_id"?: string | null,"vendor"?: string
+                    "amount": number,"building_id"?: string,"category_id": string,"created_at"?: string,"id"?: string,"note"?: string,"receipt_name"?: string | null,"receipt_path"?: string | null,"source"?: string,"special_id"?: string | null,"spent_on"?: string,"template_id"?: string | null,"vendor"?: string
                   }
                   Update: {
-                    "amount"?: number,"building_id"?: string,"category_id"?: string,"created_at"?: string,"id"?: string,"note"?: string,"receipt_path"?: string | null,"source"?: string,"special_id"?: string | null,"spent_on"?: string,"template_id"?: string | null,"vendor"?: string
+                    "amount"?: number,"building_id"?: string,"category_id"?: string,"created_at"?: string,"id"?: string,"note"?: string,"receipt_name"?: string | null,"receipt_path"?: string | null,"source"?: string,"special_id"?: string | null,"spent_on"?: string,"template_id"?: string | null,"vendor"?: string
                   }
                   Relationships: [
                     {
@@ -1093,6 +1093,9 @@ isOneToOne: false
                            },
 "is_approved":
 { Args: Record<PropertyKey, never>; Returns: boolean
+                           },
+"is_receipt_path":
+{ Args: { "p_name": string }; Returns: boolean
                            },
 "mark_task_done":
 { Args: { "p_category_id"?: string,"p_cost"?: number,"p_done_on": string,"p_note": string,"p_task_id": string }; Returns: string

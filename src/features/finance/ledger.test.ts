@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { balanceState, budgetVsActual, isBalanceSort, monthOf, receiptPath, shiftMonth, sortBalances, toLedgerGrid } from './ledger'
+import { he } from '../../lib/he'
+import { balanceState, budgetVsActual, isBalanceSort, MAX_RECEIPT_BYTES, monthOf, RECEIPT_ACCEPT, receiptError, receiptMime, receiptPath, shiftMonth, sortBalances, toLedgerGrid } from './ledger'
 
 describe('toLedgerGrid', () => {
   it('fills 12 months with zeros for months without rows', () => {
@@ -96,5 +97,49 @@ describe('small helpers', () => {
     expect(receiptPath('e1', 'application/pdf', 'u1')).toBe('e1/u1.pdf')
     expect(receiptPath('e1', 'image/jpeg', 'u1')).toBe('e1/u1.jpg')
     expect(receiptPath('e1', 'text/html', 'u1')).toBeNull()
+  })
+})
+
+describe('receipt files (Task 22)', () => {
+  const file = (name: string, type: string, size = 10): File => {
+    const f = new File(['x'], name, { type })
+    Object.defineProperty(f, 'size', { value: size })
+    return f
+  }
+
+  it('maps every whitelisted mimetype to its extension', () => {
+    const cases: [string, string][] = [
+      ['image/jpeg', 'jpg'], ['image/png', 'png'], ['image/webp', 'webp'], ['image/heic', 'heic'], ['image/heif', 'heif'],
+      ['image/gif', 'gif'], ['application/pdf', 'pdf'], ['application/msword', 'doc'],
+      ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'docx'],
+    ]
+    for (const [mime, ext] of cases) expect(receiptPath('e1', mime, 'u1')).toBe(`e1/u1.${ext}`)
+    for (const mime of ['application/x-msdownload', 'image/svg+xml', 'text/html', '']) expect(receiptPath('e1', mime, 'u1')).toBeNull()
+  })
+
+  it('falls back to the file extension when the browser gives no usable type (HEIC, Word on some systems)', () => {
+    expect(receiptMime(file('IMG_1.HEIC', ''))).toBe('image/heic')
+    expect(receiptMime(file('scan.jpeg', 'application/octet-stream'))).toBe('image/jpeg')
+    expect(receiptMime(file('invoice.docx', ''))).toBe('application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    expect(receiptMime(file('setup.exe', ''))).toBeNull()
+    // No dot: the whole name is not an extension.
+    expect(receiptMime(file('pdf', ''))).toBeNull()
+    expect(receiptMime(file('docx', 'application/octet-stream'))).toBeNull()
+    // A real type wins over the name.
+    expect(receiptMime(file('fake.pdf', 'application/x-msdownload'))).toBeNull()
+  })
+
+  it('validates type and size before upload, in Hebrew', () => {
+    expect(receiptError(file('r.pdf', 'application/pdf'))).toBeNull()
+    expect(receiptError(file('r.doc', 'application/msword'))).toBeNull()
+    expect(receiptError(file('r.exe', 'application/x-msdownload'))).toBe(he.finance.errors.receiptType)
+    expect(he.finance.errors.receiptType).toBe('סוג קובץ לא נתמך')
+    expect(receiptError(file('big.pdf', 'application/pdf', MAX_RECEIPT_BYTES + 1))).toBe(he.finance.errors.receiptSize)
+    expect(he.finance.errors.receiptSize).toBe('הקובץ גדול מ-10MB')
+    expect(receiptError(file('edge.pdf', 'application/pdf', MAX_RECEIPT_BYTES))).toBeNull()
+  })
+
+  it('the picker accepts images, PDF and Word', () => {
+    expect(RECEIPT_ACCEPT).toBe('image/*,application/pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document')
   })
 })

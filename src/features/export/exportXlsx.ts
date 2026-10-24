@@ -44,7 +44,7 @@ function saveBlob(bytes: ArrayBuffer, fileName: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
-/** Builds the workbook and triggers the browser download. */
-export async function exportXlsx(name: string, sheets: Record<string, Rows>, formats?: CellFormats): Promise<void> {
-  saveBlob(await toXlsxBytes(sheets, formats), exportFileName(name))
+/** Builds the workbook and triggers the browser download, as `<name>-YYYY-MM-DD.xlsx` (or `<name>.xlsx` when not `dated`). */
+export async function exportXlsx(name: string, sheets: Record<string, Rows>, formats?: CellFormats, dated = true): Promise<void> {
+  saveBlob(await toXlsxBytes(sheets, formats), dated ? exportFileName(name) : `${name}.xlsx`)
 }

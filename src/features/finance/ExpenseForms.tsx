@@ -9,9 +9,8 @@ import { DateInput, focusFirstError, notifyError, notifySuccess } from '../../ui
 import { useExpenseCategories } from '../maintenance/api'
 import { useApplyTemplates, useSaveExpense, useSaveTemplate, type Template } from './api'
 import { MoneyInput } from './fields'
-import { RECEIPT_EXT, receiptError } from './ledger'
+import { RECEIPT_ACCEPT, receiptError } from './ledger'
 
-const ACCEPT = Object.keys(RECEIPT_EXT).join(',')
 const positive = (v: number | string): string | null => (typeof v === 'number' && v > 0 ? null : he.finance.errors.positive)
 const required = (v: string | null): string | null => (v && v.trim() ? null : he.finance.errors.required)
 
@@ -36,7 +35,7 @@ function ReceiptField({ file, onChange }: { file: File | null; onChange: (f: Fil
           <CloseButton size={44} aria-label={he.finance.removeReceipt} onClick={() => pick(null)} />
         </Group>
       ) : (
-        <FileButton accept={ACCEPT} onChange={pick}>
+        <FileButton accept={RECEIPT_ACCEPT} onChange={pick}>
           {(props) => <Button variant="default" leftSection={<IconPaperclip size={18} stroke={1.75} />} {...props}>{he.finance.attachReceipt}</Button>}
         </FileButton>
       )}
@@ -47,7 +46,7 @@ function ReceiptField({ file, onChange }: { file: File | null; onChange: (f: Fil
 
 interface ExpenseValues { categoryId: string | null; spentOn: string; amount: number | string; vendor: string; note: string }
 
-/** "הוצאה חדשה": category, date (today), amount, vendor, note and an optional receipt (image or PDF). */
+/** "הוצאה חדשה": category, date (today), amount, vendor, note and an optional receipt (image, PDF or Word). */
 export function ExpenseForm({ onDone }: { onDone: () => void }) {
   const save = useSaveExpense()
   const categories = useCategoryData()
