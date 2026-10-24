@@ -79,12 +79,7 @@ function EmailLine({ email }: { email: string }) {
 function ContactActions({ r }: { r: DirectoryEntry }) {
   return (
     <>
-      {r.phone && (
-        <Button component="a" href={`tel:${r.phone}`} variant="subtle" aria-label={he.tenants.call(r.full_name)}
-          leftSection={<IconPhone size={18} stroke={1.75} />} className="bm-num" dir="ltr" px="xs" style={{ whiteSpace: 'nowrap' }}>
-          {r.phone}
-        </Button>
-      )}
+      {/* RTL: the last child sits leftmost — email, then the phone on the far left. */}
       {r.email && (
         <>
           <Button component="a" href={`mailto:${r.email}`} visibleFrom="sm" variant="subtle" title={r.email} px="xs"
@@ -97,6 +92,12 @@ function ContactActions({ r }: { r: DirectoryEntry }) {
             <IconMail size={20} stroke={1.75} aria-hidden="true" />
           </ActionIcon>
         </>
+      )}
+      {r.phone && (
+        <Button component="a" href={`tel:${r.phone}`} variant="subtle" aria-label={he.tenants.call(r.full_name)}
+          leftSection={<IconPhone size={18} stroke={1.75} />} className="bm-num" dir="ltr" px="xs" style={{ whiteSpace: 'nowrap' }}>
+          {r.phone}
+        </Button>
       )}
     </>
   )
