@@ -520,7 +520,7 @@ end;
 $$;
 
 -- In progress → closed: re-checks every vote total, numbers the decisions (agenda order; open items with a
--- decision), records the closing time. The content locks.
+-- decision), records the absent apartments and the closing time. The content locks.
 create function public.close_meeting(p_meeting uuid, p_closed_at timestamptz default now()) returns void
 language plpgsql security definer set search_path = ''
 as $$
@@ -536,6 +536,11 @@ begin
       then count(*) filter (where item_status = 'open' and trim(decision) <> '') over (order by position, created_at, id) end as rn
     from public.meeting_agenda_items where meeting_id = p_meeting) n
   where i.id = n.id;
+  -- Freeze the absent list: every apartment without a record is recorded absent.
+  insert into public.meeting_attendance (meeting_id, apartment_id, status)
+  select p_meeting, a.id, 'absent' from public.apartments a
+  where a.building_id = m.building_id
+    and not exists (select 1 from public.meeting_attendance t where t.meeting_id = p_meeting and t.apartment_id = a.id);
   update public.meetings set status = 'closed', closed_at = greatest(coalesce(p_closed_at, now()), opened_at) where id = p_meeting;
   insert into public.meeting_events (meeting_id, kind) values (p_meeting, 'closed');
 end;

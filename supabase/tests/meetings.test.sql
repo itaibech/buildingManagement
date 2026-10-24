@@ -4,7 +4,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(104);
+select plan(105);
 
 -- ---------------------------------------------------------------- fixtures (as postgres)
 insert into auth.users (id, email, aud, role) values
@@ -193,6 +193,9 @@ select is((select array_agg(coalesce(decision_number, 0) order by position) from
   where meeting_id = 'e2400000-0000-0000-0000-000000000001'), array[1, 0, 0, 2],
   'close: decisions are numbered in agenda order, skipping removed and undecided items');
 select ok((select closed_at is not null and status = 'closed' from public.meetings where id = 'e2400000-0000-0000-0000-000000000001'), 'close: closed_at recorded');
+select is((select array_agg(apartment_number || ':' || status order by apartment_number) from public.meeting_attendance
+  where meeting_id = 'e2400000-0000-0000-0000-000000000001'), array['1:present', '2:present', '3:absent', '4:proxy', '5:absent'],
+  'close: apartments without a record are recorded absent');
 select throws_ok($$update public.meeting_agenda_items set decision = 'שונה' where meeting_id = 'e2400000-0000-0000-0000-000000000001'$$,
   '42501', null, 'locked: items');
 select throws_ok($$update public.meeting_agenda_items set votes_for = 0, votes_against = 0, votes_abstain = 0 where title = 'אישור תקציב'$$,
@@ -257,7 +260,7 @@ select throws_like($$select public.add_addendum('e2400000-0000-0000-0000-0000000
 -- ---------------------------------------------------------------- residents: the published protocol
 set local request.jwt.claims = '{"sub":"a2400000-0000-0000-0000-000000000002","role":"authenticated"}';
 select is((select count(*) from public.meetings where id = 'e2400000-0000-0000-0000-000000000001'), 1::bigint, 'resident: sees the published meeting');
-select is((select count(*) from public.meeting_attendance where meeting_id = 'e2400000-0000-0000-0000-000000000001'), 4::bigint,
+select is((select count(*) from public.meeting_attendance where meeting_id = 'e2400000-0000-0000-0000-000000000001'), 5::bigint,
   'resident: sees the published attendance');
 select is((select count(*) from public.meeting_signatures), 2::bigint, 'resident: sees the signatures');
 select is((select count(*) from public.meeting_addenda), 1::bigint, 'resident: sees the addenda');
