@@ -89,7 +89,7 @@ select is((select v->'payment_id' from saved where k = 'damage'), 'null'::jsonb,
 select is((select v->'expense_id' from saved where k = 'damage'), 'null'::jsonb, 'no expense unless asked');
 select is(pg_temp.bal(), 0.00, 'the ₪2,006 credit is now ₪0');
 select is(public.undo_special_charge((select (v->>'special_id')::uuid from saved where k = 'damage')),
-  '{"charges": 1, "expenses": 0, "payments": 0}'::jsonb, 'undo removes the charge');
+  '{"charges": 1, "expenses": 0, "payments": 0, "receipts": []}'::jsonb, 'undo removes the charge');
 select is(pg_temp.bal(), -2006.00, 'and the credit is back');
 
 -- ---------------------------------------------------------------- paid at once: nets to 0
@@ -135,8 +135,10 @@ select is((select count(*)::int from public.payments where is_special), 0, 'nor 
 
 -- ---------------------------------------------------------------- undo removes every linked row
 set local request.jwt.claims = '{"sub":"a9800000-0000-0000-0000-000000000001","role":"authenticated"}';
+update public.expenses set receipt_path = 'e1/r.pdf' where special_id = (select (v->>'special_id')::uuid from saved where k = 'exp');
 select is(public.undo_special_charge((select (v->>'special_id')::uuid from saved where k = 'exp')),
-  '{"charges": 1, "expenses": 1, "payments": 1}'::jsonb, 'undo deletes the charge, payment and expense');
+  '{"charges": 1, "expenses": 1, "payments": 1, "receipts": ["e1/r.pdf"]}'::jsonb,
+  'undo deletes the charge, payment and expense, and returns the receipt to remove');
 select is((select count(*)::int from public.expenses where special_id = (select (v->>'special_id')::uuid from saved where k = 'exp')), 0,
   'no expense left');
 select is((select count(*)::int from public.payments where special_id = (select (v->>'special_id')::uuid from saved where k = 'exp')), 0,
@@ -145,7 +147,7 @@ select is((select count(*)::int from public.charges where special_id = (select (
   'no charge left');
 select is((select balance from public.apartment_balances where apartment_id = 'b9800000-0000-0000-0000-00000000000b'), 80.00,
   'what is left: the unpaid ₪80 item');
-select is(public.undo_special_charge(gen_random_uuid()), '{"charges": 0, "expenses": 0, "payments": 0}'::jsonb,
+select is(public.undo_special_charge(gen_random_uuid()), '{"charges": 0, "expenses": 0, "payments": 0, "receipts": []}'::jsonb,
   'undoing an unknown id deletes nothing');
 
 -- Settlement rows are separate: a settlement never touches special rows and vice versa.

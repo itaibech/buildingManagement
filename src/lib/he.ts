@@ -396,6 +396,8 @@ export const he = {
     writtenOff: (amount: string) => `מחיקת חוב ${amount}`,
     writeOffReason: (reason: string) => `סיבה: ${reason}`,
     undoWriteOff: 'ביטול מחיקת חוב',
+    undoWriteOffConfirm: 'לבטל את מחיקת החוב?',
+    undoWriteOffBody: (months: string, total: string) => `החוב יחזור ליתרה של הדירה: ${months} (סה״כ ${total}).`,
     writeOffUndone: 'מחיקת החוב בוטלה',
     special: {
       action: 'חיוב מיוחד',
@@ -416,6 +418,10 @@ export const he = {
       undo: 'ביטול חיוב מיוחד',
       undone: 'החיוב המיוחד בוטל',
       deleteBody: 'יימחקו גם התשלום וההוצאה שנרשמו איתו, אם נרשמו. אי אפשר לבטל את הפעולה.',
+      undoBody: (parts: string[]) => `יימחקו יחד: ${parts.join(' · ')}. אי אפשר לבטל את הפעולה.`,
+      partCharge: (amount: string) => `החיוב ${amount}`,
+      partPayment: (amount: string) => `התשלום ${amount}`,
+      partExpense: (amount: string, category: string) => `הוצאת הבניין ${amount} (${category})`,
       exportColumn: 'חיוב מיוחד',
     },
     settle: {
@@ -430,6 +436,7 @@ export const he = {
       datedToday: 'רשום בתאריך היום',
       datedDebtMonthHint: 'כל תשלום יירשם ב-1 לחודש של החוב, כך שהכרטסת תראה כל חודש כשולם.',
       datedTodayHint: 'כל התשלומים יירשמו בתאריך היום, וכל אחד ישויך לחודש החוב שלו.',
+      pastYearHint: 'יש חובות משנים קודמות, ולכן ברירת המחדל היא תאריך היום: כך הכסף נכנס לקופה ולדוחות של השנה שבה התקבל.',
       cashWarning: (date: string) =>
         `חלק מהחודשים קודמים לתאריך יתרת הפתיחה של הקופה (${date}), ולכן תשלומים בתאריכים האלה לא ייכנסו לקופת הבניין. אם הכסף התקבל עכשיו, סמנו "רשום בתאריך היום".`,
       reason: 'סיבת המחיקה',
@@ -715,6 +722,8 @@ export const he = {
     expenseNote: 'יובא מאקסל',
     levyLabel: 'היטל מיוחד',
     evLabel: 'טעינת רכב חשמלי',
+    settledHint: (n: number) =>
+      `בשנה הזו יש ${n === 1 ? 'רישום אחד' : `${n} רישומים`} של הסדרת חוב. ייבוא מחדש עלול לפתוח מחדש חודשים שהוסדרו או ליצור בהם זיכוי; אחרי הייבוא בדקו את הכרטסת והסדירו שוב או בטלו לפי הצורך.`,
     evNote: 'טעינת רכב חשמלי · יובא מאקסל',
     evManaged: 'יש במערכת עמדות טעינה, והטעינה מחושבת ממוני הטעינה (כספים › טעינת רכב). לכן ברירת המחדל היא לא לייבא את חיובי הטעינה מהקובץ הזה, ובכל מקרה חיובי הטעינה של דירות עם עמדה לא ייובאו.',
     warnCell: (where: string, header: string, value: string) => `${where}, עמודה ${header}: לא הצלחנו לקרוא "${value}"`,

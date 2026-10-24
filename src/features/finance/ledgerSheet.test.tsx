@@ -112,6 +112,11 @@ describe('apartment ledger sheet', () => {
     expect(within(details).getByText(he.finance.writeOffReason('חוב ישן'))).toBeInTheDocument()
     // jsdom never finishes the popover's fade-in (display stays none), so the role query includes hidden nodes.
     fireEvent.click(within(details).getByRole('button', { name: he.finance.undoWriteOff, hidden: true }))
+    // A confirm names every month of that settlement and its total; nothing is undone before it.
+    const confirm = await screen.findByRole('dialog', { name: he.finance.undoWriteOffConfirm })
+    expect(within(confirm).getByText(norm(he.finance.undoWriteOffBody(`ינואר ${thisYear}`, formatILS(843.4))))).toBeInTheDocument()
+    expect(db.rpcCalls).toEqual([])
+    fireEvent.click(within(confirm).getByRole('button', { name: he.finance.undoWriteOff }))
     await vi.waitFor(() => expect(db.rpcCalls).toEqual([{ fn: 'undo_settlement', args: { p_settlement_id: 's1' } }]))
   })
 
@@ -127,6 +132,12 @@ describe('apartment ledger sheet', () => {
     const details = await screen.findByRole('dialog', { name: he.finance.monthDetails(`ינואר ${thisYear}`) })
     expect(within(details).getByText(norm(he.finance.special.paidWith(formatILS(1000))))).toBeInTheDocument()
     fireEvent.click(within(details).getByRole('button', { name: he.finance.special.undo, hidden: true }))
+    // The confirm names the linked payment that goes too.
+    const confirm = await screen.findByRole('dialog', { name: he.finance.deleteChargeConfirm(formatILS(2006)) })
+    const S = he.finance.special
+    expect(await within(confirm).findByText(norm(S.undoBody([S.partCharge(formatILS(2006)), S.partPayment(formatILS(1000))])))).toBeInTheDocument()
+    expect(db.rpcCalls).toEqual([])
+    fireEvent.click(within(confirm).getByRole('button', { name: S.undo }))
     await vi.waitFor(() => expect(db.rpcCalls).toEqual([{ fn: 'undo_special_charge', args: { p_special_id: 'sp1' } }]))
   })
 

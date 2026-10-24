@@ -7,7 +7,8 @@ import { he } from '../../lib/he'
 import { EmptyState, ListSkeleton, Money, notifySuccess } from '../../ui'
 import { ConfirmDialog, FormModal } from '../tenants/dialogs'
 import { ApartmentFeesSection } from './ApartmentFees'
-import { useCharges, useDeleteCharge, useFeeSchedule, useUndoSpecialCharge, type Charge } from './api'
+import { useCharges, useDeleteCharge, useFeeSchedule, type Charge } from './api'
+import { UndoSpecialDialog } from './UndoConfirms'
 import { LoadFailed } from './cards'
 import { ChargeForm, FeeForm, LevyForm } from './ChargeForms'
 import { DeleteButton, Row, YearStepper } from './fields'
@@ -94,15 +95,14 @@ function Choice({ title, body, onClick }: { title: string; body: string; onClick
 /** A special charge is removed with its linked payment and expense (undo_special_charge), never on its own. */
 function RemoveDialog({ removing, onClose }: { removing: Charge | null; onClose: () => void }) {
   const del = useDeleteCharge()
-  const undo = useUndoSpecialCharge()
   const specialId = removing?.special_id ?? null
-  const done = { onSuccess: () => { notifySuccess(he.finance.chargeDeleted); onClose() } }
-  const busy = specialId ? undo : del
   return (
-    <ConfirmDialog opened={!!removing} title={he.finance.deleteChargeConfirm(formatILS(removing?.amount ?? 0))}
-      body={specialId ? he.finance.special.deleteBody : he.finance.deleteChargeBody} confirmLabel={he.finance.delete}
-      loading={busy.isPending} failed={busy.isError} onClose={onClose}
-      onConfirm={() => { if (specialId) undo.mutate(specialId, done); else if (removing) del.mutate(removing.id, done) }} />
+    <>
+      <UndoSpecialDialog specialId={specialId} amount={removing?.amount ?? 0} onClose={onClose} doneMessage={he.finance.chargeDeleted} />
+      <ConfirmDialog opened={!!removing && !specialId} title={he.finance.deleteChargeConfirm(formatILS(removing?.amount ?? 0))}
+        body={he.finance.deleteChargeBody} confirmLabel={he.finance.delete} loading={del.isPending} failed={del.isError} onClose={onClose}
+        onConfirm={() => removing && del.mutate(removing.id, { onSuccess: () => { notifySuccess(he.finance.chargeDeleted); onClose() } })} />
+    </>
   )
 }
 

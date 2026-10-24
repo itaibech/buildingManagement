@@ -262,7 +262,9 @@ $$;
 revoke execute on function public.add_special_charge(uuid, date, numeric, text, text, boolean, text, boolean, uuid, text) from anon, public;
 grant execute on function public.add_special_charge(uuid, date, numeric, text, text, boolean, text, boolean, uuid, text) to authenticated;
 
--- "ביטול חיוב מיוחד": deletes the charge and its linked payment and expense. Returns {charges, payments, expenses}.
+-- "ביטול חיוב מיוחד": deletes the charge and its linked payment and expense. Returns {charges, payments, expenses,
+-- receipts}: receipts = the deleted expense's receipt object paths, which the client removes from storage (as
+-- useDeleteExpense does for a single expense).
 create function public.undo_special_charge(p_special_id uuid)
 returns jsonb
 language plpgsql security definer set search_path = ''
@@ -272,6 +274,7 @@ declare
   v_charges int;
   v_payments int;
   v_expenses int;
+  v_receipts jsonb;
 begin
   if not public.is_admin() then
     raise exception 'admin only' using errcode = '42501';
@@ -280,9 +283,11 @@ begin
   get diagnostics v_charges = row_count;
   delete from public.payments where special_id = p_special_id and building_id = v_building;
   get diagnostics v_payments = row_count;
-  delete from public.expenses where special_id = p_special_id and building_id = v_building;
-  get diagnostics v_expenses = row_count;
-  return jsonb_build_object('charges', v_charges, 'payments', v_payments, 'expenses', v_expenses);
+  with gone as (
+    delete from public.expenses where special_id = p_special_id and building_id = v_building returning receipt_path
+  ) select count(*)::int, coalesce(jsonb_agg(receipt_path) filter (where receipt_path is not null), '[]'::jsonb)
+    into v_expenses, v_receipts from gone;
+  return jsonb_build_object('charges', v_charges, 'payments', v_payments, 'expenses', v_expenses, 'receipts', v_receipts);
 end;
 $$;
 revoke execute on function public.undo_special_charge(uuid) from anon, public;

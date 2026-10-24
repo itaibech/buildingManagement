@@ -66,24 +66,39 @@ describe('SettleDebtForm', () => {
     expect(within(may).getByText(norm(formatILS(20)))).toBeInTheDocument()
   })
 
-  it('pays each month dated at the debt month by default', async () => {
+  it('past-year months default to today, with the one-line explanation', async () => {
     const onDone = vi.fn()
     wrap(<SettleDebtForm apartmentId="a1" rows={ROWS} onDone={onDone} />)
+    expect(screen.getByRole('switch', { name: new RegExp(he.finance.settle.datedToday) })).toBeChecked()
+    expect(screen.getByText(he.finance.settle.pastYearHint)).toBeInTheDocument()
     fireEvent.click(confirm())
     await waitFor(() => expect(onDone).toHaveBeenCalled())
     expect(lastCall()).toEqual({ fn: 'settle_debt', args: {
-      p_apartment_id: 'a1', p_months: ['2024-01-01', '2024-02-01', '2025-05-01'], p_mode: 'pay', p_method: 'transfer', p_date_mode: 'debt_month', p_note: '',
+      p_apartment_id: 'a1', p_months: ['2024-01-01', '2024-02-01', '2025-05-01'], p_mode: 'pay', p_method: 'transfer', p_date_mode: 'today', p_note: '',
     } })
     expect(toast.success).toHaveBeenCalledWith(he.finance.settle.done)
   })
 
-  it('warns when debt-month dates fall before the cash opening date, and "today" clears it', async () => {
-    wrap(<SettleDebtForm apartmentId="a1" rows={ROWS} onDone={() => undefined} />)
-    expect(await screen.findByText(he.finance.settle.cashWarning('01/01/2025'))).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('switch', { name: new RegExp(he.finance.settle.datedToday) }))
-    expect(screen.queryByText(he.finance.settle.cashWarning('01/01/2025'))).not.toBeInTheDocument()
+  it('current-year months keep the debt-month date by default', async () => {
+    const y = new Date().getFullYear()
+    wrap(<SettleDebtForm apartmentId="a1" rows={[row(`${y}-01-01`, 300, 0)]} onDone={() => undefined} />)
+    expect(screen.getByRole('switch', { name: new RegExp(he.finance.settle.datedToday) })).not.toBeChecked()
+    expect(screen.queryByText(he.finance.settle.pastYearHint)).toBeNull()
     fireEvent.click(confirm())
-    await waitFor(() => expect(lastCall()?.args.p_date_mode).toBe('today'))
+    await waitFor(() => expect(lastCall()?.args.p_date_mode).toBe('debt_month'))
+  })
+
+  it('turning "today" off for old months warns about the cash opening date, and the choice sticks', async () => {
+    wrap(<SettleDebtForm apartmentId="a1" rows={ROWS} onDone={() => undefined} />)
+    const sw = screen.getByRole('switch', { name: new RegExp(he.finance.settle.datedToday) })
+    expect(screen.queryByText(he.finance.settle.cashWarning('01/01/2025'))).toBeNull()
+    fireEvent.click(sw)
+    expect(await screen.findByText(he.finance.settle.cashWarning('01/01/2025'))).toBeInTheDocument()
+    expect(screen.queryByText(he.finance.settle.pastYearHint)).toBeNull()
+    fireEvent.click(screen.getByRole('checkbox', { name: monthLabel('2025-05') }))
+    expect(sw).not.toBeChecked()
+    fireEvent.click(confirm())
+    await waitFor(() => expect(lastCall()?.args.p_date_mode).toBe('debt_month'))
   })
 
   it('quick selectors and unchecking update the summary', () => {

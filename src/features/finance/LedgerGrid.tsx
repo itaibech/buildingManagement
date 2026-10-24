@@ -51,7 +51,7 @@ function buildItems({ year, rows, charges, open, specialPayments = [] }: LedgerG
 const quiet = (from: string, to: string): string => he.finance.noMovement(monthName(from), monthName(to))
 const sumOf = (views: MonthView[], pick: (v: MonthView) => number): number => Math.round(views.reduce((t, v) => t + pick(v) * 100, 0)) / 100
 
-function DesktopTable({ items, views, admin }: { items: Item[]; views: MonthView[]; admin: boolean }) {
+function DesktopTable({ items, views, admin, charges }: { items: Item[]; views: MonthView[]; admin: boolean; charges: readonly ApartmentCharge[] }) {
   return (
     <Table.ScrollContainer minWidth={340}>
       <Table className="bm-num" verticalSpacing="sm" horizontalSpacing="xs">
@@ -68,7 +68,7 @@ function DesktopTable({ items, views, admin }: { items: Item[]; views: MonthView
             <Table.Tr key={it.from}><Table.Td colSpan={4} c="dimmed" fz="sm">{quiet(it.from, it.to)}</Table.Td></Table.Tr>
           ) : (
             <Table.Tr key={it.view.month} style={it.view.open > 0 ? OPEN_ROW : undefined} aria-label={it.view.open > 0 ? he.finance.openMonth : undefined}>
-              <Table.Td><MonthCell v={it.view} admin={admin} /></Table.Td>
+              <Table.Td><MonthCell v={it.view} admin={admin} allCharges={charges} /></Table.Td>
               <Table.Td ta="end">{amount(it.view.gross)}</Table.Td>
               <Table.Td ta="end" c={it.view.paid > 0 ? 'paid.7' : undefined}>{amount(it.view.paid)}</Table.Td>
               <Table.Td ta="end" c={it.view.balance > 0 ? 'debt.6' : undefined}>{formatILS(it.view.balance)}</Table.Td>
@@ -91,7 +91,7 @@ function DesktopTable({ items, views, admin }: { items: Item[]; views: MonthView
 const GRID: CSSProperties = { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 6.5rem 6.5rem', alignItems: 'center', columnGap: 8 }
 
 /** Mobile: month | charge | paid, the open amount as a small line under the month. */
-function MobileList({ items, admin }: { items: Item[]; admin: boolean }) {
+function MobileList({ items, admin, charges }: { items: Item[]; admin: boolean; charges: readonly ApartmentCharge[] }) {
   return (
     <Stack gap={0} className="bm-num">
       <div style={{ ...GRID, paddingBottom: 4 }}>
@@ -104,7 +104,7 @@ function MobileList({ items, admin }: { items: Item[]; admin: boolean }) {
           <Divider color="stone.1" />
           {it.type === 'empty' ? <Text size="sm" c="dimmed" py="xs">{quiet(it.from, it.to)}</Text> : (
             <div style={{ ...GRID, minHeight: 52, padding: '4px 6px', margin: '0 -6px', borderRadius: 8, ...(it.view.open > 0 ? OPEN_ROW : {}) }}>
-              <MonthCell v={it.view} admin={admin} />
+              <MonthCell v={it.view} admin={admin} allCharges={charges} />
               <Text size="sm" ta="end">{amount(it.view.gross)}</Text>
               <Text size="sm" ta="end" c={it.view.paid > 0 ? 'paid.7' : 'dimmed'}>{amount(it.view.paid)}</Text>
             </div>
@@ -120,10 +120,10 @@ export function LedgerGrid(props: LedgerGridProps) {
   const desktop = useDesktop()
   const { items, views } = buildItems(props)
   if (views.length === 0) return <EmptyState title={he.finance.noLedgerYear} />
-  if (desktop) return <DesktopTable items={items} views={views} admin={props.admin ?? false} />
+  if (desktop) return <DesktopTable items={items} views={views} admin={props.admin ?? false} charges={props.charges} />
   return (
     <Stack gap="xs">
-      <MobileList items={items} admin={props.admin ?? false} />
+      <MobileList items={items} admin={props.admin ?? false} charges={props.charges} />
       <Divider />
       <Text size="sm" fw={600} className="bm-num">{he.finance.yearSummary(formatILS(sumOf(views, (v) => v.gross)), formatILS(sumOf(views, (v) => v.paid)))}</Text>
     </Stack>

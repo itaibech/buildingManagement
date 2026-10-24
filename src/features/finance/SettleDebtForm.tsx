@@ -1,5 +1,6 @@
 import { Alert, Button, Checkbox, Divider, Group, SegmentedControl, Select, Stack, Switch, Text, TextInput } from '@mantine/core'
 import { useMemo, useState, type FormEvent } from 'react'
+import { todayISO } from '../../lib/dates'
 import { formatDate, formatILS, monthLabel } from '../../lib/format'
 import { he } from '../../lib/he'
 import { notifySuccess } from '../../ui'
@@ -66,16 +67,20 @@ function MonthPicker({ open, selected, onChange }: { open: PlanRow[]; selected: 
   )
 }
 
-interface PayProps { method: PaymentMethod; onMethod: (m: PaymentMethod) => void; today: boolean; onToday: (v: boolean) => void; note: string; onNote: (v: string) => void; warnFrom: string | null }
+interface PayProps {
+  method: PaymentMethod; onMethod: (m: PaymentMethod) => void; today: boolean; onToday: (v: boolean) => void
+  note: string; onNote: (v: string) => void; warnFrom: string | null; autoToday: boolean
+}
 
 /** "התקבל תשלום": method, the date choice (debt month by default), an optional note. */
-function PayFields({ method, onMethod, today, onToday, note, onNote, warnFrom }: PayProps) {
+function PayFields({ method, onMethod, today, onToday, note, onNote, warnFrom, autoToday }: PayProps) {
   return (
     <Stack gap="sm">
       <Select label={he.finance.method} data={METHOD_DATA} allowDeselect={false} value={method} onChange={(v) => isMethod(v) && onMethod(v)} />
       <Switch label={he.finance.settle.datedToday} checked={today} onChange={(e) => onToday(e.currentTarget.checked)}
         description={today ? he.finance.settle.datedTodayHint : he.finance.settle.datedDebtMonthHint}
         styles={{ body: { alignItems: 'center', minHeight: 44 } }} />
+      {autoToday && <Text size="sm" c="dimmed">{he.finance.settle.pastYearHint}</Text>}
       {warnFrom && <Alert color="signal">{he.finance.settle.cashWarning(formatDate(warnFrom))}</Alert>}
       <TextInput label={he.finance.note} value={note} onChange={(e) => onNote(e.currentTarget.value)} />
     </Stack>
@@ -88,11 +93,15 @@ function useSettleForm({ apartmentId, rows, onDone }: SettleDebtFormProps) {
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => monthsOf(open))
   const [mode, setMode] = useState<SettleMode>('pay')
   const [method, setMethod] = useState<PaymentMethod>('transfer')
-  const [today, setToday] = useState(false)
+  // Unset = automatic: today when a chosen month is in a past calendar year, else the debt month (ruling, Task 19).
+  const [todayChoice, setToday] = useState<boolean | null>(null)
   const [note, setNote] = useState('')
   const [reasonError, setReasonError] = useState<string | null>(null)
   const settle = useSettleDebt()
   const plan = open.filter((p) => selected.has(p.month))
+  const pastYear = plan.some((p) => yearOf(p.month) < yearOf(todayISO()))
+  const today = todayChoice ?? pastYear
+  const autoToday = todayChoice === null && pastYear
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (mode === 'write_off' && !note.trim()) return setReasonError(he.finance.settle.reasonRequired)
@@ -100,7 +109,7 @@ function useSettleForm({ apartmentId, rows, onDone }: SettleDebtFormProps) {
       { onSuccess: () => { notifySuccess(he.finance.settle.done); onDone() } })
   }
   const onNote = (v: string) => { setNote(v); setReasonError(null) }
-  return { balance, open, selected, setSelected, mode, setMode, method, setMethod, today, setToday, note, onNote, reasonError, plan, submit, pending: settle.isPending }
+  return { balance, open, selected, setSelected, mode, setMode, method, setMethod, today, setToday, autoToday, note, onNote, reasonError, plan, submit, pending: settle.isPending }
 }
 
 /** Earliest selected month before the cash opening date, when payments would be dated there (they'd miss the cash). */
@@ -123,7 +132,7 @@ export function SettleDebtForm(props: SettleDebtFormProps) {
           onChange={(v) => f.setMode(v === 'write_off' ? 'write_off' : 'pay')} />
         <MonthPicker open={f.open} selected={f.selected} onChange={f.setSelected} />
         {f.mode === 'pay' ? (
-          <PayFields method={f.method} onMethod={f.setMethod} today={f.today} onToday={f.setToday} note={f.note} onNote={f.onNote} warnFrom={warnFrom} />
+          <PayFields method={f.method} onMethod={f.setMethod} today={f.today} onToday={f.setToday} note={f.note} onNote={f.onNote} warnFrom={warnFrom} autoToday={f.autoToday} />
         ) : (
           <Stack gap="sm">
             <Text size="sm">{he.finance.settle.writeOffHint}</Text>

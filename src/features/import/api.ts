@@ -35,14 +35,19 @@ const numberOf = (r: WithApartment): number => r.apartments?.number ?? 0
 export function useYearMoney(year: number) {
   return useQuery({
     queryKey: ['import-year-money', year],
-    queryFn: async (): Promise<{ payments: ExistingPayment[]; charges: ExistingCharge[] }> => {
-      const [p, c] = await Promise.all([
+    queryFn: async (): Promise<{ payments: ExistingPayment[]; charges: ExistingCharge[]; settled: number }> => {
+      const [p, c, s] = await Promise.all([
         supabase.from('payments').select('paid_on, amount, source, apartments(number)').gte('paid_on', `${year}-01-01`).lt('paid_on', `${year + 1}-01-01`),
         supabase.from('charges').select('month, kind, source, apartments(number)').gte('month', `${year}-01-01`).lt('month', `${year + 1}-01-01`),
+        // Payments that settle a month of this year (settlements dated today still carry the debt month here).
+        supabase.from('payments').select('settlement_id').gte('for_month', `${year}-01-01`).lt('for_month', `${year + 1}-01-01`),
       ])
       if (p.error) throw new Error(p.error.message)
       if (c.error) throw new Error(c.error.message)
+      if (s.error) throw new Error(s.error.message)
+      const writeOffs = (c.data ?? []).filter((r) => r.kind === 'adjustment').length
       return {
+        settled: writeOffs + (s.data ?? []).filter((r) => Boolean(r.settlement_id)).length,
         payments: (p.data ?? []).map((r) => ({ apartment: numberOf(r), paid_on: r.paid_on, amount: Number(r.amount), source: r.source })),
         charges: (c.data ?? []).map((r) => ({ apartment: numberOf(r), month: r.month, kind: r.kind, source: r.source })),
       }

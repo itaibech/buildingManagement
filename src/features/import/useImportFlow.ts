@@ -22,6 +22,8 @@ export interface ImportContext {
   chargerNumbers: number[]
   /** The import year's payments and charges already in the system (all sources). */
   payments: ExistingPayment[]; charges: ExistingCharge[]
+  /** Settlement rows (write-offs, settlement payments) in the import year: a re-import may reopen those months. */
+  settled: number
   loading: boolean
 }
 
@@ -41,6 +43,7 @@ export function useImportContext(year: number, budgetYear: number): ImportContex
     chargerNumbers: (chargers.data ?? []).map((c) => c.number),
     payments: money.data?.payments ?? [],
     charges: money.data?.charges ?? [],
+    settled: money.data?.settled ?? 0,
     loading: fees.isLoading || budgets.isLoading || expenses.isLoading || categories.isLoading || chargers.isLoading || money.isLoading,
   }), [fees.data, budgets.data, expenses.data, categories.data, chargers.data, money.data, fees.isLoading, budgets.isLoading, expenses.isLoading, categories.isLoading, chargers.isLoading, money.isLoading])
 }

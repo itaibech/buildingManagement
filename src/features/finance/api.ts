@@ -293,9 +293,39 @@ export function useAddSpecialCharge() {
   })).error))
 }
 
-/** rpc('undo_special_charge'): deletes the special charge and its linked payment and expense. */
+export interface SpecialLinks { payment: number | null; expense: { amount: number; category: string } | null }
+
+/** What undo_special_charge would also delete: the linked payment and building expense (admins read both). */
+export function useSpecialLinks(specialId: string | null) {
+  return useQuery({
+    queryKey: [...KEY, 'special-links', specialId],
+    enabled: specialId !== null,
+    queryFn: async (): Promise<SpecialLinks> => {
+      const id = specialId ?? ''
+      const pay = must(await supabase.from('payments').select('amount').eq('special_id', id))[0]
+      const exp = must(await supabase.from('expenses').select('amount, expense_categories(name)').eq('special_id', id))[0]
+      return { payment: pay ? num(pay.amount) : null, expense: exp ? { amount: num(exp.amount), category: catName(exp.expense_categories) } : null }
+    },
+  })
+}
+
+/** Receipt paths in undo_special_charge's answer (only strings; anything else is ignored). */
+export function receiptsOf(data: unknown): string[] {
+  const list = data !== null && typeof data === 'object' && 'receipts' in data ? data.receipts : null
+  return Array.isArray(list) ? list.filter((p): p is string => typeof p === 'string') : []
+}
+
+/** rpc('undo_special_charge'): deletes the special charge, its linked payment and expense, then the expense's receipt file. */
 export function useUndoSpecialCharge() {
-  return useFinanceMutation(async (specialId: string) => fail((await supabase.rpc('undo_special_charge', { p_special_id: specialId })).error))
+  return useFinanceMutation(async (specialId: string) => {
+    const { data, error } = await supabase.rpc('undo_special_charge', { p_special_id: specialId })
+    fail(error)
+    const paths = receiptsOf(data)
+    if (paths.length === 0) return
+    // The rows are gone either way; only tell the admin that the receipt file stayed behind.
+    const removed = await supabase.storage.from(RECEIPT_BUCKET).remove(paths)
+    if (removed.error) notifyError(he.finance.receiptRemoveFailed)
+  })
 }
 
 /** One charge row per chosen apartment (a levy to many, or a single extra/opening). */

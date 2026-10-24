@@ -6,7 +6,7 @@ import { useImportYear, type ImportCounts } from './api'
 import { columnsReady, feesReady, summarize, yearValid } from './buildImport'
 import { CategoriesStep, ColumnsStep, FeesStep } from './MappingSteps'
 import { ImportError } from './parseWorkbook'
-import { AutoSkippedNote, DoneStep, EvNotice, ExemptNotice, LevyNotice, OverlapNotice, PaidNotice, PreviewStep, PriorNotice, ReplaceNotes, UploadStep } from './PreviewStep'
+import { AutoSkippedNote, DoneStep, EvNotice, ExemptNotice, LevyNotice, OverlapNotice, PaidNotice, PreviewStep, PriorNotice, ReplaceNotes, SettledNotice, UploadStep } from './PreviewStep'
 import { readWorkbook, type ReadResult } from './readWorkbook'
 import { WizardSteps } from './WizardSteps'
 import { useDerived, useImportContext, useImportState, type Derived, type ImportContext, type ImportState } from './useImportFlow'
@@ -57,6 +57,7 @@ function PreviewBody({ st, d, ctx, save, back, confirm }: PreviewBodyProps) {
         <OverlapNotice overlaps={d.overlaps} include={st.importOverlaps} onInclude={st.setImportOverlaps} />
         <ExemptNotice hints={d.exemptHints} chosen={st.exempt} year={st.year} onChange={st.setExempt} />
         <ReplaceNotes fees={d.feesReplaced} budgets={d.budgetsUpdated} />
+        <SettledNotice count={ctx.settled} />
       </PreviewStep>
       <StepNav onBack={back} onNext={confirm} nextLabel={he.import.confirm} loading={save.isPending} disabled={!ready} />
     </>

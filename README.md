@@ -23,6 +23,27 @@ opening service calls). A resident sees only their own apartment's finances.
 
 **Sign-in:** Google, or email and password. New users wait for an admin's approval.
 
+## הסדרת חוב, חיובים מיוחדים וחישובים מחדש
+
+From the apartment ledger sheet (כספים → apartment), admins can:
+- **הסדרת חוב** (`settle_debt`). Choose open months, then either "התקבל תשלום" (one payment per month) or "מחיקת חוב" (a negative `adjustment` charge with a reason; no money moves and building cash is unchanged).
+  - The server computes each month's open amount: charged − paid, oldest first, capped by the balance.
+  - Months from past years default to today's date, so the money lands in this year's cash and reports. Each payment still settles its own month (`payments.for_month`).
+- **חיוב מיוחד** (`add_special_charge`). A one-off charge, optionally already paid and/or also a building expense, all linked by `special_id`.
+- **Undo** (both confirmed): "ביטול מחיקת חוב" (`undo_settlement`) and "ביטול חיוב מיוחד" (`undo_special_charge`, which also removes the linked payment, the expense and its receipt file).
+
+**Recomputes can reopen a settled month.** A settlement fixes amounts at the time it runs. These change a month's charge afterwards:
+- an EV rate change or a corrected meter reading (EV charges are recomputed)
+- a retroactive fee change (`set_apartment_fee`, the building fee)
+- an Excel re-import of that year
+
+After such a change, a settled month can show a small open amount again, or a credit, if the charge went down. The balance is always charges − payments, so nothing is lost; the month just needs attention:
+- **Open again:** settle it again ("הסדרת חוב" offers only what is still open).
+- **Over-credited by a write-off:** undo that write-off ("ביטול מחיקת חוב"), then settle the remaining amount.
+- **Over-credited by a settlement payment:** delete that payment in "תשלומים", then settle again.
+
+The import preview warns when the target year contains settlements.
+
 ## Stack
 
 All of it runs on free tiers.
