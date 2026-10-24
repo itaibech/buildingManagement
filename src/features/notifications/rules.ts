@@ -1,6 +1,8 @@
-// Which live changes notify whom. Pure: no React, no supabase. Task 18 (page permissions) adds its check here.
+// Which live changes notify whom. Pure: no React, no supabase. Page permissions (Task 18) gate each area here too
+// (RLS already keeps those events from reaching the client; this keeps the rules honest on their own).
 import type { Database } from '../../lib/db.types'
 import { he } from '../../lib/he'
+import type { PermissionKey } from '../../lib/permissions'
 
 type Tables = Database['public']['Tables']
 export type AnnouncementRowLite = Pick<Tables['announcements']['Row'], 'id' | 'title' | 'author_id' | 'expires_at'>
@@ -16,7 +18,12 @@ export type ChangeEvent =
 export interface Viewer {
   userId: string
   isAdmin: boolean
+  /** The viewer's page permissions (admins: everything). */
+  can(key: PermissionKey): boolean
 }
+
+/** The page an event belongs to: no notice for an area the viewer's group can't open. */
+const areaOf = (event: ChangeEvent): PermissionKey => (event.table === 'announcements' ? 'announcements' : 'tickets')
 
 /** What the viewer may know about the call an event is about (from my_ticket_activity). */
 export interface TicketRef {
@@ -73,6 +80,7 @@ function forComment(row: CommentRowLite, viewer: Viewer, ticket: TicketRef | nul
  * `ticket` is the call the event is about (needed for comments and the apartment number), when the viewer can see it.
  */
 export function qualify(event: ChangeEvent, viewer: Viewer, ticket: TicketRef | null, today: string): Notice | null {
+  if (!viewer.can(areaOf(event))) return null
   switch (event.table) {
     case 'announcements':
       return forAnnouncement(event.row, viewer, today)
@@ -92,5 +100,6 @@ export function ticketIdOf(event: ChangeEvent): string | null {
 
 /** Whether qualify() needs the call's TicketRef: comments, and a new call for admins (the apartment number). */
 export function needsTicketRef(event: ChangeEvent, viewer: Viewer): boolean {
+  if (!viewer.can('tickets')) return false
   return event.table === 'ticket_comments' || (event.table === 'tickets' && event.type === 'INSERT' && viewer.isAdmin)
 }

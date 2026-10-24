@@ -65,10 +65,74 @@ beforeEach(() => {
       profile('s1', 'ראש הוועד', { role: 'admin', is_super_admin: true }),
       profile('a1', 'מנהל נוסף', { role: 'admin' }),
       profile('me', 'אני המנהל', { role: 'admin' }),
+      profile('d1', 'דייר רגיל', { group_id: null }),
+    ],
+    user_groups: [
+      { id: 'g1', name: 'דייר', description: '', is_default: true, group_permissions: [] },
+      { id: 'g2', name: 'רואה חשבון', description: '', is_default: false, group_permissions: [] },
     ],
     apartments: [{ id: 'apt7', number: 7, floor: 3, notes: null, building_id: 'b1', created_at: '' }],
     residents: [{ id: 'r1', apartment_id: 'apt7', full_name: 'נועה ממתינה', phone: null, email: null, is_owner: true, building_id: 'b1', created_at: '' }],
   }
+})
+
+// Mantine's Select scrolls the selected option into view; jsdom has no scrollIntoView.
+Element.prototype.scrollIntoView ??= () => undefined
+
+async function pick(select: HTMLElement, option: string): Promise<void> {
+  fireEvent.click(select)
+  const listbox = await waitFor(() => {
+    const el = document.getElementById(select.getAttribute('aria-controls') ?? '')
+    if (!el) throw new Error('listbox not open')
+    return el
+  })
+  fireEvent.click(within(listbox).getByRole('option', { name: option, hidden: true }))
+}
+
+const lastUpdate = () => db.calls.filter((c) => c.table === 'profiles' && c.op === 'update').at(-1)
+
+describe('UsersPage groups', () => {
+  it('approving a resident puts them in the default group (stored as null, so they follow default changes)', async () => {
+    renderPage()
+    const row = await screen.findByTestId('pending-p1')
+    const group = await within(row).findByLabelText(he.permissions.group)
+    expect(group).toHaveValue('דייר')
+    fireEvent.click(within(row).getByRole('button', { name: he.users.approve }))
+    await waitFor(() => expect(lastUpdate()?.values).toEqual({ status: 'approved', resident_id: null, role: 'resident', group_id: null }))
+  })
+
+  it('the approval can pick another group', async () => {
+    renderPage()
+    const row = await screen.findByTestId('pending-p1')
+    await pick(await within(row).findByLabelText(he.permissions.group), 'רואה חשבון')
+    fireEvent.click(within(row).getByRole('button', { name: he.users.approve }))
+    await waitFor(() => expect(lastUpdate()?.values).toMatchObject({ group_id: 'g2' }))
+  })
+
+  it('an approved resident shows their group and can be moved to another', async () => {
+    renderPage()
+    const row = await screen.findByTestId('user-d1')
+    expect(await within(row).findByText(/דייר · ללא שיוך · קבוצה: דייר/)).toBeInTheDocument()
+    fireEvent.click(within(row).getByRole('button', { name: he.users.edit }))
+    await pick(within(row).getByLabelText(he.permissions.group), 'רואה חשבון')
+    await waitFor(() => expect(lastUpdate()).toEqual({ table: 'profiles', op: 'update', values: { group_id: 'g2' }, filters: [['user_id', 'd1']] }))
+  })
+
+  it('moving a user to the default group stores null', async () => {
+    db.rows.profiles = [...(db.rows.profiles ?? []), profile('d2', 'דיירת בקבוצה', { group_id: 'g2' })]
+    renderPage()
+    const row = await screen.findByTestId('user-d2')
+    fireEvent.click(within(row).getByRole('button', { name: he.users.edit }))
+    await pick(within(row).getByLabelText(he.permissions.group), 'דייר')
+    await waitFor(() => expect(lastUpdate()).toEqual({ table: 'profiles', op: 'update', values: { group_id: null }, filters: [['user_id', 'd2']] }))
+  })
+
+  it('admins have no group select (they see everything)', async () => {
+    renderPage()
+    const row = await screen.findByTestId('user-a1')
+    fireEvent.click(within(row).getByRole('button', { name: he.users.edit }))
+    expect(within(row).queryByLabelText(he.permissions.group)).toBeNull()
+  })
 })
 
 describe('UsersPage', () => {
@@ -93,7 +157,7 @@ describe('UsersPage', () => {
       expect(update).toEqual({
         table: 'profiles',
         op: 'update',
-        values: { status: 'approved', resident_id: 'r1', role: 'admin' },
+        values: { status: 'approved', resident_id: 'r1', role: 'admin', group_id: null },
         filters: [['user_id', 'p1']],
       })
     })

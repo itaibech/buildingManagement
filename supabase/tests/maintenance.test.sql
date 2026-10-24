@@ -19,6 +19,11 @@ values ('d7000000-0000-0000-0000-000000000001', 'בדיקה', 'yearly');
 insert into public.maintenance_log (task_id, note)
 values ('d7000000-0000-0000-0000-000000000001', 'בוצע');
 
+-- Task 18: the residents here hold this page's permission (the default group otherwise has only
+-- announcements and tickets; permissions.test.sql covers the gates themselves).
+insert into public.group_permissions (group_id, permission)
+select g.id, k from public.user_groups g cross join unnest(array['maintenance']) k where g.is_default;
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"a7000000-0000-0000-0000-000000000003","role":"authenticated"}';
 select is((select count(*) from public.maintenance_tasks), 0::bigint, 'pending: sees no tasks');

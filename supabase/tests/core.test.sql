@@ -67,6 +67,11 @@ select (select count(*) from public.apartments) as apartments,
        (select count(*) from public.residents) as residents;
 grant select on expected to authenticated;
 
+-- Task 18: the residents here hold this page's permission (the default group otherwise has only
+-- announcements and tickets; permissions.test.sql covers the gates themselves).
+insert into public.group_permissions (group_id, permission)
+select g.id, k from public.user_groups g cross join unnest(array['directory']) k where g.is_default;
+
 -- ---------------------------------------------------------------- anon
 set local role anon;
 set local request.jwt.claims = '{"role":"anon"}';

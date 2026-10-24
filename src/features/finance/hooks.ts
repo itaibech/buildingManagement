@@ -2,7 +2,7 @@ import { useMediaQuery } from '@mantine/hooks'
 import { useMemo } from 'react'
 import { he } from '../../lib/he'
 import { useApartments, useResidents } from '../tenants/api'
-import { useBalances, useBudgets, useExpenses, useFeeTimeline, type ApartmentBalance } from './api'
+import { useBalances, useBudgets, useExpenseReport, useExpenses, useFeeTimeline, type ApartmentBalance } from './api'
 import { currentMonth, nextChange, type TimelineRow } from './feeTimeline'
 import { budgetVsActual } from './ledger'
 
@@ -41,6 +41,17 @@ export function useBudgetRows(year: number) {
   const rows = useMemo(() => (budgets.data && expenses.data ? budgetVsActual(budgets.data, expenses.data, year) : undefined), [budgets.data, expenses.data, year])
   const refetch = () => { void budgets.refetch(); void expenses.refetch() }
   return { rows, isLoading: budgets.isLoading || expenses.isLoading, isError: budgets.isError || expenses.isError, refetch }
+}
+
+/** Planned vs actual from the aggregate report (residents with finance_reports: no raw expense rows). */
+export function useReportBudgetRows(year: number) {
+  const budgets = useBudgets(year)
+  const report = useExpenseReport(year)
+  const rows = useMemo(() => (budgets.data && report.data
+    ? budgetVsActual(budgets.data, report.data.map((r) => ({ category: r.category, spent_on: r.month, amount: r.total })), year)
+    : undefined), [budgets.data, report.data, year])
+  const refetch = () => { void budgets.refetch(); void report.refetch() }
+  return { rows, isLoading: budgets.isLoading || report.isLoading, isError: budgets.isError || report.isError, refetch }
 }
 
 /** Ids of the templates already posted as expenses on the first of `month`. */

@@ -10,7 +10,7 @@ import { useRealtimeNotifications } from '../features/notifications/useRealtimeN
 import { he } from '../lib/he'
 import { AptPlate, ListSkeleton } from '../ui'
 import { useAuth } from '../auth/AuthProvider'
-import { activeTab, ADMIN_NAV, GENERAL_NAV, MAIN_NAV, matches, type NavItem } from './nav'
+import { activeTab, ADMIN_NAV, bestMatch, GENERAL_NAV, MAIN_NAV, permitted, type NavItem } from './nav'
 import { useShellInfo } from './useShellInfo'
 
 const ICON = { size: 22, stroke: 1.75 } as const
@@ -73,12 +73,16 @@ function MobileHeader({ name, apartment, onExit }: { name: string; apartment: nu
   )
 }
 
+const ALL_NAV: NavItem[] = [...MAIN_NAV, ...GENERAL_NAV, ...ADMIN_NAV]
+
 function NavGroup({ items, pathname, unread, label }: { items: NavItem[]; pathname: string; unread: NavCounts; label?: string }) {
+  if (items.length === 0) return null
+  const current = bestMatch(pathname, ALL_NAV)
   return (
     <>
       {label && <Divider my="xs" color="stone.1" label={label} labelPosition="right" />}
       {items.map(({ to, label: text, icon: I }) => {
-        const active = matches(pathname, to)
+        const active = current === to
         return (
           <NavLink key={to} component={Link} to={to} label={text} leftSection={<I {...ICON} />} rightSection={badgeFor(to, unread)}
             active={active} aria-current={active ? 'page' : undefined} />
@@ -89,7 +93,7 @@ function NavGroup({ items, pathname, unread, label }: { items: NavItem[]; pathna
 }
 
 function SideNav({ pathname, name, apartment, unread, onExit }: { pathname: string; name: string; apartment: number | null; unread: NavCounts; onExit: () => void }) {
-  const { isAdmin } = useAuth()
+  const { isAdmin, can } = useAuth()
   return (
     <Stack h="100%" gap="xs" justify="space-between">
       <Box px="xs" pt="xs" pb="sm">
@@ -99,8 +103,8 @@ function SideNav({ pathname, name, apartment, unread, onExit }: { pathname: stri
       </Box>
       <ScrollArea style={{ flex: 1 }} type="auto">
         <nav aria-label={he.mainNav}>
-          <NavGroup items={MAIN_NAV} pathname={pathname} unread={unread} />
-          <NavGroup items={GENERAL_NAV} pathname={pathname} unread={unread} label={he.nav.general} />
+          <NavGroup items={permitted(MAIN_NAV, can)} pathname={pathname} unread={unread} />
+          <NavGroup items={permitted(GENERAL_NAV, can)} pathname={pathname} unread={unread} label={he.nav.general} />
           {isAdmin && <NavGroup items={ADMIN_NAV} pathname={pathname} unread={unread} label={he.nav.admin} />}
         </nav>
       </ScrollArea>
@@ -109,10 +113,12 @@ function SideNav({ pathname, name, apartment, unread, onExit }: { pathname: stri
   )
 }
 
+/** The permitted main pages only, so a default-group user gets בית / הודעות / תקלות / עוד with no gaps. */
 function TabBar({ pathname, unread }: { pathname: string; unread: NavCounts }) {
+  const { can } = useAuth()
   return (
     <nav className="bm-tabbar" aria-label={he.mainNav}>
-      {MAIN_NAV.map(({ to, label, icon: I }) => {
+      {permitted(MAIN_NAV, can).map(({ to, label, icon: I }) => {
         const active = activeTab(pathname) === to
         return (
           <Link key={to} to={to} className="bm-tab" data-active={active || undefined} aria-current={active ? 'page' : undefined}>

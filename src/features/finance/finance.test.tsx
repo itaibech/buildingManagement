@@ -16,7 +16,7 @@ import { useDeleteExpense, useSaveExpense, type Template } from './api'
 
 interface Call { table: string; op: string; args: unknown[] }
 const db = vi.hoisted(() => ({
-  admin: false, calls: [] as Call[], tables: {} as Record<string, unknown[]>, rpc: {} as Record<string, unknown>,
+  admin: false, granted: [] as string[], calls: [] as Call[], tables: {} as Record<string, unknown[]>, rpc: {} as Record<string, unknown>,
   /** `table.op` keys whose statement resolves with an error. */
   fail: new Set<string>(), removed: [] as string[][], removeError: null as { message: string } | null,
 }))
@@ -49,7 +49,12 @@ vi.mock('../../lib/supabase', () => ({
     },
   },
 }))
-vi.mock('../../auth/AuthProvider', () => ({ useAuth: () => ({ isAdmin: db.admin, session: { user: { id: 'me' } } }) }))
+vi.mock('../../auth/AuthProvider', () => ({
+  useAuth: () => ({
+    isAdmin: db.admin, session: { user: { id: 'me' } },
+    can: (need: string | string[]) => db.admin || (typeof need === 'string' ? [need] : need).some((k) => db.granted.includes(k)),
+  }),
+}))
 vi.mock('../../ui/notify', () => ({ notifySuccess: toast.success, notifyError: toast.error }))
 vi.mock('../../ui', async (orig) => ({ ...(await orig<typeof import('../../ui')>()), notifySuccess: toast.success, notifyError: toast.error }))
 
@@ -69,6 +74,7 @@ const inserts = (table: string) => db.calls.filter((c) => c.table === table && c
 
 beforeEach(() => {
   db.admin = false
+  db.granted = ['home', 'finance_own', 'finance_reports', 'ev_own']
   db.calls = []
   db.rpc = { my_apartment_id: 'a1', collection_summary: [] }
   db.tables = { apartments: APARTMENTS, residents: RESIDENTS }
@@ -104,6 +110,40 @@ describe('resident finance page', () => {
     wrap(<FinancePage />)
     expect(await screen.findByText(he.home.allPaid)).toBeInTheDocument()
     expect(screen.getByText(/חיובים עתידיים/)).toBeInTheDocument()
+  })
+})
+
+describe('resident finance by permission', () => {
+  const tablesRead = () => new Set(db.calls.map((c) => c.table))
+
+  it('finance_own only: "הכספים שלי" without the building reports', async () => {
+    db.granted = ['home', 'finance_own']
+    db.tables.apartment_balances = [{ apartment_id: 'a1', balance: 120, scheduled_charges: 0 }]
+    wrap(<FinancePage />)
+    expect(await screen.findByRole('heading', { name: he.finance.myMoney })).toBeInTheDocument()
+    expect(screen.getByText(he.finance.myLedger)).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: he.finance.buildingReports })).toBeNull()
+    expect(screen.queryByText(he.finance.cash)).toBeNull()
+  })
+
+  it('finance_reports only: building aggregates, no own money, no apartment rows or names', async () => {
+    db.granted = ['home', 'finance_reports']
+    db.rpc.collection_summary = [{ apartments_total: 6, apartments_paid_up: 4, amount_due_total: 1200 }]
+    db.rpc.building_expense_report = [
+      { category_id: 'c1', category: 'ניקיון', sort_order: 1, month: `${year}-02-01`, total: 300 },
+      { category_id: 'c1', category: 'ניקיון', sort_order: 1, month: `${year}-03-01`, total: 200 },
+    ]
+    db.tables.budgets = [{ id: 'b1', year: Number(year), category_id: 'c1', amount: 1000, expense_categories: { name: 'ניקיון', sort_order: 1 } }]
+    db.tables.building_cash = [{ balance: 5000 }]
+    wrap(<FinancePage />)
+    expect(await screen.findByRole('heading', { name: he.finance.buildingReports })).toBeInTheDocument()
+    expect(await screen.findByText(he.home.collected(4, 6))).toBeInTheDocument()
+    expect(await screen.findByText('ניקיון')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: he.finance.myMoney })).toBeNull()
+    expect(screen.queryByText(he.home.myBalance)).toBeNull()
+    expect(screen.queryAllByLabelText(/^דירה \d+$/)).toHaveLength(0)
+    const read = tablesRead()
+    for (const t of ['expenses', 'apartment_balances', 'apartment_ledger', 'payments', 'charges', 'residents']) expect(read.has(t)).toBe(false)
   })
 })
 

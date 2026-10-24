@@ -43,6 +43,11 @@ select throws_ok($$insert into public.apartment_fee_overrides (apartment_id, mod
 select throws_ok($$insert into public.apartment_fee_overrides (apartment_id, mode, amount, effective_from)
   values ('b9500000-0000-0000-0000-00000000000c', 'exempt', null, '2020-01-15')$$, '23514', null, 'effective_from must be the first of a month');
 
+-- Task 18: the residents here hold this page's permission (the default group otherwise has only
+-- announcements and tickets; permissions.test.sql covers the gates themselves).
+insert into public.group_permissions (group_id, permission)
+select g.id, k from public.user_groups g cross join unnest(array['finance_own']) k where g.is_default;
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"a9500000-0000-0000-0000-000000000001","role":"authenticated"}';
 

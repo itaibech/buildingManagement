@@ -1,4 +1,4 @@
-import { Anchor, Button, Card, Divider, Group, Select, Stack, Table, Text, Title } from '@mantine/core'
+import { Anchor, Button, Card, Divider, Select, Stack, Table, Text, Title } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { Fragment, useState } from 'react'
 import { todayISO } from '../../lib/dates'
@@ -12,7 +12,7 @@ import { useSaveBudget } from './api'
 import { CashCard, LoadFailed } from './cards'
 import { useRegisterExport } from './exportSlot'
 import { MoneyInput, Row, YearStepper } from './fields'
-import { useBudgetRows, useDesktop } from './hooks'
+import { useBudgetRows, useDesktop, useReportBudgetRows } from './hooks'
 import type { BudgetRow } from './ledger'
 
 /** Planned minus actual: over budget in `debt`, under in `paid`. */
@@ -121,20 +121,28 @@ export function BudgetTab({ adding, onAddingClose }: { adding: boolean; onAdding
   )
 }
 
-/** Read-only: what the building spent per category this year (residents). */
-export function CategoryTotals() {
+/**
+ * Read-only "תקציב מול ביצוע" for residents with finance_reports. Built from budgets and the aggregate
+ * building_expense_report (category x month sums): no vendor, note, receipt or apartment ever reaches the page.
+ */
+export function BuildingBudget() {
   const year = Number(todayISO().slice(0, 4))
-  const q = useBudgetRows(year)
-  const spent = (q.rows ?? []).filter((r) => r.actual > 0).sort((a, b) => b.actual - a.actual)
-  const total = spent.reduce((t, r) => t + r.actual, 0)
+  const q = useReportBudgetRows(year)
+  const rows = (q.rows ?? []).filter((r) => r.planned > 0 || r.actual > 0)
+  const total = rows.reduce((t, r) => ({ ...t, planned: t.planned + r.planned, actual: t.actual + r.actual }), { category: he.finance.total, planned: 0, actual: 0 })
   return (
     <Card padding={0}>
-      <Title order={2} size="h4" px="md" pt="md" pb="xs">{he.finance.expensesByCategory(year)}</Title>
+      <Title order={3} size="h4" px="md" pt="md" pb="xs">{he.finance.budgetVsActual(year)}</Title>
       {q.isLoading && <Stack p="md"><ListSkeleton rows={3} /></Stack>}
       {q.isError && <Stack p="md"><LoadFailed onRetry={q.refetch} /></Stack>}
-      {q.rows && spent.length === 0 && <EmptyState title={he.finance.noExpensesYear} />}
-      {spent.map((r) => <Fragment key={r.category}><Divider color="stone.1" /><Row title={r.category} end={<Text fw={600} className="bm-num">{formatILS(r.actual)}</Text>} /></Fragment>)}
-      {spent.length > 0 && <><Divider /><Group justify="space-between" px="md" py="sm"><Text fw={600}>{he.finance.total}</Text><Text fw={600} className="bm-num">{formatILS(total)}</Text></Group></>}
+      {q.rows && rows.length === 0 && <EmptyState title={he.finance.noExpensesYear} />}
+      {rows.map((r) => (
+        <Fragment key={r.category}>
+          <Divider color="stone.1" />
+          <Row title={r.category} meta={he.finance.plannedActual(formatILS(r.planned), formatILS(r.actual))} end={<Diff row={r} />} />
+        </Fragment>
+      ))}
+      {rows.length > 0 && <><Divider /><Row title={he.finance.total} meta={he.finance.plannedActual(formatILS(total.planned), formatILS(total.actual))} end={<Diff row={total} />} /></>}
     </Card>
   )
 }

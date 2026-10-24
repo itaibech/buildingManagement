@@ -1,6 +1,8 @@
 import type { Session } from '@supabase/supabase-js'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { makeCan, type PermissionNeed } from '../lib/permissions'
 import { supabase } from '../lib/supabase'
+import { usePermissions } from './usePermissions'
 import { useProfile, type Profile } from './useProfile'
 
 export type { Profile }
@@ -9,8 +11,12 @@ export interface AuthState {
   session: Session | null
   profile: Profile | null
   isAdmin: boolean
+  /** Whether the user may open a page or feature (admins: always). UX only: RLS enforces every key. */
+  can(need: PermissionNeed): boolean
   loading: boolean
   error: string | null
+  /** my_permissions failed to load: shown as a load error with retry (never as "no access"). */
+  permissionsError: boolean
   retry(): void
   signOut(): Promise<void>
   /** The session came from a password-reset link: the app routes to #/reset-password until it is used. */
@@ -50,21 +56,26 @@ function useSession(): { session: Session | null; loaded: boolean; recovery: boo
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { session, loaded, recovery, endRecovery } = useSession()
   const { profile, loading, error, retry } = useProfile(session?.user.id)
+  const approved = profile?.status === 'approved'
+  const isAdmin = approved && profile.role === 'admin'
+  const permissions = usePermissions(profile?.user_id, approved && !isAdmin)
   const value = useMemo<AuthState>(
     () => ({
       session,
       profile,
-      isAdmin: profile?.role === 'admin' && profile.status === 'approved',
-      loading: !loaded || loading,
+      isAdmin,
+      can: makeCan(isAdmin, permissions.granted),
+      loading: !loaded || loading || permissions.loading,
       error,
-      retry,
+      permissionsError: permissions.failed,
+      retry: error ? retry : permissions.retry,
       signOut: async () => {
         await supabase.auth.signOut()
       },
       recovery,
       endRecovery,
     }),
-    [session, profile, loaded, loading, error, retry, recovery, endRecovery],
+    [session, profile, isAdmin, permissions.granted, permissions.loading, permissions.failed, permissions.retry, loaded, loading, error, retry, recovery, endRecovery],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

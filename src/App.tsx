@@ -2,7 +2,8 @@ import { Box } from '@mantine/core'
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router'
 import { AuthProvider, useAuth } from './auth/AuthProvider'
-import { RequireAdmin, RequireApproved } from './auth/Guard'
+import { RequireAdmin, RequireApproved, RequirePermission } from './auth/Guard'
+import { FINANCE_NEED } from './layout/nav'
 import LoginPage from './auth/LoginPage'
 import ResetPasswordPage from './auth/ResetPasswordPage'
 import Shell from './layout/Shell'
@@ -24,6 +25,7 @@ const EvPage = lazy(() => import('./features/ev/EvPage'))
 const ChargerPage = lazy(() => import('./features/ev/ChargerPage'))
 const EvImportPage = lazy(() => import('./features/ev/EvImportPage'))
 const SettingsPage = lazy(() => import('./features/settings/SettingsPage'))
+const PermissionsPage = lazy(() => import('./features/permissions/PermissionsPage'))
 
 // Pages load inside Shell's own Suspense (the chrome stays put); this only covers routes outside the shell.
 const fallback = (
@@ -50,13 +52,24 @@ export default function App() {
           <Route element={<RequireApproved />}>
             <Route element={<Shell />}>
               <Route index element={<HomePage />} />
-              <Route path="announcements" element={<AnnouncementsPage />} />
-              <Route path="tickets" element={<TicketsPage />} />
-              <Route path="tickets/:id" element={<TicketPage />} />
-              <Route path="finance" element={<FinancePage />} />
               <Route path="more" element={<MorePage />} />
-              <Route path="directory" element={<DirectoryPage />} />
-              <Route path="maintenance" element={<MaintenancePage />} />
+              {/* Pages by permission (UX only: RLS enforces the same keys). */}
+              <Route element={<RequirePermission need="announcements" />}>
+                <Route path="announcements" element={<AnnouncementsPage />} />
+              </Route>
+              <Route element={<RequirePermission need="tickets" />}>
+                <Route path="tickets" element={<TicketsPage />} />
+                <Route path="tickets/:id" element={<TicketPage />} />
+              </Route>
+              <Route element={<RequirePermission need={FINANCE_NEED} />}>
+                <Route path="finance" element={<FinancePage />} />
+              </Route>
+              <Route element={<RequirePermission need="directory" />}>
+                <Route path="directory" element={<DirectoryPage />} />
+              </Route>
+              <Route element={<RequirePermission need="maintenance" />}>
+                <Route path="maintenance" element={<MaintenancePage />} />
+              </Route>
               <Route element={<RequireAdmin />}>
                 <Route path="apartments" element={<ApartmentsPage />} />
                 <Route path="apartments/:id" element={<ApartmentPage />} />
@@ -66,6 +79,7 @@ export default function App() {
                 <Route path="ev/import" element={<EvImportPage />} />
                 <Route path="ev/:id" element={<ChargerPage />} />
                 <Route path="settings" element={<SettingsPage />} />
+                <Route path="settings/permissions" element={<PermissionsPage />} />
               </Route>
             </Route>
           </Route>

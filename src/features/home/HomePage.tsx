@@ -174,13 +174,21 @@ function MyTickets({ onReport }: { onReport: () => void }) {
   )
 }
 
+/** Only the sections the user's group may see (the server returns nothing for the others anyway). */
 function ResidentHome({ onReport }: { onReport: () => void }) {
+  const { can } = useAuth()
+  const money = can('finance_own')
+  const news = can('announcements')
+  const calls = can('tickets')
+  if (!money && !news && !calls) {
+    return <Card><EmptyState title={he.permissions.homeEmpty} body={he.permissions.homeEmptyBody} /></Card>
+  }
   return (
     <Stack gap="lg">
-      <MyBalanceHero />
-      <HowToPay whenOwed />
-      <LatestAnnouncement showUnread />
-      <MyTickets onReport={onReport} />
+      {money && <MyBalanceHero />}
+      {money && <HowToPay whenOwed />}
+      {news && <LatestAnnouncement showUnread />}
+      {calls && <MyTickets onReport={onReport} />}
     </Stack>
   )
 }

@@ -165,6 +165,17 @@ export function useCollectionSummary(month: string, enabled = true) {
   })
 }
 
+export interface ExpenseReportRow { category: string; month: string; total: number }
+
+/** rpc('building_expense_report'): what the building spent in `year` per category and month (sums only). */
+export function useExpenseReport(year: number) {
+  return useQuery({
+    queryKey: [...KEY, 'expense-report', year],
+    queryFn: async (): Promise<ExpenseReportRow[]> =>
+      must(await supabase.rpc('building_expense_report', { p_year: year })).map((r) => ({ category: r.category, month: r.month, total: num(r.total) })),
+  })
+}
+
 /** Money actually in the building's account today. */
 export function useBuildingCash() {
   return useQuery({

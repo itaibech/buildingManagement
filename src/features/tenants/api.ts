@@ -44,7 +44,7 @@ export interface ResidentInput {
   is_owner: boolean
 }
 
-export type ProfilePatch = Partial<Pick<Profile, 'role' | 'status' | 'resident_id'>>
+export type ProfilePatch = Partial<Pick<Profile, 'role' | 'status' | 'resident_id' | 'group_id'>>
 
 interface DbError {
   message: string
@@ -201,11 +201,12 @@ export function useUpdateProfile() {
   })
 }
 
-export function useApproveProfile(): (args: { userId: string; residentId: string | null; role: Role }) => Promise<void> {
+/** Approves with the chosen resident link, role and group (admins see everything: no group). */
+export function useApproveProfile(): (args: { userId: string; residentId: string | null; role: Role; groupId: string | null }) => Promise<void> {
   const { mutateAsync } = useUpdateProfile()
   return useCallback(
-    ({ userId, residentId, role }) =>
-      mutateAsync({ userId, patch: { status: 'approved', resident_id: residentId, role } }),
+    ({ userId, residentId, role, groupId }) =>
+      mutateAsync({ userId, patch: { status: 'approved', resident_id: residentId, role, group_id: role === 'admin' ? null : groupId } }),
     [mutateAsync],
   )
 }

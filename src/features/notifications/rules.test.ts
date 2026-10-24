@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { needsTicketRef, qualify, type ChangeEvent, type TicketRef, type TicketRowLite, type Viewer } from './rules'
 
-const ADMIN: Viewer = { userId: 'admin', isAdmin: true }
-const RES: Viewer = { userId: 'res', isAdmin: false }
+const ADMIN: Viewer = { userId: 'admin', isAdmin: true, can: () => true }
+const RES: Viewer = { userId: 'res', isAdmin: false, can: (k) => k === 'announcements' || k === 'tickets' }
+const ONLY = (...keys: string[]): Viewer => ({ userId: 'res', isAdmin: false, can: (k) => keys.includes(k) })
 const TODAY = '2026-10-24'
 
 const ticketRow = (o: Partial<TicketRowLite> = {}): TicketRowLite => ({
@@ -82,5 +83,19 @@ describe('needsTicketRef', () => {
     expect(needsTicketRef(ticket('INSERT'), RES)).toBe(false)
     expect(needsTicketRef(ticket('UPDATE'), ADMIN)).toBe(false)
     expect(needsTicketRef(announcement('x'), ADMIN)).toBe(false)
+  })
+})
+
+describe('permissions (Task 18)', () => {
+  it('no announcement notice for a group without announcements', () => {
+    expect(qualify(announcement('admin'), ONLY('tickets'), null, TODAY)).toBeNull()
+    expect(qualify(announcement('admin'), ONLY('announcements'), null, TODAY)).not.toBeNull()
+  })
+
+  it('no call notice (status or comment) for a group without tickets, and no lookup for it', () => {
+    expect(qualify(ticket('UPDATE', { last_activity_by: 'admin', last_activity_kind: 'status' }), ONLY('announcements'), null, TODAY)).toBeNull()
+    expect(qualify(comment('admin'), ONLY('announcements'), ref(), TODAY)).toBeNull()
+    expect(needsTicketRef(comment('admin'), ONLY('announcements'))).toBe(false)
+    expect(qualify(ticket('UPDATE', { last_activity_by: 'admin', last_activity_kind: 'status' }), RES, null, TODAY)).not.toBeNull()
   })
 })

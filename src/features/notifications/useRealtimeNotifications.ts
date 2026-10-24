@@ -50,14 +50,14 @@ export async function handleChange(event: ChangeEvent, ctx: HandlerContext): Pro
 
 /** Mounted once in the Shell: one Realtime channel per signed-in user, closed on sign-out or user change. */
 export function useRealtimeNotifications(): void {
-  const { session, isAdmin } = useAuth()
+  const { session, isAdmin, can } = useAuth()
   const userId = session?.user.id
   const client = useQueryClient()
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const ctx = useRef<HandlerContext | null>(null)
   useEffect(() => {
-    ctx.current = userId ? { viewer: { userId, isAdmin }, client, navigate: (p) => void navigate(p), pathname } : null
+    ctx.current = userId ? { viewer: { userId, isAdmin, can }, client, navigate: (p) => void navigate(p), pathname } : null
   })
   useEffect(() => {
     if (!userId) return

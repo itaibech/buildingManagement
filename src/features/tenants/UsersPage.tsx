@@ -5,6 +5,7 @@ import { he } from '../../lib/he'
 import { AptPlate, EmptyState, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
 import { usersRows } from '../export/buildWorkbook'
 import { useExportAction } from '../export/useExport'
+import { useGroups, type Group as UserGroup } from '../permissions/api'
 import {
   useApproveProfile,
   useDirectory,
@@ -52,6 +53,17 @@ function ResidentSelect({ value, onChange, options }: { value: string | null; on
   )
 }
 
+function GroupSelect({ value, onChange, groups }: { value: string | null; onChange: (id: string) => void; groups: UserGroup[] }) {
+  return (
+    <Select label={he.permissions.group} data={groups.map((g) => ({ value: g.id, label: g.name }))} value={value}
+      onChange={(id) => id && onChange(id)} allowDeselect={false} style={{ minWidth: 180 }} />
+  )
+}
+
+const defaultGroupId = (groups: UserGroup[]): string | null => groups.find((g) => g.isDefault)?.id ?? null
+/** The default group is stored as null, so the user follows a later change of default. */
+const storedGroup = (id: string | null, groups: UserGroup[]): string | null => (id === defaultGroupId(groups) ? null : id)
+
 function Identity({ p, plate, children }: { p: Profile; plate: number | null; children?: ReactNode }) {
   return (
     <Group gap="sm" wrap="nowrap" align="center">
@@ -65,15 +77,19 @@ function Identity({ p, plate, children }: { p: Profile; plate: number | null; ch
   )
 }
 
-function PendingRow({ p, residents, options }: { p: Profile; residents: DirectoryEntry[]; options: Option[] }) {
+interface RowProps { residents: DirectoryEntry[]; options: Option[]; groups: UserGroup[] }
+
+function PendingRow({ p, residents, options, groups }: RowProps & { p: Profile }) {
   const approve = useApproveProfile()
   const byEmail = residents.find((r) => r.email && r.email.toLowerCase() === p.email?.toLowerCase())
   const [residentId, setResidentId] = useState<string | null>(byEmail?.id ?? null)
   const [role, setRole] = useState<Role>('resident')
+  const [picked, setPicked] = useState<string | null>(null)
+  const groupId = picked ?? defaultGroupId(groups)
   const [state, setState] = useState<'idle' | 'busy' | 'failed'>('idle')
   const onApprove = () => {
     setState('busy')
-    approve({ userId: p.user_id, residentId, role }).then(() => { setState('idle'); notifySuccess(he.toast.userApproved) }, () => setState('failed'))
+    approve({ userId: p.user_id, residentId, role, groupId: storedGroup(groupId, groups) }).then(() => { setState('idle'); notifySuccess(he.toast.userApproved) }, () => setState('failed'))
   }
   return (
     <Card padding="md" data-testid={`pending-${p.user_id}`}>
@@ -82,6 +98,7 @@ function PendingRow({ p, residents, options }: { p: Profile; residents: Director
         <Group align="flex-end" wrap="wrap" gap="sm">
           <ResidentSelect value={residentId} onChange={setResidentId} options={options} />
           <RoleControl value={role} onChange={setRole} />
+          {role === 'resident' && <GroupSelect value={groupId} onChange={setPicked} groups={groups} />}
           <Button onClick={onApprove} loading={state === 'busy'}>{he.users.approve}</Button>
         </Group>
         {state === 'failed' && <Text c="debt.7" size="sm">{he.users.actionError}</Text>}
@@ -90,7 +107,7 @@ function PendingRow({ p, residents, options }: { p: Profile; residents: Director
   )
 }
 
-function UserControls({ p, options, locked }: { p: Profile; options: Option[]; locked: boolean }) {
+function UserControls({ p, options, groups, locked }: { p: Profile; options: Option[]; groups: UserGroup[]; locked: boolean }) {
   const update = useUpdateProfile()
   const patch = (values: Parameters<typeof update.mutate>[0]['patch']) => update.mutate({ userId: p.user_id, patch: values }, { onSuccess: () => notifySuccess(he.toast.userUpdated) })
   return (
@@ -98,6 +115,7 @@ function UserControls({ p, options, locked }: { p: Profile; options: Option[]; l
       <Group align="flex-end" wrap="wrap" gap="sm">
         <ResidentSelect value={p.resident_id} onChange={(id) => patch({ resident_id: id })} options={options} />
         <RoleControl value={p.role} onChange={(role) => patch({ role })} disabled={locked} />
+        {p.role !== 'admin' && <GroupSelect value={p.group_id ?? defaultGroupId(groups)} onChange={(id) => patch({ group_id: storedGroup(id, groups) })} groups={groups} />}
         <Button variant="subtle" color="debt" disabled={locked} onClick={() => patch({ status: 'pending' })}>
           {he.users.block}
         </Button>
@@ -108,10 +126,19 @@ function UserControls({ p, options, locked }: { p: Profile; options: Option[]; l
 }
 
 /** An approved user: read-only by default (role and apartment in words); "עריכה" opens the controls. */
-function UserRow({ p, residents, options, isMe }: { p: Profile; residents: DirectoryEntry[]; options: Option[]; isMe: boolean }) {
+function summaryOf(p: Profile, linked: DirectoryEntry | undefined, groups: UserGroup[]): string {
+  const group = groups.find((g) => g.id === (p.group_id ?? defaultGroupId(groups)))
+  return [
+    p.role === 'admin' ? he.users.roleAdmin : he.users.roleResident,
+    linked ? he.apartment(linked.apartmentNumber) : he.users.noLink,
+    ...(p.role !== 'admin' && group ? [he.users.groupSummary(group.name)] : []),
+  ].join(' · ')
+}
+
+function UserRow({ p, residents, options, groups, isMe }: RowProps & { p: Profile; isMe: boolean }) {
   const [editing, setEditing] = useState(false)
   const linked = residents.find((r) => r.id === p.resident_id)
-  const summary = [p.role === 'admin' ? he.users.roleAdmin : he.users.roleResident, linked ? he.apartment(linked.apartmentNumber) : he.users.noLink].join(' · ')
+  const summary = summaryOf(p, linked, groups)
   return (
     <Card padding="md" data-testid={`user-${p.user_id}`}>
       <Stack gap="sm">
@@ -122,7 +149,7 @@ function UserRow({ p, residents, options, isMe }: { p: Profile; residents: Direc
             {editing ? he.users.done : he.users.edit}
           </Button>
         </Identity>
-        {editing ? <UserControls p={p} options={options} locked={p.is_super_admin || isMe} /> : <Text size="sm" c="dimmed">{summary}</Text>}
+        {editing ? <UserControls p={p} options={options} groups={groups} locked={p.is_super_admin || isMe} /> : <Text size="sm" c="dimmed">{summary}</Text>}
       </Stack>
     </Card>
   )
@@ -141,11 +168,12 @@ export default function UsersPage() {
   const { profile: me } = useAuth()
   const profiles = useProfiles()
   const directory = useDirectory()
+  const groups = useGroups()
   const residents = useMemo(() => directory.data ?? [], [directory.data])
   const options = useMemo(() => residents.map((r) => ({ value: r.id, label: he.users.residentOption(r.apartmentNumber, r.full_name) })), [residents])
   const pending = profiles.data?.filter((p) => p.status === 'pending') ?? []
   const approved = profiles.data?.filter((p) => p.status === 'approved') ?? []
-  const row = { residents, options }
+  const row: RowProps = { residents, options, groups: groups.data ?? [] }
   const exportAction = useExportAction(
     he.export.files.users,
     () => usersRows(profiles.data ?? [], (id) => residents.find((r) => r.id === id)?.apartmentNumber ?? null),
