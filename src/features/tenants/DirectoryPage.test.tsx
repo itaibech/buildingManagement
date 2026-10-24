@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { MantineProvider } from '@mantine/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { he } from '../../lib/he'
 import { theme } from '../../ui/theme'
@@ -18,12 +18,25 @@ const rows: Record<string, unknown[]> = {
   ],
 }
 
+const auth = vi.hoisted(() => ({ isAdmin: true }))
+const deleted = vi.hoisted(() => vi.fn())
+vi.mock('../../auth/AuthProvider', () => ({ useAuth: () => ({ isAdmin: auth.isAdmin }) }))
+vi.mock('./ApartmentForm', () => ({
+  ApartmentForm: ({ apartment }: { apartment?: { number: number } }) => <div data-testid="apt-form">{apartment?.number}</div>,
+}))
+vi.mock('./ResidentForm', () => ({
+  ResidentForm: ({ apartmentId, resident }: { apartmentId: string; resident?: { full_name: string } }) => (
+    <div data-testid="res-form">{apartmentId}|{resident?.full_name ?? 'new'}</div>
+  ),
+}))
+
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: (table: string) => {
       const q = {
         select: () => q,
         order: () => q,
+        delete: () => ({ eq: (_c: string, id: string) => { deleted(id); return Promise.resolve({ error: null }) } }),
         then: (resolve: (r: { data: unknown; error: null }) => unknown) =>
           Promise.resolve(resolve({ data: rows[table], error: null })),
       }
@@ -62,5 +75,49 @@ describe('DirectoryPage', () => {
     expect(screen.queryByText('יוסי לדוגמה')).not.toBeInTheDocument()
     fireEvent.change(search, { target: { value: 'אין כזה' } })
     expect(screen.getByText(he.tenants.noMatches)).toBeInTheDocument()
+  })
+
+  describe('admin controls', () => {
+    it('shows pencil and menus to an admin only', async () => {
+      auth.isAdmin = true
+      const { unmount } = renderPage()
+      await screen.findByText('דנה בדיקה')
+      expect(screen.getByLabelText(he.tenants.editApartmentN(12))).toBeInTheDocument()
+      expect(screen.getByLabelText(he.tenants.residentActions('דנה בדיקה'))).toBeInTheDocument()
+      unmount()
+      auth.isAdmin = false
+      renderPage()
+      await screen.findByText('דנה בדיקה')
+      expect(screen.queryByLabelText(he.tenants.editApartmentN(12))).not.toBeInTheDocument()
+      expect(screen.queryByLabelText(he.tenants.residentActions('דנה בדיקה'))).not.toBeInTheDocument()
+      expect(screen.queryByText(he.tenants.addResident)).not.toBeInTheDocument()
+      auth.isAdmin = true
+    })
+
+    it('opens the apartment form prefilled', async () => {
+      renderPage()
+      await screen.findByText('דנה בדיקה')
+      fireEvent.click(screen.getByLabelText(he.tenants.editApartmentN(12)))
+      expect(await screen.findByTestId('apt-form')).toHaveTextContent('12')
+    })
+
+    it('opens the resident form for the chosen resident', async () => {
+      renderPage()
+      await screen.findByText('יוסי לדוגמה')
+      fireEvent.click(screen.getByLabelText(he.tenants.residentActions('יוסי לדוגמה')))
+      fireEvent.click(await screen.findByText(he.tenants.editResident))
+      expect(await screen.findByTestId('res-form')).toHaveTextContent('a12|יוסי לדוגמה')
+    })
+
+    it('asks for confirmation before removing a resident', async () => {
+      renderPage()
+      await screen.findByText('דנה בדיקה')
+      fireEvent.click(screen.getByLabelText(he.tenants.residentActions('דנה בדיקה')))
+      fireEvent.click(await screen.findByText(he.tenants.removeResident))
+      expect(await screen.findByText(he.tenants.deleteResidentConfirm('דנה בדיקה'))).toBeInTheDocument()
+      expect(deleted).not.toHaveBeenCalled()
+      fireEvent.click(screen.getAllByRole('button', { name: he.tenants.removeResident }).at(-1) as HTMLElement)
+      await waitFor(() => expect(deleted).toHaveBeenCalledWith('r1'))
+    })
   })
 })
