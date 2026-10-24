@@ -8,7 +8,7 @@ import { UnreadDot } from '../../ui/UnreadDot'
 import { useMarkRead } from '../announcements/api'
 import { useMarkAllRead, useMarkTicketsSeen, useNotificationCount, useNotificationFeed } from './api'
 import type { FeedItem } from './feed'
-import { disableSystem, enableSystem, systemEnabled, systemSupported } from './system'
+import { disableSystem, enableSystem, systemDenied, systemEnabled, systemSupported } from './system'
 
 const ICON = { size: 22, stroke: 1.75 } as const
 
@@ -30,9 +30,9 @@ function FeedRow({ item, onPick }: { item: FeedItem; onPick: (item: FeedItem) =>
 
 /** Opt-in system notifications; the preference lives in localStorage, the permission in the browser. */
 function SystemToggle() {
-  const supported = systemSupported()
+  const [supported, setSupported] = useState(systemSupported)
   const [on, setOn] = useState(systemEnabled)
-  const [denied, setDenied] = useState(false)
+  const [denied, setDenied] = useState(systemDenied)
   const toggle = async (next: boolean) => {
     if (!next) {
       disableSystem()
@@ -42,6 +42,7 @@ function SystemToggle() {
     const result = await enableSystem()
     setOn(result === 'granted')
     setDenied(result === 'denied')
+    setSupported(result !== 'unsupported')
   }
   const hint = !supported ? he.notifications.systemUnsupported : denied ? he.notifications.systemDenied : he.notifications.systemHint
   return (

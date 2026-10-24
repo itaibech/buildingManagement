@@ -45,6 +45,18 @@ describe('handleChange', () => {
     expect(m.show).toHaveBeenCalledWith(expect.objectContaining({ text: 'הודעה חדשה: מים' }), expect.any(Function))
   })
 
+  it('never rejects: a failing lookup or system notification is swallowed', async () => {
+    m.fetch.mockRejectedValue(new Error('offline'))
+    m.system.mockRejectedValue(new Error('no worker'))
+    const ev = { table: 'announcements', row: { id: 'a1', title: 'מים', author_id: 'admin', expires_at: null } } as const
+    await expect(handleChange(ev, ctx({ viewer: { userId: 'res', isAdmin: false } }))).resolves.toBeUndefined()
+    m.show.mockImplementation(() => { throw new Error('boom') })
+    await expect(handleChange({ table: 'tickets', type: 'INSERT', row: {
+      id: 't9', title: 'x', status: 'open', opened_by: 'res', last_activity_by: 'res', last_activity_kind: 'created',
+    } }, ctx())).resolves.toBeUndefined()
+    m.show.mockReset()
+  })
+
   it('no toast for the viewer\'s own action, or when they are already on that page', async () => {
     await handleChange({ table: 'ticket_comments', row: { id: 'c1', ticket_id: 't1', author_id: 'admin' } }, ctx())
     await handleChange({ table: 'ticket_comments', row: { id: 'c2', ticket_id: 't1', author_id: 'res' } }, ctx({ pathname: '/tickets/t1' }))

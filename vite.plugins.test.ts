@@ -25,6 +25,12 @@ describe('buildCsp', () => {
     expect(prod).toContain("form-action 'self'")
   })
 
+  it('allows only the app’s own service worker (system notifications)', () => {
+    expect(directive(prod, 'worker-src')).toBe("worker-src 'self'")
+    expect(existsSync('public/notify-sw.js')).toBe(true)
+    expect(readFileSync('public/notify-sw.js', 'utf8')).not.toMatch(/addEventListener\(['"]fetch/)
+  })
+
   it('maps a local http stack to ws and allows Vite HMR plus its inline preamble in dev', () => {
     const dev = buildCsp({ supabaseUrl: 'http://127.0.0.1:54321', dev: true })
     expect(directive(dev, 'connect-src')).toBe(

@@ -849,6 +849,7 @@ export const he = {
     systemHint: 'פועל כשהאפליקציה פתוחה בדפדפן',
     systemDenied: 'הדפדפן חוסם התראות לאתר. אפשר לאשר אותן בהגדרות האתר בדפדפן.',
     systemUnsupported: 'הדפדפן הזה לא תומך בהתראות מערכת',
+    systemOn: 'התראות מערכת הופעלו',
   },
   toast: {
     apartmentSaved: 'הדירה נשמרה',

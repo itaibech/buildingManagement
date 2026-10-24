@@ -5,7 +5,7 @@ import { useAuth } from '../../auth/AuthProvider'
 import { todayISO } from '../../lib/dates'
 import { fetchActivity, subscribeToChanges } from './api'
 import { needsTicketRef, qualify, ticketIdOf, type ChangeEvent, type TicketRef, type Viewer } from './rules'
-import { systemNotify } from './system'
+import { onNotificationOpen, registerNotifyWorker, systemEnabled, systemNotify } from './system'
 import { showNotice } from './toasts'
 
 export interface HandlerContext {
@@ -29,16 +29,23 @@ async function lookupTicket(ticketId: string): Promise<TicketRef | null> {
   }
 }
 
-/** One Realtime change: refresh what it affects, then toast (and maybe a system notification) if it qualifies. */
+/**
+ * One Realtime change: refresh what it affects, then toast (and maybe a system notification) if it qualifies.
+ * Never rejects: a notification that can't be shown must not surface as an unhandled rejection.
+ */
 export async function handleChange(event: ChangeEvent, ctx: HandlerContext): Promise<void> {
-  const ticketId = ticketIdOf(event)
-  void ctx.client.invalidateQueries({ queryKey: ticketId === null ? ['announcements'] : ['tickets'] })
-  const ticket = ticketId !== null && needsTicketRef(event, ctx.viewer) ? await lookupTicket(ticketId) : null
-  const notice = qualify(event, ctx.viewer, ticket, todayISO())
-  if (!notice || notice.path === ctx.pathname) return
-  const open = () => ctx.navigate(notice.path)
-  showNotice(notice, open)
-  systemNotify(notice, open)
+  try {
+    const ticketId = ticketIdOf(event)
+    void ctx.client.invalidateQueries({ queryKey: ticketId === null ? ['announcements'] : ['tickets'] })
+    const ticket = ticketId !== null && needsTicketRef(event, ctx.viewer) ? await lookupTicket(ticketId) : null
+    const notice = qualify(event, ctx.viewer, ticket, todayISO())
+    if (!notice || notice.path === ctx.pathname) return
+    const open = () => ctx.navigate(notice.path)
+    showNotice(notice, open)
+    await systemNotify(notice, open)
+  } catch {
+    // The queries were already invalidated; the badge and lists still update.
+  }
 }
 
 /** Mounted once in the Shell: one Realtime channel per signed-in user, closed on sign-out or user change. */
@@ -54,8 +61,22 @@ export function useRealtimeNotifications(): void {
   })
   useEffect(() => {
     if (!userId) return
+    const resync = () => {
+      void client.invalidateQueries({ queryKey: ['tickets'] })
+      void client.invalidateQueries({ queryKey: ['announcements'] })
+    }
     return subscribeToChanges(userId, (event) => {
       if (ctx.current) void handleChange(event, ctx.current)
-    })
-  }, [userId])
+    }, resync)
+  }, [userId, client])
+  useSystemNotificationClicks()
+}
+
+/** A tapped system notification (via the service worker) opens its item; the worker is registered if enabled. */
+function useSystemNotificationClicks(): void {
+  const navigate = useNavigate()
+  useEffect(() => {
+    if (systemEnabled()) void registerNotifyWorker()
+    return onNotificationOpen((path) => void navigate(path))
+  }, [navigate])
 }

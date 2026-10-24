@@ -58,7 +58,11 @@ export function useMarkTicketsSeen() {
       const { error } = await supabase.rpc('mark_tickets_seen', ids === null ? {} : { p_ids: [...ids] })
       if (error) throw new Error(error.message)
     },
-    onMutate: (ids) => setSeen(client, key, ids),
+    onMutate: async (ids) => {
+      // An in-flight refetch would land after the optimistic write and bring the old flags back.
+      await client.cancelQueries({ queryKey: key })
+      setSeen(client, key, ids)
+    },
     onSettled: () => client.invalidateQueries({ queryKey: key }),
   })
 }
@@ -75,14 +79,21 @@ export function useMarkAllRead(): () => void {
   }
 }
 
+let channelSeq = 0
+
 /**
  * One Realtime channel for the signed-in user: new announcements, new and changed calls, new comments.
- * Realtime applies each table's SELECT policy to the subscriber. Returns the unsubscribe function.
+ * Realtime applies each table's SELECT policy to the subscriber. Each call gets its own topic, so a quick
+ * unsubscribe/resubscribe (StrictMode, user switch) never reuses a channel that is still closing. `onResync` runs
+ * when the channel re-joins after a drop: events sent while offline are lost, so the caller refetches.
+ * Returns the unsubscribe function.
  */
-export function subscribeToChanges(userId: string, onEvent: (event: ChangeEvent) => void): () => void {
+export function subscribeToChanges(userId: string, onEvent: (event: ChangeEvent) => void, onResync: () => void): () => void {
   const pg = { schema: 'public' } as const
+  let joined = false
+  channelSeq += 1
   const channel = supabase
-    .channel(`notifications:${userId}`)
+    .channel(`notifications:${userId}:${channelSeq}`)
     .on<AnnouncementRowLite>('postgres_changes', { ...pg, event: 'INSERT', table: 'announcements' },
       (p) => onEvent({ table: 'announcements', row: p.new }))
     .on<TicketRowLite>('postgres_changes', { ...pg, event: 'INSERT', table: 'tickets' },
@@ -91,7 +102,11 @@ export function subscribeToChanges(userId: string, onEvent: (event: ChangeEvent)
       (p) => onEvent({ table: 'tickets', type: 'UPDATE', row: p.new }))
     .on<CommentRowLite>('postgres_changes', { ...pg, event: 'INSERT', table: 'ticket_comments' },
       (p) => onEvent({ table: 'ticket_comments', row: p.new }))
-    .subscribe()
+    .subscribe((status) => {
+      if (status !== 'SUBSCRIBED') return
+      if (joined) onResync()
+      joined = true
+    })
   return () => {
     void supabase.removeChannel(channel)
   }

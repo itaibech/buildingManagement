@@ -9,7 +9,7 @@ import { NotificationBell } from './NotificationCenter'
 
 const m = vi.hoisted(() => ({
   feed: [] as FeedItem[], count: 0, markAll: vi.fn(), markSeen: vi.fn(), markRead: vi.fn(),
-  enable: vi.fn(), disable: vi.fn(), enabled: false, supported: true,
+  enable: vi.fn(), disable: vi.fn(), enabled: false, supported: true, denied: false,
 }))
 vi.mock('./api', () => ({
   useNotificationFeed: () => m.feed,
@@ -19,7 +19,7 @@ vi.mock('./api', () => ({
 }))
 vi.mock('../announcements/api', () => ({ useMarkRead: () => ({ mutate: m.markRead }) }))
 vi.mock('./system', () => ({
-  systemSupported: () => m.supported, systemEnabled: () => m.enabled, enableSystem: m.enable, disableSystem: m.disable,
+  systemSupported: () => m.supported, systemEnabled: () => m.enabled, systemDenied: () => m.denied, enableSystem: m.enable, disableSystem: m.disable,
 }))
 
 const now = Date.now()
@@ -51,6 +51,7 @@ beforeEach(() => {
   m.count = 2
   m.enabled = false
   m.supported = true
+  m.denied = false
 })
 
 describe('NotificationBell', () => {
@@ -117,6 +118,24 @@ describe('system notifications toggle', () => {
     const toggle = await screen.findByRole('switch', { name: /^התראות מערכת בדפדפן/ })
     fireEvent.click(toggle)
     expect(await screen.findByText(/הדפדפן חוסם התראות/)).toBeInTheDocument()
+    expect(toggle).not.toBeChecked()
+  })
+
+  it('starts with the blocked hint when the browser already denies notifications', async () => {
+    m.denied = true
+    renderBell()
+    fireEvent.click(screen.getByRole('button', { name: /התראות/ }))
+    expect(await screen.findByText(/הדפדפן חוסם התראות/)).toBeInTheDocument()
+  })
+
+  it('becomes unsupported when the browser cannot show a notification after all', async () => {
+    m.enable.mockResolvedValue('unsupported')
+    renderBell()
+    fireEvent.click(screen.getByRole('button', { name: /התראות/ }))
+    const toggle = await screen.findByRole('switch', { name: /^התראות מערכת בדפדפן/ })
+    fireEvent.click(toggle)
+    expect(await screen.findByText('הדפדפן הזה לא תומך בהתראות מערכת')).toBeInTheDocument()
+    expect(toggle).toBeDisabled()
     expect(toggle).not.toBeChecked()
   })
 

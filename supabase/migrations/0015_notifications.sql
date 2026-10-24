@@ -6,8 +6,9 @@
 --   * ticket_seen: when each user last opened each call. Own rows only; written through mark_tickets_seen().
 --   * my_ticket_activity(): the calls the user is notified about (admins: every call; others: the calls they
 --     opened), with the latest activity by someone else and whether it is unseen. Security invoker, so the
---     tickets RLS still applies. No ticket_seen row = seen as of the account's creation; existing users are
---     backfilled as having seen everything, so the rollout doesn't light every badge.
+--     tickets RLS still applies. No ticket_seen row = seen as of the account's approval (profiles.approved_at,
+--     set by trigger; falls back to created_at); existing users are backfilled as having seen everything, so
+--     the rollout doesn't light every badge.
 --   * The supabase_realtime publication gains announcements, tickets and ticket_comments. Realtime applies the
 --     tables' SELECT policies per subscriber, so pending users receive nothing.
 
@@ -56,6 +57,32 @@ create trigger tickets_touch
   before insert or update on public.tickets
   for each row execute function public.tickets_touch();
 
+-- ---------------------------------------------------------------- profiles.approved_at
+-- When the account was approved: the "seen" baseline for calls with no ticket_seen row. Set by trigger (it runs
+-- after profiles_guard, so a resident still can't write it); cleared if the account goes back to pending.
+alter table public.profiles add column approved_at timestamptz;
+update public.profiles set approved_at = created_at where status = 'approved';
+
+create function public.profiles_set_approved_at() returns trigger
+language plpgsql set search_path = ''
+as $$
+begin
+  if new.status <> 'approved' then
+    new.approved_at := null;
+  elsif tg_op = 'INSERT' or old.status is distinct from 'approved' then
+    new.approved_at := now();
+  else
+    new.approved_at := old.approved_at;
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function public.profiles_set_approved_at() from public, anon, authenticated;
+
+create trigger profiles_set_approved_at
+  before insert or update on public.profiles
+  for each row execute function public.profiles_set_approved_at();
+
 -- ---------------------------------------------------------------- ticket_seen
 create table public.ticket_seen (
   ticket_id uuid not null references public.tickets on delete cascade,
@@ -87,7 +114,7 @@ language sql stable set search_path = ''
 as $$
   with me as (
     select auth.uid() as id, public.is_admin() as admin,
-      (select p.created_at from public.profiles p where p.user_id = auth.uid()) as joined
+      (select coalesce(p.approved_at, p.created_at) from public.profiles p where p.user_id = auth.uid()) as joined
   )
   select t.id, t.title, t.status, t.opened_by, a.number,
     x.at, x.by, x.kind,

@@ -110,6 +110,7 @@ Mobile (<768)                        Desktop (≥768)
 - Notification center (`features/notifications`): an `IconBell` with the unseen total, beside exit in the mobile header
   (a full-screen sheet) and in the side-nav header (a popover). Live notices are top-centre toasts with a "לצפייה"
   action, at most 3 on screen; further ones collapse into "ועוד N עדכונים".
+  Badge = any unseen activity by others; toast = the interruptive subset (the rules in `notifications/rules.ts`).
 - `focusFirstError`: pass as `form.onSubmit(handler, focusFirstError)`.
 - Sheets: every Modal close is named "סגירה" and is 44px (theme). Short sheets use
   `FormModal compact` (centred, not full screen).

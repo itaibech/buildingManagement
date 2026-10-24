@@ -3,7 +3,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(27);
+select plan(32);
 
 -- ---------------------------------------------------------------- fixtures
 insert into auth.users (id, email, aud, role, raw_user_meta_data) values
@@ -13,8 +13,12 @@ insert into auth.users (id, email, aud, role, raw_user_meta_data) values
 update public.profiles set role = 'admin', status = 'approved' where user_id = 'a7000000-0000-0000-0000-000000000001';
 update public.profiles set status = 'approved'
   where user_id in ('a7000000-0000-0000-0000-000000000002', 'a7000000-0000-0000-0000-000000000003');
--- Accounts created well before the tickets, so "no ticket_seen row" falls back to an old baseline.
-update public.profiles set created_at = now() - interval '1 day' where user_id::text like 'a7000000-%';
+-- Accounts created and approved well before the tickets, so "no ticket_seen row" falls back to an old baseline
+-- (triggers off for this fixture write only: approved_at is otherwise trigger-managed).
+set local session_replication_role = replica;
+update public.profiles set created_at = now() - interval '1 day', approved_at = now() - interval '1 day'
+  where user_id::text like 'a7000000-%';
+set local session_replication_role = default;
 delete from public.tickets;
 
 -- ---------------------------------------------------------------- publication
@@ -134,6 +138,44 @@ select is(
 );
 set local role authenticated;
 select is((select count(*)::int from public.ticket_seen), 1, 'isolation: the resident sees only their own row');
+
+-- ---------------------------------------------------------------- approval baseline
+reset role;
+insert into auth.users (id, email, aud, role, raw_user_meta_data) values
+  ('a7000000-0000-0000-0000-000000000004', 'nt-new@test.local', 'authenticated', 'authenticated', '{"full_name":"חדשה"}');
+select is(
+  (select approved_at from public.profiles where user_id = 'a7000000-0000-0000-0000-000000000004'),
+  null, 'approved_at: null while pending'
+);
+-- A call from two hours ago, by a resident.
+insert into public.tickets (id, title, opened_by, created_at)
+  values ('e7000000-0000-0000-0000-000000000003', 'ישנה', 'a7000000-0000-0000-0000-000000000002', now() - interval '2 hours');
+-- The account was created a day ago but approved (as an admin) only now.
+set local session_replication_role = replica;
+update public.profiles set created_at = now() - interval '1 day' where user_id = 'a7000000-0000-0000-0000-000000000004';
+set local session_replication_role = default;
+update public.profiles set status = 'approved', role = 'admin' where user_id = 'a7000000-0000-0000-0000-000000000004';
+select is(
+  (select approved_at from public.profiles where user_id = 'a7000000-0000-0000-0000-000000000004'),
+  now(), 'approved_at: set by the trigger when the account is approved'
+);
+update public.profiles set approved_at = now() - interval '1 year' where user_id = 'a7000000-0000-0000-0000-000000000004';
+select is(
+  (select approved_at from public.profiles where user_id = 'a7000000-0000-0000-0000-000000000004'),
+  now(), 'approved_at: cannot be rewritten while the status stays approved'
+);
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"a7000000-0000-0000-0000-000000000004","role":"authenticated"}';
+select is(
+  (select unseen from public.my_ticket_activity() where ticket_id = 'e7000000-0000-0000-0000-000000000003'),
+  false, 'baseline: a call from before the approval is not unseen for a newly approved admin'
+);
+reset role;
+update public.profiles set status = 'pending' where user_id = 'a7000000-0000-0000-0000-000000000004';
+select is(
+  (select approved_at from public.profiles where user_id = 'a7000000-0000-0000-0000-000000000004'),
+  null, 'approved_at: cleared when the account goes back to pending'
+);
 
 select * from finish();
 rollback;
