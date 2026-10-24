@@ -8,16 +8,20 @@ export type StatusBadgeProps =
   | { kind: 'due'; value: 'overdue' | 'soon' | 'later' | 'none' }
   | { kind: 'reading'; value: 'recorded' | 'pending' }
   | { kind: 'fee'; value: FeeMode }
+  | { kind: 'meeting'; value: 'draft' | 'invited' | 'in_progress' | 'closed' | 'published' }
 
 // The only place the status colour mapping lives (docs/design-system.md); fee sources are in feeBadge.ts.
 const TICKET_COLOR = { open: 'signal', in_progress: 'enamel', closed: 'stone' } as const
 const DUE_COLOR = { overdue: 'debt', soon: 'signal', later: 'stone', none: 'stone' } as const
 // EV meter reading for the current month: recorded = paid (done), pending = signal (needs attention).
 const READING_COLOR = { recorded: 'paid', pending: 'signal' } as const
+// Meetings: draft = stone, invited = enamel, in progress and closed-but-unpublished = signal (needs action), published = paid.
+const MEETING_COLOR = { draft: 'stone', invited: 'enamel', in_progress: 'signal', closed: 'signal', published: 'paid' } as const
 
 function resolve(props: StatusBadgeProps): { color: string; label: string } {
   if (props.kind === 'ticket') return { color: TICKET_COLOR[props.value], label: he.ticketStatus[props.value] }
   if (props.kind === 'fee') return feeBadge(props.value)
+  if (props.kind === 'meeting') return { color: MEETING_COLOR[props.value], label: he.meetings.statuses[props.value] }
   if (props.kind === 'reading') return { color: READING_COLOR[props.value], label: he.readingStatus[props.value] }
   return { color: DUE_COLOR[props.value], label: he.dueStatus[props.value] }
 }
