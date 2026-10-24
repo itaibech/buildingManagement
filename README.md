@@ -17,6 +17,7 @@ one place, on phone and desktop. It's inspired by Hombi, Bllink and Darimpo.
 | 4 | **משימות תחזוקה** Maintenance | Recurring tasks (elevator, fire safety, backflow preventers…) with due dates and a done log |
 | 5 | **הכנסות והוצאות** Finance | Monthly fees, levies, payments, debts per apartment, expenses by category, and budget vs actual |
 | 6 | **ייבוא מאקסל** Excel import | Imports the committee's existing payments and expenses workbook |
+| 7 | **מיילים** Email | Admins email an announcement or a service call to all or chosen apartments, and personalised debt reminders (one apartment or every debtor). See [Email setup](#email-setup) |
 
 **Roles:** *admin* (committee, full access) and *resident* (read-only, plus
 opening service calls). A resident sees only their own apartment's finances.
@@ -158,6 +159,96 @@ Free-tier projects pause after a week without activity. `.github/workflows/keepa
 answers with `[]`. Scheduled workflows only run from the default branch, so it starts after the first
 merge to `main`. GitHub disables schedules after 60 days without repo activity; re-enable it there if so.
 
+## Email setup
+
+Admins send email from the app: **"שליחה במייל"** on an announcement (its ⋯ menu) or a service call, **"שליחת
+תזכורת חוב"** in an apartment's ledger, **"תזכורת לכל החייבים"** on the **יתרות** tab, and **"שליחת מייל בדיקה"**
+on **עוד → הגדרות בניין** (with the **"היסטוריית מיילים"** list). Every email goes out one recipient at a time
+(no one sees other residents' addresses) from the Supabase Edge Function `supabase/functions/send-email`. The
+browser never holds mail credentials, and the function checks that the caller is an admin.
+
+Until a provider is configured the function runs in **dry run**: it prepares the emails, logs them and records
+them in the history, but sends nothing. The app then shows **"שליחת מיילים טרם הוגדרה (מצב בדיקה)"**.
+
+CI deploys the function on every push to `main`, but it never sets its secrets. You set them once, by hand,
+with one of the two options below. Supabase Edge Functions block outbound SMTP, so both options send over HTTPS.
+
+### Option A: Gmail through Google Apps Script (free, no domain needed)
+
+1. Sign in to the sending Gmail account, e.g. `vaad.havatzelet6@gmail.com`. A dedicated account for the committee is
+   recommended over a personal one.
+2. Go to [script.google.com](https://script.google.com) and click **New project**. Replace the editor's contents
+   with [`docs/email/apps-script.gs`](docs/email/apps-script.gs). In the line `var TOKEN = 'CHANGE_ME';`, replace
+   `CHANGE_ME` with a long random string you generate yourself, for example the output of `openssl rand -hex 32`.
+   Keep it private: it is what stops strangers from sending mail through your account. Save the project.
+3. Click **Deploy → New deployment**, and pick the type **Web app**. Set **Execute as: Me** and **Who has access:
+   Anyone**, then **Deploy**. Google asks you to authorize the script: choose the account, then **Advanced → Go to
+   (project name) (unsafe)** (the warning appears because the script is yours and unverified), and **Allow**.
+   Copy the **Web app URL** (it ends in `/exec`).
+4. On your computer (not in a chat or an issue), run once:
+   ```bash
+   npx supabase secrets set --project-ref kttyozquueaoacrwbnmx \
+     EMAIL_PROVIDER=appsscript \
+     APPS_SCRIPT_URL='<web app URL>' \
+     APPS_SCRIPT_TOKEN='<the token from step 2>' \
+     EMAIL_FROM_NAME="ועד הבית חבצלת השרון 6"
+   ```
+   (`npx supabase login` first if the CLI asks for it.)
+5. In the app, open **עוד → הגדרות בניין** and press **"שליחת מייל בדיקה"**. The email arrives at the address in
+   your own profile, and the history shows it without the **מצב בדיקה** badge.
+
+### Option B: Resend (when you own a domain)
+
+1. Create an account at [resend.com](https://resend.com).
+2. Under **Domains**, add your domain and add the DNS records Resend shows at your registrar. Wait until the domain
+   shows **Verified**.
+3. Under **API Keys**, create a key with sending access.
+4. Run once:
+   ```bash
+   npx supabase secrets set --project-ref kttyozquueaoacrwbnmx \
+     EMAIL_PROVIDER=resend \
+     RESEND_API_KEY='<key>' \
+     EMAIL_FROM="ועד הבית <vaad@yourdomain>"
+   ```
+5. Press **"שליחת מייל בדיקה"** in the app.
+
+### Settings (Supabase secrets)
+
+| Secret | Default | Meaning |
+|---|---|---|
+| `EMAIL_PROVIDER` | `appsscript` | `appsscript` or `resend`. To switch providers, set the other option's secrets and change this. |
+| `APPS_SCRIPT_URL`, `APPS_SCRIPT_TOKEN` | | Option A. |
+| `EMAIL_FROM_NAME` | `ועד הבית` | Option A: the sender name recipients see. |
+| `RESEND_API_KEY`, `EMAIL_FROM` | | Option B. `EMAIL_FROM` must be on the verified domain. |
+| `EMAIL_DAILY_CAP` | `90` | The most real emails sent per day (Israel time), across all sends. |
+| `EMAIL_DRY_RUN` | | `true` forces dry run even when a provider is configured. |
+
+`npx supabase secrets list --project-ref kttyozquueaoacrwbnmx` shows which secrets are set (not their values).
+Secrets take effect on the next call; no redeploy is needed.
+
+### Limits
+
+- A consumer Gmail account sends to about **100 recipients a day** through Apps Script; Resend's free tier allows
+  100 a day and 3,000 a month. The app stops at `EMAIL_DAILY_CAP` (default 90) and answers with how many emails
+  remain today, so a large send never fails halfway because of the provider quota.
+- Each recipient is one email, sent about every half second, so a send to 40 residents takes about 20 seconds.
+- Debt reminders skip apartments that owe nothing (the dialog lists them) and residents without an email address.
+
+### Troubleshooting
+
+- **Still "מצב בדיקה" after setup:** a secret is missing or misspelled (`secrets list`), or `EMAIL_PROVIDER` doesn't
+  match the secrets you set, or `EMAIL_DRY_RUN=true` is set.
+- **Every email fails after you edited the script:** a **New deployment** gets a new URL. Either update
+  `APPS_SCRIPT_URL`, or redeploy with **Deploy → Manage deployments → ✏️ → Version: New version**, which keeps the URL.
+- **"unauthorized" in the failures:** `APPS_SCRIPT_TOKEN` and the script's `TOKEN` differ.
+- **"daily quota exhausted" / "Service invoked too many times":** Gmail's daily quota is used up; it resets within
+  24 hours. Lower `EMAIL_DAILY_CAP` if it happens often.
+- **The authorization screen says "Google hasn't verified this app":** expected for your own script; use
+  **Advanced → Go to …**. If you change the script to use more Google services, it asks again.
+- **Resend `HTTP 403`/`422`:** the domain isn't verified yet, or `EMAIL_FROM` isn't on it.
+- Function logs: Supabase dashboard → Edge Functions → `send-email` → Logs. Dry runs log each email with a masked
+  address; tokens and keys are never logged.
+
 ## Development
 
 Requires Node 22 and Docker (for the local Supabase stack).
@@ -185,6 +276,13 @@ The Content-Security-Policy is injected at build time from `VITE_SUPABASE_URL` (
 dev, preview and production each allow only their own Supabase origin. To check the production build
 locally against the local stack: `npm run build && npm run preview` (http://localhost:4173/buildingManagement/).
 
+To try email locally, serve the function in dry run (nothing is delivered):
+
+```bash
+printf 'EMAIL_DRY_RUN=true\n' > supabase/functions/.env   # git-ignored; never put real secrets in the repo
+npx supabase functions serve send-email --env-file supabase/functions/.env
+```
+
 ### Tests
 
 ```bash
@@ -204,7 +302,8 @@ Before pushing: `npm test && npm run lint && npm run typecheck && npm run build 
 2. Merge the stack down into `main`. A push to `main` runs `deploy.yml`: it first runs the whole CI
    (`ci.yml` as a reusable workflow, pgTAP included); only when that passes does it build with the repo
    variables, apply new migrations in `supabase/migrations` to the hosted project (`supabase db push`),
-   and publish GitHub Pages.
+   deploy the `send-email` Edge Function (`supabase functions deploy`, JWT verification on), and publish
+   GitHub Pages.
 3. Migrations are forward-only: fix a bad one with a new migration, never by editing an applied one.
    Protect `main` (Settings → Branches) so it only takes PRs with a green CI.
 
