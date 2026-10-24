@@ -305,6 +305,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"email_log": {
+                  Row: {
+                    "apartment_ids": (string)[] | null,"building_id": string,"created_at": string,"dry_run": boolean,"error": string | null,"failed": number,"id": string,"kind": string,"recipients": number,"ref_id": string | null,"sent": number,"sent_by": string | null,"skipped": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "apartment_ids"?: (string)[] | null,"building_id": string,"created_at"?: string,"dry_run"?: boolean,"error"?: string | null,"failed"?: number,"id"?: string,"kind": string,"recipients"?: number,"ref_id"?: string | null,"sent"?: number,"sent_by"?: string | null,"skipped"?: number
+                  }
+                  Update: {
+                    "apartment_ids"?: (string)[] | null,"building_id"?: string,"created_at"?: string,"dry_run"?: boolean,"error"?: string | null,"failed"?: number,"id"?: string,"kind"?: string,"recipients"?: number,"ref_id"?: string | null,"sent"?: number,"sent_by"?: string | null,"skipped"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "email_log_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "email_log_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"ev_chargers": {
                   Row: {
                     "active": boolean,"apartment_id": string,"building_id": string,"created_at": string,"id": string,"initial_reading": number,"label": string
@@ -986,6 +1012,9 @@ isOneToOne: false
                            },
 "delete_ev_reading":
 { Args: { "p_reading_id": string }; Returns: undefined
+                           },
+"email_sent_today":
+{ Args: Record<PropertyKey, never>; Returns: number
                            },
 "ev_charge_reading":
 { Args: { "p_reading_id": string }; Returns: Json
