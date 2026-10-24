@@ -1,4 +1,5 @@
-import { Card, Divider, Group, SegmentedControl, Stack, Text } from '@mantine/core'
+import { Button, Card, Divider, Group, SegmentedControl, Stack, Text } from '@mantine/core'
+import { IconMail } from '@tabler/icons-react'
 import { useLocalStorage } from '@mantine/hooks'
 import { Fragment, useState } from 'react'
 import { formatILS } from '../../lib/format'
@@ -6,6 +7,7 @@ import { he } from '../../lib/he'
 import { EmptyState, ListSkeleton, Money } from '../../ui'
 import { balancesRows } from '../export/buildWorkbook'
 import { useChargers } from '../ev/api'
+import { DebtBulkForm } from '../email/DebtReminder'
 import { FormModal } from '../tenants/dialogs'
 import { useBalances, type ApartmentBalance } from './api'
 import { ApartmentLedger } from './ApartmentLedger'
@@ -14,6 +16,22 @@ import { BalanceBadges, LoadFailed } from './cards'
 import { BALANCE_SORTS, hasBadges, isBalanceSort, sortBalances, type BalanceSort } from './ledger'
 import { Row } from './fields'
 import { PaymentForm } from './PaymentForm'
+
+/** Admin: "תזכורת לכל החייבים" opens the debtors list (all checked) to send personalised reminders. */
+function RemindAll({ debtors }: { debtors: ApartmentBalance[] }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <Button variant="light" color="debt" leftSection={<IconMail size={20} stroke={1.75} aria-hidden="true" />} onClick={() => setOpen(true)}
+        style={{ alignSelf: 'center' }}>
+        {he.mail.debt.bulkAction}
+      </Button>
+      <FormModal opened={open} title={he.mail.debt.bulkTitle} onClose={() => setOpen(false)}>
+        {open && <DebtBulkForm debtors={debtors} onDone={() => setOpen(false)} />}
+      </FormModal>
+    </>
+  )
+}
 
 function Summary({ rows }: { rows: ApartmentBalance[] }) {
   const debtors = rows.filter((r) => r.balance > 0)
@@ -28,6 +46,7 @@ function Summary({ rows }: { rows: ApartmentBalance[] }) {
         <Text size="sm" c="dimmed">{he.finance.debtorsCount}</Text>
         <Text className="bm-display bm-num" fz="h2">{he.finance.ofApartments(debtors.length, rows.length)}</Text>
       </Stack>
+      {debtors.length > 0 && <RemindAll debtors={debtors} />}
     </Group>
   )
 }

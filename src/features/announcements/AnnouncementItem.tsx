@@ -1,5 +1,5 @@
 import { ActionIcon, Badge, Box, Card, Collapse, Group, Menu, Stack, Text, UnstyledButton } from '@mantine/core'
-import { IconChevronDown, IconDots, IconPencil, IconPin, IconTrash } from '@tabler/icons-react'
+import { IconChevronDown, IconDots, IconMail, IconPencil, IconPin, IconTrash } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
 import { formatDate } from '../../lib/format'
 import { he } from '../../lib/he'
@@ -18,6 +18,7 @@ function Meta({ a, expired }: { a: Item; expired: boolean }) {
 export interface AdminActions {
   onEdit: (item: Item) => void
   onDelete: (item: Item) => void
+  onEmail: (item: Item) => void
 }
 
 function ItemMenu({ item, actions }: { item: Item; actions: AdminActions }) {
@@ -30,6 +31,7 @@ function ItemMenu({ item, actions }: { item: Item; actions: AdminActions }) {
       </Menu.Target>
       <Menu.Dropdown>
         <Menu.Item leftSection={<IconPencil size={18} stroke={1.75} />} onClick={() => actions.onEdit(item)}>{he.announcements.edit}</Menu.Item>
+        <Menu.Item leftSection={<IconMail size={18} stroke={1.75} />} onClick={() => actions.onEmail(item)}>{he.mail.send}</Menu.Item>
         <Menu.Item color="debt" leftSection={<IconTrash size={18} stroke={1.75} />} onClick={() => actions.onDelete(item)}>{he.announcements.delete}</Menu.Item>
       </Menu.Dropdown>
     </Menu>
