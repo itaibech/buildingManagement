@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { MantineProvider } from '@mantine/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { he } from '../../lib/he'
 import { theme } from '../../ui/theme'
@@ -10,6 +10,7 @@ import DirectoryPage from './DirectoryPage'
 const rows: Record<string, unknown[]> = {
   apartments: [
     { id: 'a1', number: 1, floor: 1 },
+    { id: 'a5', number: 5, floor: 2 },
     { id: 'a12', number: 12, floor: 4 },
   ],
   residents: [
@@ -91,7 +92,17 @@ describe('DirectoryPage', () => {
       expect(screen.queryByLabelText(he.tenants.editApartmentN(12))).not.toBeInTheDocument()
       expect(screen.queryByLabelText(he.tenants.residentActions('דנה בדיקה'))).not.toBeInTheDocument()
       expect(screen.queryByText(he.tenants.addResident)).not.toBeInTheDocument()
+      expect(screen.queryByLabelText(he.apartment(5))).not.toBeInTheDocument()
       auth.isAdmin = true
+    })
+
+    it('lists an apartment with no residents for admins, found by number', async () => {
+      renderPage()
+      await screen.findByText('דנה בדיקה')
+      expect(screen.getByLabelText(he.tenants.editApartmentN(5))).toBeInTheDocument()
+      fireEvent.change(screen.getByLabelText(he.tenants.search), { target: { value: '5' } })
+      expect(screen.getByText(he.tenants.noResidentsShort)).toBeInTheDocument()
+      expect(screen.queryByText('דנה בדיקה')).not.toBeInTheDocument()
     })
 
     it('opens the apartment form prefilled', async () => {
@@ -116,7 +127,8 @@ describe('DirectoryPage', () => {
       fireEvent.click(await screen.findByText(he.tenants.removeResident))
       expect(await screen.findByText(he.tenants.deleteResidentConfirm('דנה בדיקה'))).toBeInTheDocument()
       expect(deleted).not.toHaveBeenCalled()
-      fireEvent.click(screen.getAllByRole('button', { name: he.tenants.removeResident }).at(-1) as HTMLElement)
+      const dialog = await screen.findByRole('dialog', { name: he.tenants.deleteResidentConfirm('דנה בדיקה') })
+      fireEvent.click(within(dialog).getByRole('button', { name: he.tenants.removeResident }))
       await waitFor(() => expect(deleted).toHaveBeenCalledWith('r1'))
     })
   })

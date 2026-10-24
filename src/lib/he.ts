@@ -145,6 +145,8 @@ export const he = {
     editApartment: 'עריכת דירה',
     editApartmentN: (n: number) => `עריכת דירה ${n}`,
     removeResident: 'הסרת דייר',
+    cannotUndo: 'אי אפשר לבטל את הפעולה.',
+    noResidentsShort: 'אין דיירים',
     deleteApartment: 'מחיקת דירה',
     deleteApartmentConfirm: (n: number) => `למחוק את דירה ${n}?`,
     deleteApartmentCascade: (count: number) =>
