@@ -1,12 +1,13 @@
-import { Card, Group, SegmentedControl, Stack, Text } from '@mantine/core'
+import { Box, Card, Group, SegmentedControl, Stack, Text } from '@mantine/core'
 import { IconPhoto } from '@tabler/icons-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { relativeDate } from '../../lib/format'
 import { he } from '../../lib/he'
-import { EmptyState, ListSkeleton, PageHeader, StatusBadge } from '../../ui'
+import { EmptyState, ListSkeleton, PageHeader, StatusBadge, UnreadDot } from '../../ui'
 import { ticketsRows } from '../export/buildWorkbook'
 import { useExportAction } from '../export/useExport'
+import { useUnseenTicketIds } from '../notifications/api'
 import { FormModal } from '../tenants/dialogs'
 import { useTickets, type TicketListItem, type TicketStatus } from './api'
 import { TicketForm } from './TicketForm'
@@ -25,11 +26,17 @@ function PhotoCount({ n }: { n: number }) {
   )
 }
 
-export function TicketRow({ ticket }: { ticket: TicketListItem }) {
+/**
+ * `unseen`: the call has activity the user hasn't opened yet (the `signal` dot, as for unread announcements). When
+ * given, rows keep the dot's slot so titles line up.
+ */
+export function TicketRow({ ticket, unseen }: { ticket: TicketListItem; unseen?: boolean }) {
   const meta = [ticket.location, relativeDate(ticket.created_at)].filter(Boolean).join(' · ')
   return (
     <Card component={Link} to={`/tickets/${ticket.id}`} padding="md" className="bm-row" mih={44}>
       <Group wrap="nowrap" gap="sm">
+        {unseen && <UnreadDot label={he.notifications.unseen} />}
+        {unseen === false && <Box w={10} style={{ flexShrink: 0 }} />}
         <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
           <Text fw={600} truncate="end">{ticket.title}</Text>
           <Text size="sm" c="dimmed" truncate="end">{meta}</Text>
@@ -53,6 +60,7 @@ export default function TicketsPage() {
   const [filter, setFilter] = useState<Filter>('active')
   const [adding, setAdding] = useState(false)
   const list = useTickets(STATUSES[filter])
+  const unseen = useUnseenTicketIds()
   const add = { label: he.tickets.add, onClick: () => setAdding(true) }
   const exportAction = useExportAction(he.export.files.tickets, () => ticketsRows(list.data ?? []), !!list.data)
   return (
@@ -62,7 +70,7 @@ export default function TicketsPage() {
       {list.isError && <Text c="debt.7">{he.tickets.errors.load}</Text>}
       {list.isLoading && <ListSkeleton rows={4} />}
       {list.data?.length === 0 && <EmptyState title={he.tickets.empty} body={he.tickets.emptyBody} action={add} />}
-      {list.data?.map((t) => <TicketRow key={t.id} ticket={t} />)}
+      {list.data?.map((t) => <TicketRow key={t.id} ticket={t} unseen={unseen.has(t.id)} />)}
       <FormModal opened={adding} title={he.tickets.add} onClose={() => setAdding(false)}>
         {adding && <TicketForm onDone={() => setAdding(false)} />}
       </FormModal>

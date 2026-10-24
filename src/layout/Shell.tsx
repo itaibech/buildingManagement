@@ -4,6 +4,9 @@ import { Suspense, useEffect, type ReactNode } from 'react'
 import { Link, Outlet, useLocation } from 'react-router'
 import { useExit } from '../auth/useExit'
 import { useUnreadCount } from '../features/announcements/api'
+import { useUnseenTicketCount } from '../features/notifications/api'
+import { NotificationBell } from '../features/notifications/NotificationCenter'
+import { useRealtimeNotifications } from '../features/notifications/useRealtimeNotifications'
 import { he } from '../lib/he'
 import { AptPlate, ListSkeleton } from '../ui'
 import { useAuth } from '../auth/AuthProvider'
@@ -11,18 +14,29 @@ import { activeTab, ADMIN_NAV, GENERAL_NAV, MAIN_NAV, matches, type NavItem } fr
 import { useShellInfo } from './useShellInfo'
 
 const ICON = { size: 22, stroke: 1.75 } as const
-const ANNOUNCEMENTS = '/announcements'
 
-/** Small `signal` count pill for unread announcements. */
-function UnreadBadge({ count }: { count: number }) {
+/** Live counts for the nav badges: unread announcements and calls with unseen activity. */
+interface NavCounts {
+  announcements: number
+  tickets: number
+}
+
+/** Small `signal` count pill on a nav item. */
+function UnreadBadge({ count, label }: { count: number; label: string }) {
   return (
-    <span className="bm-unread" role="img" aria-label={he.announcements.unreadCount(count)}>
+    <span className="bm-unread" role="img" aria-label={label}>
       {count > 9 ? '9+' : count}
     </span>
   )
 }
 
-const badgeFor = (to: string, unread: number) => (to === ANNOUNCEMENTS && unread > 0 ? <UnreadBadge count={unread} /> : undefined)
+function badgeFor(to: string, counts: NavCounts) {
+  if (to === '/announcements' && counts.announcements > 0) {
+    return <UnreadBadge count={counts.announcements} label={he.announcements.unreadCount(counts.announcements)} />
+  }
+  if (to === '/tickets' && counts.tickets > 0) return <UnreadBadge count={counts.tickets} label={he.notifications.ticketsUnseen(counts.tickets)} />
+  return undefined
+}
 
 
 /** Building name on the start side; the user's plate (and any trailing controls) on the end side. */
@@ -48,6 +62,7 @@ function MobileHeader({ name, apartment, onExit }: { name: string; apartment: nu
   return (
     <Box h="100%" px="md" className="bm-header" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
       <BuildingIdentity name={name} apartment={apartment}>
+        <NotificationBell sheet />
         <Tooltip label={he.exit}>
           <ActionIcon variant="subtle" color="stone.7" size={44} aria-label={he.exit} onClick={onExit}>
             <ExitIcon />
@@ -58,7 +73,7 @@ function MobileHeader({ name, apartment, onExit }: { name: string; apartment: nu
   )
 }
 
-function NavGroup({ items, pathname, unread, label }: { items: NavItem[]; pathname: string; unread: number; label?: string }) {
+function NavGroup({ items, pathname, unread, label }: { items: NavItem[]; pathname: string; unread: NavCounts; label?: string }) {
   return (
     <>
       {label && <Divider my="xs" color="stone.1" label={label} labelPosition="right" />}
@@ -73,12 +88,14 @@ function NavGroup({ items, pathname, unread, label }: { items: NavItem[]; pathna
   )
 }
 
-function SideNav({ pathname, name, apartment, unread, onExit }: { pathname: string; name: string; apartment: number | null; unread: number; onExit: () => void }) {
+function SideNav({ pathname, name, apartment, unread, onExit }: { pathname: string; name: string; apartment: number | null; unread: NavCounts; onExit: () => void }) {
   const { isAdmin } = useAuth()
   return (
     <Stack h="100%" gap="xs" justify="space-between">
       <Box px="xs" pt="xs" pb="sm">
-        <BuildingIdentity name={name} apartment={apartment} />
+        <BuildingIdentity name={name} apartment={apartment}>
+          <NotificationBell />
+        </BuildingIdentity>
       </Box>
       <ScrollArea style={{ flex: 1 }} type="auto">
         <nav aria-label={he.mainNav}>
@@ -92,7 +109,7 @@ function SideNav({ pathname, name, apartment, unread, onExit }: { pathname: stri
   )
 }
 
-function TabBar({ pathname, unread }: { pathname: string; unread: number }) {
+function TabBar({ pathname, unread }: { pathname: string; unread: NavCounts }) {
   return (
     <nav className="bm-tabbar" aria-label={he.mainNav}>
       {MAIN_NAV.map(({ to, label, icon: I }) => {
@@ -128,10 +145,11 @@ export default function Shell() {
   const { pathname } = useLocation()
   const exit = useExit()
   const { buildingName, apartmentNumber } = useShellInfo()
-  const unread = useUnreadCount()
+  const unread: NavCounts = { announcements: useUnreadCount(), tickets: useUnseenTicketCount() }
   const name = buildingName ?? he.appName
   const onExit = () => void exit()
   usePrefetchTabs()
+  useRealtimeNotifications()
   return (
     <AppShell
       header={{ height: { base: 'calc(56px + env(safe-area-inset-top, 0px))', sm: 0 } }}

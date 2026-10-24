@@ -54,16 +54,19 @@ export function useUnreadCount(): number {
   return useMemo(() => data?.filter((a) => !a.isRead).length ?? 0, [data])
 }
 
+/** Marks one announcement (or several) read for the signed-in user. */
 export function useMarkRead() {
   const client = useQueryClient()
   const { session } = useAuth()
   const userId = session?.user.id
   return useMutation({
-    mutationFn: async (announcementId: string) => {
+    mutationFn: async (ids: string | readonly string[]) => {
       if (!userId) throw new Error('Not signed in')
+      const rows = (typeof ids === 'string' ? [ids] : ids).map((announcement_id) => ({ announcement_id, user_id: userId }))
+      if (rows.length === 0) return
       const { error } = await supabase
         .from('announcement_reads')
-        .upsert({ announcement_id: announcementId, user_id: userId }, { onConflict: 'announcement_id,user_id', ignoreDuplicates: true })
+        .upsert(rows, { onConflict: 'announcement_id,user_id', ignoreDuplicates: true })
       if (error) throw new Error(error.message)
     },
     onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
