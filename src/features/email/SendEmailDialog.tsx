@@ -2,7 +2,8 @@ import { Group, Input, MultiSelect, SegmentedControl, Stack, Text, Textarea } fr
 import { useState } from 'react'
 import { he } from '../../lib/he'
 import { AptPlate } from '../../ui'
-import { useApartments } from '../tenants/api'
+import { useApartments, useResidents } from '../tenants/api'
+import { apartmentOptions } from './options'
 import { FormModal } from '../tenants/dialogs'
 import { sendableCount, useEmailPreview, useSplitSend, type EmailRequest } from './api'
 import { PreviewInfo, SendActions } from './parts'
@@ -21,7 +22,8 @@ export interface SendEmailDialogProps {
 /** Multi-select of the building's apartments, each option with its plate. */
 export function ApartmentPicker({ value, onChange }: { value: string[]; onChange: (ids: string[]) => void }) {
   const apartments = useApartments()
-  const data = (apartments.data ?? []).map((a) => ({ value: a.id, label: he.apartment(a.number), number: a.number }))
+  const residents = useResidents()
+  const data = apartmentOptions(apartments.data ?? [], residents.data ?? [])
   const numberOf = (id: string): number => data.find((d) => d.value === id)?.number ?? 0
   return (
     <MultiSelect label={he.mail.apartments} placeholder={value.length ? undefined : he.mail.apartmentsPlaceholder} data={data}

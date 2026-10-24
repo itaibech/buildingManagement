@@ -9,6 +9,7 @@ import { he } from '../../lib/he'
 import { theme } from '../../ui/theme'
 import type { ApartmentBalance } from '../finance/api'
 import { DebtBulkForm } from './DebtReminder'
+import { apartmentOptions } from './options'
 import { SendEmailDialog } from './SendEmailDialog'
 
 type Body = Record<string, unknown>
@@ -24,10 +25,12 @@ const notify = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn
 vi.mock('../../ui/notify', () => ({ notifySuccess: notify.success, notifyError: notify.error, notifyInfo: notify.info }))
 vi.mock('../../lib/supabase', () => {
   const apartments = [{ id: 'a1', number: 1 }, { id: 'a2', number: 2 }]
+  const residents = [{ id: 'r1', apartment_id: 'a1', full_name: 'דנה בדיקה' }, { id: 'r2', apartment_id: 'a1', full_name: 'יוסי בדיקה' }]
   const q: Record<string, unknown> = { select: () => q, order: () => Promise.resolve({ data: apartments, error: null }) }
+  const rq: Record<string, unknown> = { select: () => rq, order: () => Promise.resolve({ data: residents, error: null }) }
   return {
     supabase: {
-      from: () => q,
+      from: (table: string) => (table === 'residents' ? rq : q),
       functions: {
         invoke: async (_name: string, { body }: { body: Body }) => {
           m.calls.push(body)
@@ -97,6 +100,12 @@ describe('SendEmailDialog', () => {
     fireEvent.click(screen.getByText(he.mail.scopes.selected))
     expect(screen.getByRole('button', { name: he.mail.confirm })).toBeDisabled()
     expect(previews()).toHaveLength(1)
+  })
+
+  it('apartment picker options carry the residents next to the apartment number', () => {
+    const opts = apartmentOptions([{ id: 'a1', number: 1 }, { id: 'a2', number: 2 }],
+      [{ apartment_id: 'a1', full_name: 'דנה בדיקה' }, { apartment_id: 'a1', full_name: 'יוסי בדיקה' }])
+    expect(opts.map((o) => o.label)).toEqual([`${he.apartment(1)} · דנה בדיקה, יוסי בדיקה`, he.apartment(2)])
   })
 
   it('dry run: says email is not set up yet', async () => {
