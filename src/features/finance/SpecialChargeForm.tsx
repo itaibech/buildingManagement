@@ -86,7 +86,7 @@ export function SpecialChargeForm({ apartmentId, onDone }: { apartmentId: string
         <MoneyInput label={S.amount} withAsterisk min={0} {...form.getInputProps('amount')} />
         <MonthField label={S.month} value={form.values.month} onChange={(m) => form.setFieldValue('month', m)} error={form.errors.month} />
         <TextInput label={he.finance.note} {...form.getInputProps('note')} />
-        <Checkbox label={S.paid} size="md" {...form.getInputProps('paid', { type: 'checkbox' })} />
+        <Checkbox label={S.paid} description={S.paidDescription} size="md" {...form.getInputProps('paid', { type: 'checkbox' })} />
         {form.values.paid && <PaidFields form={form} />}
         <Checkbox label={S.expense} size="md" {...form.getInputProps('expense', { type: 'checkbox' })} />
         {form.values.expense && <ExpenseFields form={form} />}
