@@ -6,6 +6,8 @@ import { handleChange, type HandlerContext } from './useRealtimeNotifications'
 const m = vi.hoisted(() => ({ show: vi.fn(), system: vi.fn(), fetch: vi.fn() }))
 vi.mock('./toasts', () => ({ showNotice: m.show }))
 vi.mock('./system', () => ({ systemNotify: m.system }))
+// The real client needs env vars CI doesn't have.
+vi.mock('../../lib/supabase', () => ({ supabase: {} }))
 vi.mock('./api', () => ({ fetchActivity: m.fetch }))
 
 const row: TicketActivity = {
