@@ -16,6 +16,7 @@ const m = vi.hoisted(() => ({
   success: vi.fn(),
 }))
 
+vi.mock('../../lib/supabase', () => ({ supabase: {} }))
 vi.mock('./api', () => ({
   useGroups: () => ({
     data: [
