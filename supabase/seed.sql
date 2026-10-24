@@ -241,3 +241,9 @@ values ('60000000-0000-0000-0000-000000000001', 'חבר ועד צופה', 'צפ�
 insert into public.group_permissions (group_id, permission)
 select '60000000-0000-0000-0000-000000000001', k
 from unnest(array['announcements', 'tickets', 'maintenance', 'directory', 'finance_reports']) k;
+
+-- Email (Task 23, invented): more residents with an address, so the send dialogs have recipients locally
+-- (the function runs in dry run locally; nothing is delivered).
+update public.residents set email = 'yossi@example.test' where id = '20000000-0000-0000-0000-000000000002';
+update public.residents set email = 'michal@example.test' where id = '20000000-0000-0000-0000-000000000003';
+update public.residents set email = 'avi@example.test' where id = '20000000-0000-0000-0000-000000000004';
