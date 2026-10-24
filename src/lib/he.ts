@@ -143,6 +143,10 @@ export const he = {
     apartmentsEmptyBody: 'הוסיפו את דירות הבניין כדי לשייך אליהן דיירים.',
     addApartment: 'הוספת דירה',
     editApartment: 'עריכת דירה',
+    editApartmentN: (n: number) => `עריכת דירה ${n}`,
+    removeResident: 'הסרת דייר',
+    cannotUndo: 'אי אפשר לבטל את הפעולה.',
+    noResidentsShort: 'אין דיירים',
     deleteApartment: 'מחיקת דירה',
     deleteApartmentConfirm: (n: number) => `למחוק את דירה ${n}?`,
     deleteApartmentCascade: (count: number) =>
