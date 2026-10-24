@@ -1,7 +1,10 @@
 /** Shared types of the send-email function (pure: no Deno or network imports, so Vitest can load them). */
 
-export type EmailKind = 'announcement' | 'ticket' | 'debt' | 'test'
-export const EMAIL_KINDS: readonly EmailKind[] = ['announcement', 'ticket', 'debt', 'test']
+export type EmailKind = 'announcement' | 'ticket' | 'debt' | 'test' | 'meeting'
+export const EMAIL_KINDS: readonly EmailKind[] = ['announcement', 'ticket', 'debt', 'test', 'meeting']
+/** kind 'meeting': the invitation, its update, or the published protocol. */
+export type MeetingVariant = 'invite' | 'update' | 'published'
+export const MEETING_VARIANTS: readonly MeetingVariant[] = ['invite', 'update', 'published']
 
 /** apartmentIds omitted = the kind's default (announcement/debt: every apartment; ticket: the opener's). */
 export interface EmailRequest {
@@ -9,6 +12,7 @@ export interface EmailRequest {
   id?: string
   apartmentIds?: string[] | 'all'
   note?: string
+  variant?: MeetingVariant
   preview: boolean
 }
 
@@ -29,6 +33,18 @@ export interface TicketInfo {
   location: string
   latestComment: string | null
   openerApartmentId: string | null
+}
+
+export interface MeetingInfo {
+  id: string
+  kind: string
+  title: string
+  scheduled_at: string
+  opened_at: string | null
+  location: string
+  status: string
+  /** Open agenda item titles, in order. */
+  agenda: string[]
 }
 
 export interface Balance { apartmentId: string; balance: number }
@@ -55,6 +71,7 @@ export interface DataSource {
   residents(buildingId: string): Promise<Resident[]>
   announcement(id: string, buildingId: string): Promise<{ title: string; body: string } | null>
   ticket(id: string, buildingId: string): Promise<TicketInfo | null>
+  meeting(id: string, buildingId: string): Promise<MeetingInfo | null>
   balances(apartmentIds: string[]): Promise<Balance[]>
   ledger(apartmentIds: string[]): Promise<(LedgerRow & { apartmentId: string })[]>
   /** Real emails used today in the building (pending reservations count in full). */

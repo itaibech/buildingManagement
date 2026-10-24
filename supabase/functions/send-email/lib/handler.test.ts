@@ -27,6 +27,7 @@ function fakeData(over: Partial<DataSource> = {}, used = 0): Fake {
     ],
     announcement: async () => ({ title: 'הודעה', body: 'גוף' }),
     ticket: async () => ({ id: T1, title: 'נזילה', status: 'in_progress', location: 'לובי', latestComment: null, openerApartmentId: A2 }),
+    meeting: async () => null,
     balances: async () => [{ apartmentId: A1, balance: 300 }, { apartmentId: A2, balance: 0 }, { apartmentId: A3, balance: 50 }],
     ledger: async () => [{ apartmentId: A1, month: '2026-10-01', charged: 300, paid: 0 }],
     sentToday: async () => used + reserved.reduce((t, r) => t + r.count, 0),
