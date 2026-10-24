@@ -163,6 +163,16 @@ export function PaidNotice({ overlaps, include, onInclude }: { overlaps: Payment
   )
 }
 
+/** "N חודשי הוראת קבע דולגו": standing-order months are never imported again. */
+export function AutoSkippedNote({ count }: { count: number }) {
+  if (count === 0) return null
+  return (
+    <Alert color="enamel" title={he.import.autoSkipped(count)}>
+      <Text size="sm">{he.import.autoSkippedBody}</Text>
+    </Alert>
+  )
+}
+
 export function PriorNotice({ prior, keep, onKeep }: { prior: { levy: number; ev: number }; keep: boolean; onKeep: (v: boolean) => void }) {
   if (prior.levy === 0 && prior.ev === 0) return null
   return (

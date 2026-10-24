@@ -1,4 +1,5 @@
-import { Badge } from '@mantine/core'
+import { Badge, Group } from '@mantine/core'
+import { IconBolt } from '@tabler/icons-react'
 import { he } from '../lib/he'
 import { feeBadge, type FeeMode } from './feeBadge'
 
@@ -35,4 +36,26 @@ export function StatusBadge(props: StatusBadgeProps) {
 export function ExemptBadge() {
   const { color } = feeBadge('exempt')
   return <Badge color={color} c={`${color}.9`} data-status="exempt">{he.fees.exemptBadge}</Badge>
+}
+
+// Apartment tags are neutral facts, not states that need attention: committee and EV charger are stone; a standing
+// order (the fee is collected automatically) is enamel, like a custom fee, since it changes how the apartment pays.
+const TAG_COLOR = { committee: 'stone', standingOrder: 'enamel', ev: 'stone' } as const
+
+export interface ApartmentTagsProps { committee?: boolean; standingOrder?: boolean; ev?: boolean }
+
+/** "נציג ועד" / "הוראת קבע" / "עמדת טעינה" badges for an apartment; nothing when none applies. */
+export function ApartmentTags({ committee = false, standingOrder = false, ev = false }: ApartmentTagsProps) {
+  const tags = (['committee', 'standingOrder', 'ev'] as const).filter((t) => ({ committee, standingOrder, ev })[t])
+  if (tags.length === 0) return null
+  return (
+    <Group gap={6} wrap="wrap">
+      {tags.map((t) => (
+        <Badge key={t} color={TAG_COLOR[t]} c={`${TAG_COLOR[t]}.9`} data-tag={t}
+          leftSection={t === 'ev' ? <IconBolt size={12} stroke={2} aria-hidden="true" /> : undefined}>
+          {he.tags[t]}
+        </Badge>
+      ))}
+    </Group>
+  )
 }

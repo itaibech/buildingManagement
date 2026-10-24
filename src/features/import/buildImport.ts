@@ -256,6 +256,18 @@ export function skipRecorded(payments: PaymentRow[], overlaps: PaymentOverlap[])
 }
 
 /**
+ * What the file's payments become: standing-order months (source 'auto', the system's record of money collected)
+ * are always left out, even when the admin opts in; other recorded payments are left out unless `importPaid`.
+ * `paid`: the non-auto overlaps (the notice); `autoSkipped`: apartment-months already paid by standing order.
+ */
+export function guardPayments(payments: PaymentRow[], existing: ExistingPayment[], importPaid: boolean): { payments: PaymentRow[]; paid: PaymentOverlap[]; autoSkipped: number } {
+  const auto = findPaymentOverlaps(payments, existing.filter((e) => e.source === 'auto'))
+  const rest = auto.length === 0 ? payments : skipRecorded(payments, auto)
+  const paid = findPaymentOverlaps(rest, existing.filter((e) => e.source !== 'auto'))
+  return { payments: importPaid || paid.length === 0 ? rest : skipRecorded(rest, paid), paid, autoSkipped: auto.length }
+}
+
+/**
  * The previous import's charges a re-import would remove because the file has none of that kind
  * (`kinds` = the kinds the file brings). EV charges of apartments with a charger are never touched.
  */

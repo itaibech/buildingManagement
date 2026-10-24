@@ -3,14 +3,18 @@ import { IconChevronLeft } from '@tabler/icons-react'
 import { Fragment, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { he } from '../../lib/he'
-import { AptPlate, EmptyState, ListSkeleton, PageHeader } from '../../ui'
+import { ApartmentTags, AptPlate, EmptyState, ListSkeleton, Money, PageHeader } from '../../ui'
+import { useChargers } from '../ev/api'
+import { useBalances } from '../finance/api'
 import { ApartmentForm } from './ApartmentForm'
-import { useApartments, useResidents, type Apartment, type Resident } from './api'
+import { billingOf, useApartmentBilling, useApartments, useResidents, type Apartment, type Resident } from './api'
 import { apartmentsRows } from '../export/buildWorkbook'
 import { useExportAction } from '../export/useExport'
 import { FormModal } from './dialogs'
 
-function ApartmentRow({ apartment, residents }: { apartment: Apartment; residents: Resident[] }) {
+interface RowExtras { fee?: number; ev: boolean; standingOrder: boolean }
+
+function ApartmentRow({ apartment, residents, fee, ev, standingOrder }: { apartment: Apartment; residents: Resident[] } & RowExtras) {
   const meta = [
     apartment.floor !== null ? he.tenants.floorLabel(apartment.floor) : null,
     he.tenants.residentsCount(residents.length),
@@ -22,7 +26,9 @@ function ApartmentRow({ apartment, residents }: { apartment: Apartment; resident
       <Stack gap={0} style={{ flex: 1, minWidth: 0 }}>
         <Text fw={600} truncate>{residents.map((r) => r.full_name).join(', ') || he.apartment(apartment.number)}</Text>
         <Text size="sm" c="dimmed">{meta}</Text>
+        <ApartmentTags committee={apartment.is_committee} standingOrder={standingOrder} ev={ev} />
       </Stack>
+      {fee !== undefined && <Money amount={fee} tone="neutral" />}
       <IconChevronLeft size={20} stroke={1.75} color="var(--mantine-color-stone-6)" aria-hidden="true" />
     </UnstyledButton>
   )
@@ -37,6 +43,16 @@ function useResidentsByApartment(): Map<string, Resident[]> {
   }, [residents.data])
 }
 
+/** Apartment id → this month's fee, EV charger and standing order (for the list's badges, amounts and export). */
+function useRowExtras(): (id: string) => RowExtras {
+  const balances = useBalances()
+  const chargers = useChargers()
+  const billing = useApartmentBilling()
+  const fees = useMemo(() => new Map((balances.data ?? []).map((b) => [b.apartmentId, b.fee])), [balances.data])
+  const ev = useMemo(() => new Set((chargers.data ?? []).map((c) => c.apartment_id)), [chargers.data])
+  return (id) => ({ fee: fees.get(id), ev: ev.has(id), standingOrder: billingOf(billing.data, id).paymentMethod === 'standing_order' })
+}
+
 /** Admin: every apartment sorted by number; tap through to its residents. */
 export default function ApartmentsPage() {
   const apartments = useApartments()
@@ -45,7 +61,8 @@ export default function ApartmentsPage() {
   const add = { label: he.tenants.addApartment, onClick: () => setAdding(true) }
   const list = apartments.data ?? []
   const residents = useResidents()
-  const exportAction = useExportAction(he.export.files.apartments, () => apartmentsRows(list, residents.data ?? []), !!apartments.data && !!residents.data)
+  const extras = useRowExtras()
+  const exportAction = useExportAction(he.export.files.apartments, () => apartmentsRows(list, residents.data ?? [], extras), !!apartments.data && !!residents.data)
   return (
     <Stack gap="md">
       <PageHeader title={he.nav.apartments} action={add} secondaryAction={exportAction} />
@@ -58,7 +75,7 @@ export default function ApartmentsPage() {
         {list.map((a, i) => (
           <Fragment key={a.id}>
             {i > 0 && <Divider color="stone.1" />}
-            <ApartmentRow apartment={a} residents={byApartment.get(a.id) ?? []} />
+            <ApartmentRow apartment={a} residents={byApartment.get(a.id) ?? []} {...extras(a.id)} />
           </Fragment>
         ))}
       </Card>

@@ -1,6 +1,7 @@
 /** Pure finance helpers: ledger grid, budget vs actual, month arithmetic. No I/O here. */
 import { formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
+import type { ApartmentBalance } from './api'
 
 export interface LedgerRow {
   apartment_id: string
@@ -149,3 +150,7 @@ export function receiptError(file: File): string | null {
   if (!Object.hasOwn(RECEIPT_EXT, file.type)) return he.finance.errors.receiptType
   return file.size > MAX_RECEIPT_BYTES ? he.finance.errors.receiptSize : null
 }
+
+/** Whether a balance row carries any badge (exempt, committee, standing order). */
+export const hasBadges = (row: Pick<ApartmentBalance, 'feeMode' | 'isCommittee' | 'standingOrder'>): boolean =>
+  row.feeMode === 'exempt' || row.isCommittee || row.standingOrder

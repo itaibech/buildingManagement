@@ -6,8 +6,8 @@ import { useChargers } from '../ev/api'
 import { useYearMoney } from './api'
 import { useExpenseCategories } from '../maintenance/api'
 import {
-  budgetUpdates, buildImport, feesToReplace, findOverlaps, findPaymentOverlaps, initialFees, likelyExempt, NEW_CATEGORY, overlapKey,
-  priorCharges, skipRecorded, type ExistingCharge, type ExistingExpense, type ExistingFee, type ExistingPayment, type FeeEntry,
+  budgetUpdates, buildImport, feesToReplace, findOverlaps, guardPayments, initialFees, likelyExempt, NEW_CATEGORY, overlapKey,
+  priorCharges, type ExistingCharge, type ExistingExpense, type ExistingFee, type ExistingPayment, type FeeEntry,
   type ImportOptions, type ImportPayload,
 } from './buildImport'
 import type { ColumnMap } from './parseWorkbook'
@@ -96,19 +96,18 @@ function evSkipped(ev: { apartment: number; byMonth: Record<string, number> }[],
   return ev.filter((e) => !include || chargers.includes(e.apartment)).reduce((n, e) => n + Object.keys(e.byMonth).length, 0)
 }
 
-/** Payments already recorded (skipped unless the admin opts in) and the prior charges a re-import would remove. */
+/** Payments already recorded (standing orders always skipped, the rest unless the admin opts in) and the prior charges a re-import would remove. */
 function guardMoney(built: ImportPayload, st: ImportState, ctx: ImportContext) {
-  const paid = findPaymentOverlaps(built.payments, ctx.payments)
-  const payload = st.importPaid || paid.length === 0 ? built : { ...built, payments: skipRecorded(built.payments, paid) }
+  const { payments, paid, autoSkipped } = guardPayments(built.payments, ctx.payments, st.importPaid)
   const prior = priorCharges(ctx.charges, [...new Set(built.charges.map((c) => c.kind))], ctx.chargerNumbers)
-  return { payload, paid, prior }
+  return { payload: { ...built, payments }, paid, autoSkipped, prior }
 }
 
 /** Everything computed from the state: fees prefill, category mapping, the payload and the guard notices. */
 export function useDerived(st: ImportState, ctx: ImportContext) {
   return useMemo(() => {
     const { names, resolved, categoryMap } = categoryChoices(st, ctx.categories)
-    if (!st.read) return { names, resolved, fees: [], fromSystem: false, payload: null, overlaps: [], paid: [], prior: { levy: 0, ev: 0 }, levies: [], ev: { apartments: [], total: 0 }, includeEv: false, evSkipped: 0, feesReplaced: 0, budgetsUpdated: 0, exemptHints: [] }
+    if (!st.read) return { names, resolved, fees: [], fromSystem: false, payload: null, overlaps: [], paid: [], autoSkipped: 0, prior: { levy: 0, ev: 0 }, levies: [], ev: { apartments: [], total: 0 }, includeEv: false, evSkipped: 0, feesReplaced: 0, budgetsUpdated: 0, exemptHints: [] }
     const { income } = st.read.parsed
     const init = initialFees(ctx.fees, income, income.columns, st.year)
     const fees = st.feesEdit ?? init.fees
@@ -119,13 +118,13 @@ export function useDerived(st: ImportState, ctx: ImportContext) {
     const overlaps = findOverlaps(base.expenses, ctx.expenses)
     const built = st.importOverlaps || overlaps.length === 0 ? base
       : buildImport(st.read.parsed, st.columns, fees, { ...opts, skipExpenses: overlaps.map((o) => overlapKey(o.category, o.month)) })
-    const { payload, paid, prior } = guardMoney(built, st, ctx)
+    const { payload, paid, autoSkipped, prior } = guardMoney(built, st, ctx)
     const ev: EvInfo = {
       apartments: income.ev.map((e) => e.apartment).sort((a, b) => a - b),
       total: income.ev.reduce((s, e) => s + Object.values(e.byMonth).reduce((t, v) => t + v, 0), 0),
     }
     return {
-      names, resolved, fees, fromSystem: init.fromSystem, payload, overlaps, paid, prior, levies: levyLines(st.columns), ev, includeEv,
+      names, resolved, fees, fromSystem: init.fromSystem, payload, overlaps, paid, autoSkipped, prior, levies: levyLines(st.columns), ev, includeEv,
       evSkipped: evSkipped(income.ev, includeEv, ctx.chargerNumbers),
       feesReplaced: payload.fees.length > 0 ? feesToReplace(ctx.fees, st.year) : 0,
       budgetsUpdated: budgetUpdates(payload.budgets, ctx.budgets),

@@ -49,6 +49,12 @@ describe('restoreAfterExempt', () => {
     expect(restoreAfterExempt(rows, '2026-10-01')).toEqual({ mode: 'custom', amount: 450 })
     expect(restoreLabel(restoreAfterExempt(rows, '2026-10-01'))).toBe(he.fees.restoreCustom(formatILS(450)))
   })
+  it('restores what the exempt row replaced in its own month', () => {
+    const exempt: TimelineRow = { ...row('2026-10-01', 'exempt'), restore_mode: 'custom', restore_amount: 450 }
+    expect(restoreAfterExempt([row('2026-01-01', 'custom', 300), exempt], '2026-10-01')).toEqual({ mode: 'custom', amount: 450 })
+    expect(restoreAfterExempt([row('2026-01-01', 'custom', 300), { ...exempt, restore_mode: 'building', restore_amount: null }], '2026-10-01'))
+      .toEqual(building)
+  })
   it('falls back to the building fee', () => {
     expect(restoreAfterExempt([row('2026-05-01', 'exempt')], '2026-10-01')).toEqual(building)
     expect(restoreAfterExempt([row('2026-01-01', 'building'), row('2026-05-01', 'exempt')], '2026-10-01')).toEqual(building)

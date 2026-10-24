@@ -28,13 +28,20 @@ export function toSheetRows<T>(rows: T[], columns: Column<T>[]): Rows {
 
 const residentsOf = (residents: Resident[], apartmentId: string): Resident[] => residents.filter((r) => r.apartment_id === apartmentId)
 
-export function apartmentsRows(apartments: Apartment[], residents: Resident[]): Rows {
+const yes = (flag: boolean): string => (flag ? he.export.yes : '')
+const payMethod = (standingOrder: boolean): string => he.tenants.form.methods[standingOrder ? 'standing_order' : 'manual']
+
+/** `flags`: the apartment's standing order (apartment_billing) and EV charger. */
+export function apartmentsRows(apartments: Apartment[], residents: Resident[], flags: (apartmentId: string) => { standingOrder: boolean; ev: boolean }): Rows {
   return toSheetRows(apartments, [
     { header: H.apartment, value: (a) => a.number },
     { header: H.floor, value: (a) => a.floor },
     { header: H.residents, value: (a) => joined(residentsOf(residents, a.id).map((r) => r.full_name)) },
     { header: H.phone, value: (a) => joined(residentsOf(residents, a.id).map((r) => r.phone)) },
     { header: H.notes, value: (a) => a.notes },
+    { header: H.method, value: (a) => payMethod(flags(a.id).standingOrder) },
+    { header: H.committee, value: (a) => yes(a.is_committee) },
+    { header: H.ev, value: (a) => yes(flags(a.id).ev) },
   ])
 }
 
@@ -72,7 +79,7 @@ export function tasksRows(tasks: Task[], lastDone: ReadonlyMap<string, string>):
   ])
 }
 
-export function balancesRows(balances: ApartmentBalance[]): Rows {
+export function balancesRows(balances: ApartmentBalance[], hasCharger: (apartmentId: string) => boolean): Rows {
   return toSheetRows(balances, [
     { header: H.apartment, value: (b) => b.number },
     { header: H.residents, value: (b) => b.names.join(', ') },
@@ -80,6 +87,9 @@ export function balancesRows(balances: ApartmentBalance[]): Rows {
     { header: H.future, value: (b) => b.scheduled },
     { header: he.fees.exportFee, value: (b) => b.fee },
     { header: he.fees.exportMode, value: (b) => he.fees.modes[b.feeMode] },
+    { header: H.method, value: (b) => payMethod(b.standingOrder) },
+    { header: H.committee, value: (b) => yes(b.isCommittee) },
+    { header: H.ev, value: (b) => yes(hasCharger(b.apartmentId)) },
   ])
 }
 

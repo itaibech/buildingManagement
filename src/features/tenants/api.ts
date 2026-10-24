@@ -4,16 +4,35 @@ import type { Database } from '../../lib/db.types'
 import { supabase } from '../../lib/supabase'
 
 type Tables = Database['public']['Tables']
+type SaveApartmentArgs = Database['public']['Functions']['save_apartment']['Args']
 export type Apartment = Tables['apartments']['Row']
 export type Resident = Tables['residents']['Row']
 export type Profile = Tables['profiles']['Row']
 export type Role = 'admin' | 'resident'
 
+/** How the apartment pays its monthly fee: manually, or collected automatically by standing order. */
+export type PayMethod = 'manual' | 'standing_order'
+export const isPayMethod = (v: unknown): v is PayMethod => v === 'manual' || v === 'standing_order'
+
+/** An apartment's payment method (apartment_billing, finance-private). */
+export interface Billing { paymentMethod: PayMethod; standingOrderFrom: string | null }
+const MANUAL: Billing = { paymentMethod: 'manual', standingOrderFrom: null }
+/** The apartment's billing; no row (or a row RLS hides) = manual. */
+export const billingOf = (billing: ReadonlyMap<string, Billing> | undefined, apartmentId: string): Billing => billing?.get(apartmentId) ?? MANUAL
+
+/** Everything the apartment form saves in one save_apartment call. fee null = the building rate. */
 export interface ApartmentInput {
   id?: string
   number: number
   floor: number | null
   notes: string | null
+  fee: number | null
+  isCommittee: boolean
+  paymentMethod: PayMethod
+  /** First of the month the standing order starts; ignored for manual payment. */
+  standingOrderFrom: string | null
+  ev: boolean
+  evInitial: number
 }
 
 export interface ResidentInput {
@@ -69,6 +88,22 @@ export function useResidents(apartmentId?: string) {
   })
 }
 
+/**
+ * Payment methods by apartment id. RLS: admins get every apartment, a resident only their own (others read as
+ * manual). Under ['finance'] so save_apartment (and every finance mutation) refreshes it.
+ */
+export function useApartmentBilling() {
+  return useQuery({
+    queryKey: ['finance', 'billing'],
+    queryFn: async (): Promise<ReadonlyMap<string, Billing>> => {
+      const data = rows(await supabase.from('apartment_billing').select('apartment_id, payment_method, standing_order_from'))
+      return new Map(data.map((b) => [b.apartment_id, {
+        paymentMethod: isPayMethod(b.payment_method) ? b.payment_method : 'manual', standingOrderFrom: b.standing_order_from,
+      }]))
+    },
+  })
+}
+
 function useInvalidate() {
   const client = useQueryClient()
   return useCallback(
@@ -78,14 +113,34 @@ function useInvalidate() {
   )
 }
 
+/** rpc('save_apartment') arguments. Nulls are left out: every parameter defaults to null (p_id null = new). */
+export function toSaveApartmentArgs(v: ApartmentInput): SaveApartmentArgs {
+  const from = v.paymentMethod === 'standing_order' ? v.standingOrderFrom : null
+  return {
+    ...(v.id ? { p_id: v.id } : {}),
+    p_number: v.number,
+    ...(v.floor === null ? {} : { p_floor: v.floor }),
+    ...(v.notes === null ? {} : { p_notes: v.notes }),
+    ...(v.fee === null ? {} : { p_fee: v.fee }),
+    p_is_committee: v.isCommittee,
+    p_payment_method: v.paymentMethod,
+    ...(from === null ? {} : { p_standing_order_from: from }),
+    p_ev: v.ev,
+    p_ev_initial: v.ev ? v.evInitial : 0,
+  }
+}
+
+/** Saves the apartment, its fee, committee flag, payment method and charger atomically; refreshes finance and EV. */
 export function useSaveApartment() {
   const invalidate = useInvalidate()
+  const client = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, ...values }: ApartmentInput) => {
-      const table = supabase.from('apartments')
-      check((await (id ? table.update(values).eq('id', id) : table.insert(values))).error)
+    mutationFn: async (input: ApartmentInput) => {
+      const { data, error } = await supabase.rpc('save_apartment', toSaveApartmentArgs(input))
+      check(error)
+      return data
     },
-    onSuccess: () => invalidate('apartments'),
+    onSuccess: () => Promise.all([invalidate('apartments'), client.invalidateQueries({ queryKey: ['finance'] })]).then(() => undefined),
   })
 }
 

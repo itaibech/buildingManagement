@@ -2,13 +2,15 @@ import { Card, Divider, Group, Stack, Text } from '@mantine/core'
 import { Fragment, useState } from 'react'
 import { formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
-import { EmptyState, ExemptBadge, ListSkeleton, Money } from '../../ui'
+import { EmptyState, ListSkeleton, Money } from '../../ui'
 import { balancesRows } from '../export/buildWorkbook'
+import { useChargers } from '../ev/api'
 import { FormModal } from '../tenants/dialogs'
 import { useBalances, type ApartmentBalance } from './api'
 import { ApartmentLedger } from './ApartmentLedger'
 import { useRegisterExport } from './exportSlot'
-import { LoadFailed } from './cards'
+import { BalanceBadges, LoadFailed } from './cards'
+import { hasBadges } from './ledger'
 import { Row } from './fields'
 import { PaymentForm } from './PaymentForm'
 
@@ -34,7 +36,7 @@ export function BalanceRow({ row, onOpen }: { row: ApartmentBalance; onOpen?: (i
   const meta = row.scheduled > 0 ? he.finance.scheduled(formatILS(row.scheduled)) : undefined
   return (
     <Row plate={row.number} title={row.names.join(', ') || he.finance.noResidents} meta={meta}
-      badge={row.feeMode === 'exempt' ? <ExemptBadge /> : undefined} end={<Money amount={row.balance} />} onClick={onOpen ? () => onOpen(row.apartmentId) : undefined}
+      badge={hasBadges(row) ? <BalanceBadges row={row} /> : undefined} end={<Money amount={row.balance} />} onClick={onOpen ? () => onOpen(row.apartmentId) : undefined}
       label={onOpen ? he.finance.openLedger(row.number) : undefined} />
   )
 }
@@ -44,7 +46,8 @@ export function BalancesTab({ paying, onPayingClose }: { paying: boolean; onPayi
   const q = useBalances()
   const [openId, setOpenId] = useState<string | null>(null)
   const open = q.data?.find((r) => r.apartmentId === openId)
-  useRegisterExport(he.export.files.balances, () => balancesRows(q.data ?? []), !!q.data)
+  const chargers = useChargers()
+  useRegisterExport(he.export.files.balances, () => balancesRows(q.data ?? [], (id) => (chargers.data ?? []).some((c) => c.apartment_id === id)), !!q.data && !!chargers.data)
   return (
     <Card padding={0}>
       {q.isLoading && <Stack p="md"><ListSkeleton rows={6} /></Stack>}
