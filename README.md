@@ -229,11 +229,14 @@ Secrets take effect on the next call; no redeploy is needed.
 ### Limits
 
 - A consumer Gmail account sends to about **100 recipients a day** through Apps Script; Resend's free tier allows
-  100 a day and 3,000 a month. The app stops at `EMAIL_DAILY_CAP` (default 90) and answers with how many emails
-  remain today, so a large send never fails halfway because of the provider quota.
+  100 a day and 3,000 a month. The app stops at `EMAIL_DAILY_CAP` (default 90, per building, which in phase 1 is
+  the one sending account). Before sending, the dialog compares the recipients with what remains today; if they don't
+  fit, the send button is disabled and it says "נותרו היום X מיילים — יש לבחור פחות נמענים או לשלוח מחר", so a send
+  (even one split into several calls) doesn't start unless all of it fits.
 - Each recipient is one email, sent about every half second. One call to the function sends at most 40 emails (about
   20 seconds); the app splits a larger send into several calls by apartment and shows "נשלחו X מתוך Y". Each call
-  reserves its share of the daily cap before sending, so two admins sending at once can't pass it.
+  also reserves its share of the daily cap before sending, so two admins sending at once can't pass it (the second
+  one gets the "remaining today" message instead of sending).
 - Debt reminders skip apartments that owe nothing (the dialog lists them) and residents without an email address.
 
 ### Troubleshooting

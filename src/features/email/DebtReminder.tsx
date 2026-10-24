@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { he } from '../../lib/he'
 import { AptPlate, Money } from '../../ui'
 import type { ApartmentBalance } from '../finance/api'
-import { useEmailPreview, useSendEmail, useSplitSend } from './api'
+import { sendableCount, useEmailPreview, useSendEmail, useSplitSend } from './api'
 import { PreviewInfo, SendActions } from './parts'
 
 /** One apartment's reminder: its balance, the recipients count, send. */
@@ -23,7 +23,7 @@ export function DebtReminderForm({ apartment, onDone }: { apartment: ApartmentBa
       </Group>
       <Text size="sm" c="dimmed">{he.mail.debt.body}</Text>
       <PreviewInfo q={preview} />
-      <SendActions count={preview.data?.recipients ?? 0} loading={send.isPending} onCancel={onDone}
+      <SendActions count={sendableCount(preview.data)} loading={send.isPending} onCancel={onDone}
         onSend={() => send.mutate(req, { onSuccess: onDone })} />
     </Stack>
   )
@@ -60,7 +60,7 @@ export function DebtBulkForm({ debtors, onDone }: { debtors: ApartmentBalance[];
         {debtors.map((d) => <DebtorRow key={d.apartmentId} row={d} checked={picked.includes(d.apartmentId)} onToggle={() => toggle(d.apartmentId)} />)}
       </Stack>
       {picked.length === 0 ? <Text size="sm" c="debt.7">{he.mail.debt.noneSelected}</Text> : <PreviewInfo q={preview} />}
-      <SendActions count={picked.length && settled ? preview.data?.recipients ?? 0 : 0} loading={send.isPending} onCancel={onDone}
+      <SendActions count={picked.length && settled ? sendableCount(preview.data) : 0} loading={send.isPending} onCancel={onDone}
         progress={send.progress} onSend={() => send.start({ kind: 'debt', apartmentIds: picked }, preview.data, onDone)} />
     </Stack>
   )

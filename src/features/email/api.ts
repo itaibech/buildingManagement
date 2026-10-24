@@ -59,6 +59,12 @@ async function invoke(body: Json): Promise<Json> {
   return data
 }
 
+/** True when a real (not dry-run) send wouldn't fit in what remains of today's cap: sending is refused up front. */
+export const overQuota = (p: EmailPreview): boolean => !p.dryRun && p.recipients > p.remainingToday
+
+/** How many emails the send button may send: 0 (disabled) when unknown, empty, or over today's remaining quota. */
+export const sendableCount = (p: EmailPreview | undefined): number => (p && !overQuota(p) ? p.recipients : 0)
+
 /** Recipient count (no email is sent); null request = nothing to count yet. */
 export function useEmailPreview(req: EmailRequest | null) {
   return useQuery({

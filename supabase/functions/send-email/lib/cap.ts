@@ -1,3 +1,4 @@
+// The cap is per building (email_sent_today / reserve_email_quota), which in phase 1 = the one sending account.
 export const DEFAULT_DAILY_CAP = 90
 
 /** EMAIL_DAILY_CAP as a positive integer; anything else falls back to the default (90). */

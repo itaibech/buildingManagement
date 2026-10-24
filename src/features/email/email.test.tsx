@@ -17,6 +17,7 @@ const m = vi.hoisted(() => ({
   dryRun: false,
   failWith: null as { status: number; error: string } | null,
   big: false,
+  remaining: 90,
 }))
 const notify = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }))
 
@@ -43,7 +44,7 @@ vi.mock('../../lib/supabase', () => {
           }
           const ids = Array.isArray(body.apartmentIds) ? body.apartmentIds.length : 3
           return body.preview
-            ? { data: { preview: true, recipients: ids, skipped: [], dryRun: m.dryRun, remainingToday: 90 }, error: null }
+            ? { data: { preview: true, recipients: ids, skipped: [], dryRun: m.dryRun, remainingToday: m.remaining }, error: null }
             : { data: { sent: ids, failed: 0, skipped: [], recipients: ids, dryRun: m.dryRun }, error: null }
         },
       },
@@ -64,6 +65,7 @@ beforeEach(() => {
   m.dryRun = false
   m.failWith = null
   m.big = false
+  m.remaining = 90
   vi.clearAllMocks()
 })
 
@@ -114,6 +116,22 @@ describe('SendEmailDialog', () => {
     expect(notify.success).toHaveBeenCalledWith(he.mail.sent(50))
   })
 
+  it("over today's remaining quota: says so and disables sending (a split send never stops halfway)", async () => {
+    m.remaining = 2
+    wrap(<SendEmailDialog opened onClose={() => undefined} kind="announcement" refId="n1" subject="ניקיון" />)
+    expect(await screen.findByText(he.mail.overQuota(2))).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: he.mail.confirm })).toBeDisabled()
+  })
+
+  it('in dry run the remaining quota does not block (nothing is sent)', async () => {
+    m.remaining = 0
+    m.dryRun = true
+    wrap(<SendEmailDialog opened onClose={() => undefined} kind="announcement" refId="n1" subject="ניקיון" />)
+    await screen.findByText(he.mail.willSend(3))
+    expect(screen.queryByText(he.mail.overQuota(0))).toBeNull()
+    expect(screen.getByRole('button', { name: he.mail.confirm })).toBeEnabled()
+  })
+
   it("a refused send (daily cap) shows the function's Hebrew message", async () => {
     m.failWith = { status: 429, error: 'נותרו היום 2 מיילים' }
     wrap(<SendEmailDialog opened onClose={() => undefined} kind="announcement" refId="n1" subject="ניקיון" />)
@@ -138,6 +156,15 @@ describe('DebtBulkForm', () => {
     fireEvent.click(screen.getByRole('button', { name: he.mail.confirm }))
     await waitFor(() => expect(onDone).toHaveBeenCalled())
     expect(sends()[0]).toEqual({ kind: 'debt', apartmentIds: ['a1'] })
+  })
+
+  it("bulk debt over today's remaining quota is disabled until fewer are picked", async () => {
+    m.remaining = 1
+    wrap(<DebtBulkForm debtors={[debtor('a1', 1, 300), debtor('a2', 2, 90)]} onDone={() => undefined} />)
+    expect(await screen.findByText(he.mail.overQuota(1))).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: he.mail.confirm })).toBeDisabled()
+    fireEvent.click(screen.getByLabelText(he.mail.debt.pick(2)))
+    await waitFor(() => expect(screen.getByRole('button', { name: he.mail.confirm })).toBeEnabled())
   })
 
   it('unchecking all disables sending', async () => {

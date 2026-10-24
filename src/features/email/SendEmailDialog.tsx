@@ -4,7 +4,7 @@ import { he } from '../../lib/he'
 import { AptPlate } from '../../ui'
 import { useApartments } from '../tenants/api'
 import { FormModal } from '../tenants/dialogs'
-import { useEmailPreview, useSplitSend, type EmailRequest } from './api'
+import { sendableCount, useEmailPreview, useSplitSend, type EmailRequest } from './api'
 import { PreviewInfo, SendActions } from './parts'
 
 type Scope = 'all' | 'selected' | 'opener'
@@ -54,7 +54,7 @@ function SendEmailForm({ kind, refId, subject, onClose }: Omit<SendEmailDialogPr
           value={note} onChange={(e) => setNote(e.currentTarget.value)} />
       )}
       <PreviewInfo q={preview} idle={!ready} />
-      <SendActions count={ready ? preview.data?.recipients ?? 0 : 0} loading={send.isPending} progress={send.progress} onSend={onSend} onCancel={onClose} />
+      <SendActions count={ready ? sendableCount(preview.data) : 0} loading={send.isPending} progress={send.progress} onSend={onSend} onCancel={onClose} />
     </Stack>
   )
 }

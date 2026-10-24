@@ -1,7 +1,7 @@
 import { Alert, Anchor, Button, Group, Loader, Text } from '@mantine/core'
 import type { UseQueryResult } from '@tanstack/react-query'
 import { he } from '../../lib/he'
-import type { EmailPreview, SendProgress } from './api'
+import { overQuota, type EmailPreview, type SendProgress } from './api'
 
 /** Shown while the function runs in dry run (no provider secrets yet): nothing is really sent. */
 export function DryRunNotice() {
@@ -26,7 +26,9 @@ export function PreviewInfo({ q, idle = false }: { q: UseQueryResult<EmailPrevie
         {recipients === 0 ? he.mail.noRecipients : he.mail.willSend(recipients)}
       </Text>
       {skipped.length > 0 && <Text size="sm" c="dimmed" className="bm-num">{he.mail.skipped(skipped.join(', '))}</Text>}
-      {!dryRun && <Text size="sm" c="dimmed" className="bm-num">{he.mail.remaining(remainingToday)}</Text>}
+      {overQuota(q.data)
+        ? <Alert color="debt" className="bm-num">{he.mail.overQuota(remainingToday)}</Alert>
+        : !dryRun && <Text size="sm" c="dimmed" className="bm-num">{he.mail.remaining(remainingToday)}</Text>}
       {dryRun && <DryRunNotice />}
     </>
   )

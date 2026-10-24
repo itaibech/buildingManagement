@@ -28,6 +28,7 @@ grant select on public.email_log to authenticated;
 create policy email_log_admin_select on public.email_log for select to authenticated
   using ((select public.is_admin()));
 
+-- The daily cap is per building, which in phase 1 = per sending account (one building, one provider account).
 -- Real (non dry-run) emails used since midnight, Israel time, for one building: 'done' rows count what was sent,
 -- 'pending' rows (a send in progress, or one that died midway, however old) count every recipient reserved.
 -- Conservative: a crashed send never frees quota that may already have been spent.

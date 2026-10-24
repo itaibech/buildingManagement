@@ -1030,6 +1030,7 @@ export const he = {
     willSend: (n: number) => (n === 1 ? 'יישלח לנמען אחד' : `יישלח ל-${n.toLocaleString('he-IL')} נמענים`),
     noRecipients: 'אין בדירות שנבחרו דיירים עם כתובת מייל.',
     remaining: (n: number) => `נותרו היום ${n.toLocaleString('he-IL')} מיילים`,
+    overQuota: (n: number) => `נותרו היום ${n.toLocaleString('he-IL')} מיילים — יש לבחור פחות נמענים או לשלוח מחר`,
     confirm: 'שליחה',
     cancel: 'ביטול',
     sent: (n: number) => (n === 1 ? 'נשלח לנמען אחד' : `נשלח ל-${n.toLocaleString('he-IL')} נמענים`),
