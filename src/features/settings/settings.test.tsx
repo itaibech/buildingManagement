@@ -17,9 +17,13 @@ vi.mock('../../lib/supabase', () => {
   const read: Record<string, unknown> = {}
   for (const op of ['select', 'order']) read[op] = () => read
   read.limit = () => Promise.resolve({ data: [db.row], error: null })
+  const log: Record<string, unknown> = {}
+  for (const op of ['select', 'order']) log[op] = () => log
+  log.limit = () => Promise.resolve({ data: [], error: null })
   return {
     supabase: {
-      from: () => ({
+      functions: { invoke: () => Promise.resolve({ data: { preview: true, recipients: 1, skipped: [], dryRun: false, remainingToday: 90 }, error: null }) },
+      from: (table: string) => (table === 'email_log' ? log : {
         ...read,
         update: (patch: unknown) => ({ eq: () => { db.updates.push(patch); return Promise.resolve({ error: null }) } }),
       }),
