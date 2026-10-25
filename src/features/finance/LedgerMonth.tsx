@@ -3,6 +3,7 @@ import { IconBolt } from '@tabler/icons-react'
 import { formatILS, formatKwh, monthLabel } from '../../lib/format'
 import { he } from '../../lib/he'
 import { useState } from 'react'
+import type { MonthAllocation } from './allocation'
 import type { ApartmentCharge, SpecialPayment } from './api'
 import { monthName } from './ledger'
 import { UndoSpecialDialog, UndoWriteOffDialog } from './UndoConfirms'
@@ -20,6 +21,8 @@ export interface MonthView {
   balance: number
   charges: ApartmentCharge[]
   specialPayments: SpecialPayment[]
+  /** How the month's charge was covered (allocation: paid in the month, credit from other months, still open). */
+  alloc?: MonthAllocation
 }
 
 const kwhOf = (v: MonthView): number => v.charges.reduce((t, c) => t + (c.kwh ?? 0), 0)
@@ -63,6 +66,21 @@ function Special({ charge, paid, onUndo }: { charge: ApartmentCharge; paid: Spec
   )
 }
 
+/** "שולם בחודש זה: ₪0 · זיכוי מחודשים אחרים: ₪60 · נותר: ₪270". */
+function AllocationLines({ a }: { a: MonthAllocation }) {
+  const A = he.finance.alloc
+  return (
+    <Stack gap={2} data-testid="allocation">
+      <Divider color="stone.1" mb={4} />
+      <Text size="xs" c="dimmed">{A.title}</Text>
+      <Line label={A.paidInMonth} amount={a.paidInMonth} />
+      {a.fromCredit > 0 && <Line label={A.fromCredit} amount={a.fromCredit} />}
+      <Line label={A.open} amount={a.open} />
+      {a.surplus > 0 && <Text size="xs" c="paid.7" className="bm-num">{A.surplus(formatILS(a.surplus))}</Text>}
+    </Stack>
+  )
+}
+
 /** The month's lines: the fee (what the charges don't explain), each charge (EV with kWh), write-offs with the reason. */
 function MonthDetails({ v, onUndo }: { v: MonthView; onUndo?: OnUndo }) {
   const regular = v.charges.filter((c) => c.kind !== 'adjustment')
@@ -79,6 +97,7 @@ function MonthDetails({ v, onUndo }: { v: MonthView; onUndo?: OnUndo }) {
       {v.charges.filter((c) => c.kind === 'adjustment').map((c) => (
         <div key={c.id}><Divider color="stone.1" mb="xs" /><WriteOff charge={c} onUndo={onUndo} /></div>
       ))}
+      {v.alloc && v.alloc.charged > 0 && <AllocationLines a={v.alloc} />}
     </Stack>
   )
 }
@@ -112,7 +131,7 @@ export function MonthCell({ v, admin, allCharges = [] }: { v: MonthView; admin: 
   const kwh = kwhOf(v)
   return (
     <Stack gap={0}>
-      {v.charges.length === 0 ? <Text fw={600}>{monthName(v.month)}</Text> : <MonthName v={v} admin={admin} allCharges={allCharges} />}
+      {v.charges.length === 0 && !(v.gross > 0 || v.paid > 0) ? <Text fw={600}>{monthName(v.month)}</Text> : <MonthName v={v} admin={admin} allCharges={allCharges} />}
       {kwh > 0 && (
         <Text size="xs" c="dimmed" className="bm-num" style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
           <IconBolt size={12} stroke={1.75} aria-hidden="true" />{he.finance.kwh(formatKwh(kwh))}

@@ -8,6 +8,7 @@ import type { ApartmentCharge, SpecialPayment } from './api'
 import { useDesktop } from './hooks'
 import { monthName, yearMonths, type LedgerRow } from './ledger'
 import { MonthCell, type MonthView } from './LedgerMonth'
+import { allocation } from './allocation'
 import { groupLedgerMonths, runningBalances, type PlanRow } from './settlement'
 
 export interface LedgerGridProps {
@@ -34,13 +35,14 @@ function buildItems({ year, rows, charges, open, specialPayments = [] }: LedgerG
   const months = yearMonths(year).filter((m) => m.slice(0, 7) <= now)
   const byMonth = new Map(rows.filter((r) => months.includes(r.month)).map((r) => [r.month, r]))
   const balances = runningBalances(rows, months)
+  const alloc = allocation(rows)
   const views = months.map((month, i): MonthView => {
     const r = byMonth.get(month)
     const adjusted = r?.adjusted ?? 0
     return {
       month, gross: Math.round(((r?.charged ?? 0) - adjusted) * 100) / 100, paid: r?.paid ?? 0, adjusted,
       open: open.find((p) => p.month === month)?.open ?? 0, balance: balances[i] ?? 0, charges: charges.filter((c) => c.month === month),
-      specialPayments: specialPayments.filter((p) => p.month === month),
+      specialPayments: specialPayments.filter((p) => p.month === month), alloc: alloc.get(month),
     }
   })
   const items = groupLedgerMonths(months, byMonth).map((g): Item =>
@@ -120,9 +122,11 @@ export function LedgerGrid(props: LedgerGridProps) {
   const desktop = useDesktop()
   const { items, views } = buildItems(props)
   if (views.length === 0) return <EmptyState title={he.finance.noLedgerYear} />
-  if (desktop) return <DesktopTable items={items} views={views} admin={props.admin ?? false} charges={props.charges} />
+  const legend = <Text size="xs" c="dimmed">{he.finance.alloc.legend}</Text>
+  if (desktop) return <Stack gap="xs"><DesktopTable items={items} views={views} admin={props.admin ?? false} charges={props.charges} />{legend}</Stack>
   return (
     <Stack gap="xs">
+      {legend}
       <MobileList items={items} admin={props.admin ?? false} charges={props.charges} />
       <Divider />
       <Text size="sm" fw={600} className="bm-num">{he.finance.yearSummary(formatILS(sumOf(views, (v) => v.gross)), formatILS(sumOf(views, (v) => v.paid)))}</Text>
