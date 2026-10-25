@@ -2,6 +2,7 @@ import { Alert, Anchor, Button, Group, PasswordInput, Stack, Text, TextInput, Ti
 import { useState, type ChangeEvent, type SyntheticEvent } from 'react'
 import { he } from '../lib/he'
 import { supabase } from '../lib/supabase'
+import { authErrorMessage } from './authErrors'
 
 type Mode = 'signIn' | 'signUp' | 'forgot'
 interface Result {
@@ -9,26 +10,19 @@ interface Result {
   info: string | null
 }
 
-function authErrorMessage(message: string): string {
-  const m = message.toLowerCase()
-  if (m.includes('invalid login credentials')) return he.authErrors.invalidCredentials
-  if (m.includes('already registered') || m.includes('already exists')) return he.authErrors.userExists
-  if (m.includes('password')) return he.authErrors.weakPassword
-  if (m.includes('not confirmed')) return he.authErrors.emailNotConfirmed
-  return he.authErrors.generic
-}
-
 async function submitCredentials(mode: Mode, email: string, password: string, fullName: string): Promise<Result> {
   if (mode === 'forgot') {
     // The link lands on the site root; AuthProvider sees PASSWORD_RECOVERY and routes to #/reset-password.
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: location.origin + import.meta.env.BASE_URL })
-    return error ? { error: he.authErrors.generic, info: null } : { error: null, info: he.reset.sent }
+    return error ? { error: authErrorMessage(error.message), info: null } : { error: null, info: he.reset.sent }
   }
   if (mode === 'signIn') {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     return { error: error ? authErrorMessage(error.message) : null, info: null }
   }
-  const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: fullName } } })
+  // The confirmation link returns here, not to the project's Site URL.
+  const emailRedirectTo = location.origin + import.meta.env.BASE_URL
+  const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: fullName }, emailRedirectTo } })
   if (error) return { error: authErrorMessage(error.message), info: null }
   return { error: null, info: data.session ? null : he.checkEmailConfirm }
 }
