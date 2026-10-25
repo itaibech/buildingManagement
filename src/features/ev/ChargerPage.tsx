@@ -71,6 +71,26 @@ function Sheets({ charger, sheet, onClose }: { charger: Charger; sheet: Sheet; o
   )
 }
 
+/** A charger's readings by year with record / edit / delete, for the admin apartment page ("טעינת רכב"). */
+export function ChargerHistory({ charger }: { charger: Charger }) {
+  const del = useDeleteReading()
+  const [sheet, setSheet] = useState<Sheet>(null)
+  const [removing, setRemoving] = useState<Reading | null>(null)
+  const confirm = () => removing && del.mutate(removing.id, { onSuccess: () => { notifySuccess(he.ev.readingDeleted); setRemoving(null) } })
+  return (
+    <Stack gap="sm">
+      <Group gap="sm">
+        <Button leftSection={<IconGauge size={20} stroke={1.75} />} onClick={() => setSheet({ kind: 'record' })}>{he.ev.recordReading}</Button>
+        <Button variant="default" leftSection={<IconCash size={20} stroke={1.75} />} onClick={() => setSheet({ kind: 'pay' })}>{he.ev.recordPayment}</Button>
+      </Group>
+      <YearHistory charger={charger} onEdit={(reading) => setSheet({ kind: 'edit', reading })} onDelete={setRemoving} />
+      <Sheets charger={charger} sheet={sheet} onClose={() => setSheet(null)} />
+      <ConfirmDialog opened={!!removing} title={he.ev.deleteReadingConfirm(removing ? monthLabel(removing.month) : '')} body={he.ev.deleteReadingBody}
+        confirmLabel={he.ev.delete} loading={del.isPending} failed={del.isError} onClose={() => setRemoving(null)} onConfirm={confirm} />
+    </Stack>
+  )
+}
+
 /** One charger (/ev/:id): its months in the sheet's columns, with edit, delete and an EV payment shortcut. */
 export default function ChargerPage() {
   const { id } = useParams()

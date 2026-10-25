@@ -4,6 +4,7 @@ import { useCallback, useMemo } from 'react'
 import type { Database } from '../../lib/db.types'
 import { he } from '../../lib/he'
 import { supabase } from '../../lib/supabase'
+import { sourceOf, type AptPayment } from './aptData'
 
 type Tables = Database['public']['Tables']
 type SaveApartmentArgs = Database['public']['Functions']['save_apartment']['Args']
@@ -327,3 +328,72 @@ export function useDirectory() {
   }, [apartments.data, residents.data])
   return { data, isLoading: apartments.isLoading || residents.isLoading, isError: apartments.isError || residents.isError }
 }
+
+// ---------------------------------------------------------------- the admin apartment page's sections
+
+/** Every payment of the apartment (any year), newest first. Under ['finance'] so payment writes refresh it. */
+export function useApartmentPayments(apartmentId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['finance', 'apartment-payments', apartmentId],
+    enabled,
+    queryFn: async (): Promise<AptPayment[]> => {
+      const data = rows(await supabase.from('payments').select('id, paid_on, for_month, amount, method, note, source, settlement_id, special_id')
+        .eq('apartment_id', apartmentId).order('paid_on', { ascending: false }))
+      return data.map((p) => ({ id: p.id, paid_on: p.paid_on, for_month: p.for_month, amount: Number(p.amount), method: p.method, note: p.note, source: sourceOf(p) }))
+    },
+  })
+}
+
+export interface AptTicket { id: string; title: string; status: string; created_at: string }
+
+/** Tickets opened by the logins linked to the apartment's residents. */
+export function useApartmentTickets(apartmentId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['tickets', 'apartment', apartmentId],
+    enabled,
+    queryFn: async (): Promise<AptTicket[]> => {
+      const residents = rows(await supabase.from('residents').select('id').eq('apartment_id', apartmentId)).map((r) => r.id)
+      if (residents.length === 0) return []
+      const users = rows(await supabase.from('profiles').select('user_id').in('resident_id', residents)).map((p) => p.user_id)
+      if (users.length === 0) return []
+      return rows(await supabase.from('tickets').select('id, title, status, created_at').in('opened_by', users).order('created_at', { ascending: false }))
+    },
+  })
+}
+
+export interface AptMeeting { id: string; meetingId: string; title: string; at: string; status: string; name: string }
+
+/** The apartment's attendance records in published meetings, newest first. */
+export function useApartmentMeetings(apartmentId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['meetings', 'apartment', apartmentId],
+    enabled,
+    queryFn: async (): Promise<AptMeeting[]> => {
+      const data = rows(await supabase.from('meeting_attendance')
+        .select('id, status, attendee_name, proxy_name, meetings!inner(id, title, scheduled_at, opened_at, status)')
+        .eq('apartment_id', apartmentId).eq('meetings.status', 'published'))
+      return data.map((a) => ({ id: a.id, meetingId: a.meetings.id, title: a.meetings.title, at: a.meetings.opened_at ?? a.meetings.scheduled_at,
+        status: a.status, name: a.status === 'proxy' ? a.proxy_name : a.attendee_name })).sort((a, b) => b.at.localeCompare(a.at))
+    },
+  })
+}
+
+export interface AptLogEntry { id: string; at: string; kind: 'audit' | 'email'; action: string; details: string }
+
+/** admin_audit rows about the apartment and emails sent to it, newest first. */
+export function useApartmentLog(apartmentId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['apartment-log', apartmentId],
+    enabled,
+    queryFn: async (): Promise<AptLogEntry[]> => {
+      const [audit, mail] = await Promise.all([
+        supabase.from('admin_audit').select('id, created_at, action, details').eq('apartment_id', apartmentId),
+        supabase.from('email_log').select('id, created_at, kind, sent, dry_run').contains('apartment_ids', [apartmentId]),
+      ])
+      const a = rows(audit).map((r): AptLogEntry => ({ id: r.id, at: r.created_at, kind: 'audit', action: r.action, details: '' }))
+      const m = rows(mail).map((r): AptLogEntry => ({ id: r.id, at: r.created_at, kind: 'email', action: r.kind, details: r.dry_run ? 'dry' : String(r.sent) }))
+      return [...a, ...m].sort((x, y) => y.at.localeCompare(x.at))
+    },
+  })
+}
+
