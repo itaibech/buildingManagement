@@ -26,7 +26,7 @@ const ACTION: Record<Tab, { label: string; icon: ReactNode }> = {
   budget: { label: he.finance.addBudget, icon: <IconPlus {...ICON} /> },
 }
 
-// Scrolls sideways on narrow screens instead of wrapping; the end edge fades while more tabs are hidden there.
+// One row on wide screens (scrolls sideways with an end fade if it overflows); a 3-column grid on narrow ones (global.css).
 const TAB_STYLES = {
   list: { flexWrap: 'nowrap', overflowX: 'auto', scrollbarWidth: 'none' },
   tab: { minHeight: 44, flexShrink: 0, paddingInline: 12, fontWeight: 600, fontSize: 'var(--mantine-font-size-md)' },
@@ -78,7 +78,7 @@ export function AdminFinance() {
     <ExportRegistration.Provider value={setSource}>
       <PageHeader title={he.nav.finance} action={{ ...ACTION[tab], onClick: open }} secondaryAction={source ? secondary : undefined} extra={evLink} />
       <Tabs value={tab} onChange={select} keepMounted={false} styles={TAB_STYLES}>
-        <Tabs.List ref={listRef} aria-label={he.finance.tabsLabel} mb="md" className="bm-tabs-scroll">
+        <Tabs.List ref={listRef} aria-label={he.finance.tabsLabel} mb="md" className="bm-tabs-scroll bm-tabs-grid">
           {TABS.map((t) => <Tabs.Tab key={t} value={t}>{he.finance.tabs[t]}</Tabs.Tab>)}
         </Tabs.List>
         <Tabs.Panel value="balances"><BalancesTab paying={primary} onPayingClose={close} /></Tabs.Panel>

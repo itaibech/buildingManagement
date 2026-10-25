@@ -206,7 +206,7 @@ export default function UsersPage() {
   if (profiles.isError || directory.isError) return <Text c="debt.7">{he.tenants.loadError}</Text>
   return (
     <Stack gap="xl">
-      <PageHeader title={he.nav.users} secondaryAction={exportAction} />
+      <PageHeader title={he.nav.users} subtitle={he.nav.hints.users} secondaryAction={exportAction} />
       {profiles.isLoading || directory.isLoading ? <ListSkeleton /> : (
         <>
           <Section title={he.users.pending}>

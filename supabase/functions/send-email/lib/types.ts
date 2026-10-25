@@ -14,6 +14,8 @@ export interface EmailRequest {
   note?: string
   variant?: MeetingVariant
   preview: boolean
+  /** kind 'test' with preview only: just say whether sending is live (dryRun), no data read. */
+  status?: boolean
 }
 
 export type Env = Readonly<Record<string, string | undefined>>

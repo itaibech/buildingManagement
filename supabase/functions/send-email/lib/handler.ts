@@ -172,6 +172,8 @@ export async function handle(body: unknown, deps: Deps): Promise<Reply> {
   const auth = await authorize(body, deps)
   if ('status' in auth) return auth
   const { caller, req } = auth
+  // The app's "is email configured" check: no data read, nothing sent, so it works without a profile email.
+  if (req.status) return reply(200, { status: true, dryRun: deps.transport.dryRun, reason: deps.transport.reason })
   const ctx = await deps.data.context(caller.userId)
   const brand: Brand = { buildingName: ctx.building.name, appUrl: deps.env.APP_URL || APP_URL }
   const plan = await buildPlan(req, ctx, deps.data, brand)

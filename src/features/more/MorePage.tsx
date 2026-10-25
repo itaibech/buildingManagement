@@ -16,8 +16,8 @@ function NavCard({ title, items, children }: { title: string; items: NavItem[]; 
   return (
     <Card padding="xs">
       <Title order={2} size="h4" px="sm" pt={4} pb={4}>{title}</Title>
-      {items.map(({ to, label, icon: I }) => (
-        <NavLink key={to} component={Link} to={to} label={label} leftSection={<I {...ICON} aria-hidden="true" />}
+      {items.map(({ to, label, icon: I, hint }) => (
+        <NavLink key={to} component={Link} to={to} label={label} description={hint} leftSection={<I {...ICON} aria-hidden="true" />}
           rightSection={CHEVRON} fw={600} style={{ borderRadius: 10 }} />
       ))}
       {children}

@@ -91,6 +91,21 @@ describe('apartment ledger sheet', () => {
     expect(within(details).getByText('טעינת רכב חשמלי')).toBeInTheDocument()
   })
 
+  it('a month paid by credit from another month explains it: paid in the month, credit, left open', async () => {
+    db.tables.apartment_ledger = [
+      { apartment_id: 'a19', month: `${thisYear}-01-01`, charged: 330, paid: 720, adjusted: 0 },
+      { apartment_id: 'a19', month: `${thisYear}-02-01`, charged: 330, paid: 0, adjusted: 0 },
+      { apartment_id: 'a19', month: `${thisYear}-03-01`, charged: 330, paid: 0, adjusted: 0 },
+    ]
+    db.tables.charges = []
+    wrap(<ApartmentLedger apartment={apt(270)} />)
+    expect(await screen.findByText(he.finance.alloc.legend)).toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('button', { name: he.finance.monthDetails(`פברואר ${thisYear}`) }))
+    const details = within(await screen.findByTestId('allocation'))
+    expect(details.getByText(he.finance.alloc.fromCredit).parentElement?.parentElement?.textContent).toContain('60.00')
+    expect(details.getByText(he.finance.alloc.open).parentElement?.parentElement?.textContent).toContain('270.00')
+  })
+
   it('admins settle from the sheet; no settle button without a debt', async () => {
     const { unmount } = wrap(<ApartmentLedger apartment={apt(2530.2)} />)
     expect(screen.getByRole('button', { name: he.finance.recordPayment })).toBeInTheDocument()

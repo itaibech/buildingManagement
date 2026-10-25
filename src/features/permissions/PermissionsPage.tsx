@@ -1,11 +1,12 @@
 import { Alert, Badge, Button, Card, Group as Row, SimpleGrid, Stack, Text } from '@mantine/core'
 import { IconLock } from '@tabler/icons-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { he } from '../../lib/he'
 import { ListSkeleton, PageHeader } from '../../ui'
 import { LoadFailed } from '../finance/cards'
 import { FormModal } from '../tenants/dialogs'
 import { useProfiles } from '../tenants/api'
+import { PERMISSIONS_SEEN_KEY } from '../home/checklist'
 import { useGroups, type Group } from './api'
 import { memberCounts } from './groups'
 import { GroupEditor } from './GroupEditor'
@@ -43,6 +44,8 @@ function GroupList({ groups, selectedId, onSelect }: { groups: Group[]; selected
 
 /** Admin "הרשאות וקבוצות": user groups and the pages each one sees. The server enforces every toggle. */
 export default function PermissionsPage() {
+  // The home setup checklist's "סקירת הרשאות הדיירים" step: done once the admin has opened this page.
+  useEffect(() => { localStorage.setItem(PERMISSIONS_SEEN_KEY, 'true') }, [])
   const q = useGroups()
   const [picked, setPicked] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)

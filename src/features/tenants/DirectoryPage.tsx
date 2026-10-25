@@ -1,6 +1,7 @@
 import { ActionIcon, Button, Card, Divider, Group, Menu, Stack, Text, TextInput } from '@mantine/core'
 import { IconDots, IconMail, IconPencil, IconPhone, IconPlus, IconSearch, IconTrash } from '@tabler/icons-react'
 import { Fragment, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { useAuth } from '../../auth/AuthProvider'
 import { he } from '../../lib/he'
 import { AptPlate, EmptyState, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
@@ -189,7 +190,13 @@ export default function DirectoryPage() {
   const { isAdmin } = useAuth()
   const [dialog, setDialog] = useState<Dialog>(null)
   const actions: Actions = { admin: isAdmin, open: setDialog }
-  const [query, setQuery] = useState('')
+  // ?q= (the header search) starts the list filtered.
+  const [params] = useSearchParams()
+  const linked = params.get('q')
+  const [query, setQuery] = useState(linked ?? '')
+  // A new ?q= while the page is open (another search result) replaces the filter.
+  const [seenLink, setSeenLink] = useState(linked)
+  if (linked !== seenLink) { setSeenLink(linked); setQuery(linked ?? '') }
   const q = query.trim()
   const apartments = useApartments()
   const groups = useMemo(() => {
@@ -200,7 +207,7 @@ export default function DirectoryPage() {
   const empty = directory.data?.length === 0 && !(isAdmin && apartments.data?.length)
   return (
     <Stack gap="md">
-      <PageHeader title={he.nav.directory} secondaryAction={exportAction} />
+      <PageHeader title={he.nav.directory} subtitle={he.nav.hints.directory} secondaryAction={exportAction} />
       <TextInput aria-label={he.tenants.search} placeholder={he.tenants.searchPlaceholder} value={query}
         onChange={(e) => setQuery(e.currentTarget.value)} leftSection={<IconSearch size={18} stroke={1.75} />} type="search" />
       <Card padding="md">

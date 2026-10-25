@@ -13,6 +13,12 @@ const A2 = '22222222-2222-4222-8222-222222222222'
 const brand = { buildingName: 'בניין <הדוגמה>', appUrl: 'https://example.test/app/' }
 
 describe('parseRequest', () => {
+  it('status: only with kind test and preview', () => {
+    expect(parseRequest({ kind: 'test', preview: true, status: true })).toEqual({ ok: true, value: { kind: 'test', preview: true, status: true } })
+    expect(parseRequest({ kind: 'debt', preview: true, status: true })).toEqual({ ok: false, error: 'status' })
+    expect(parseRequest({ kind: 'test', status: true })).toEqual({ ok: false, error: 'status' })
+    expect(parseRequest({ kind: 'test', preview: true, status: 'yes' })).toEqual({ ok: false, error: 'status' })
+  })
   it('accepts each kind with its required fields', () => {
     expect(parseRequest({ kind: 'announcement', id: A1 })).toEqual({ ok: true, value: { kind: 'announcement', id: A1, preview: false } })
     expect(parseRequest({ kind: 'ticket', id: A1, apartmentIds: [A2], note: ' בדרך ', preview: true }))

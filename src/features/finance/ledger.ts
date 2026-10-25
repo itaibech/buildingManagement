@@ -2,6 +2,7 @@
 import { formatILS, HEBREW_MONTHS } from '../../lib/format'
 import { he } from '../../lib/he'
 import type { ApartmentBalance } from './api'
+import type { BudgetSource } from './budget'
 
 export interface LedgerRow {
   apartment_id: string
@@ -61,6 +62,9 @@ export interface BudgetLine {
   year: number
   category: string
   amount: number
+  categoryId?: string
+  /** budget_for_year: a recurring default or a one-off for the year. */
+  source?: BudgetSource
 }
 
 export interface ExpenseLine {
@@ -73,6 +77,9 @@ export interface BudgetRow {
   category: string
   planned: number
   actual: number
+  categoryId?: string
+  /** Set when the category has a budget line for the year (none = unbudgeted spending). */
+  source?: BudgetSource
 }
 
 /** Planned vs spent per category for `year`: budgeted categories first (in input order), then unbudgeted spending. */
@@ -82,6 +89,8 @@ export function budgetVsActual(budgets: BudgetLine[], expenses: ExpenseLine[], y
     if (b.year !== year) continue
     const row = rows.get(b.category) ?? { category: b.category, planned: 0, actual: 0 }
     row.planned = money(row.planned + b.amount)
+    if (b.categoryId) row.categoryId = b.categoryId
+    if (b.source) row.source = b.source
     rows.set(b.category, row)
   }
   const prefix = `${year}-`

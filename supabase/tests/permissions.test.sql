@@ -197,7 +197,7 @@ select is(
 );
 select ok((select amount_due_total < 99999 from public.collection_summary(public.current_month())),
   'finance_reports: collection_summary counts only the caller''s building');
-select ok((select balance is not null from public.building_cash limit 1), 'finance_reports: building cash');
+select is((select count(*) from public.building_cash), 0::bigint, 'finance_reports: no building cash (admins only, 0023)');
 select ok((select count(*) > 0 from public.budgets), 'finance_reports: budgets');
 
 -- ---------------------------------------------------------------- custom group assigned to a user

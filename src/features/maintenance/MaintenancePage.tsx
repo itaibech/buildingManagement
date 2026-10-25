@@ -1,5 +1,6 @@
 import { Stack, Text, Title } from '@mantine/core'
 import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { useAuth } from '../../auth/AuthProvider'
 import { he } from '../../lib/he'
 import { EmptyState, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
@@ -60,6 +61,11 @@ export default function MaintenancePage() {
   const { isAdmin } = useAuth()
   const list = useTasks()
   const [dialog, setDialog] = useState<Dialog>(null)
+  // ?task=<id> (the home "תחזוקה" rows) opens that task's detail once the list is loaded.
+  const [params, setParams] = useSearchParams()
+  const linked = list.data?.find((t) => t.id === params.get('task'))
+  const shown: Dialog = dialog ?? (linked ? { kind: 'detail', task: linked } : null)
+  const closeDialog = () => { setDialog(null); if (linked) setParams({}, { replace: true }) }
   const add = isAdmin ? { label: he.maintenance.add, onClick: () => setDialog({ kind: 'add' }) } : undefined
   const actions: TaskActions | undefined = isAdmin
     ? { onDone: (task) => setDialog({ kind: 'done', task }), onEdit: (task) => setDialog({ kind: 'edit', task }), onDelete: (task) => setDialog({ kind: 'delete', task }) }
@@ -72,7 +78,7 @@ export default function MaintenancePage() {
       {list.isLoading && <ListSkeleton rows={4} />}
       {list.data?.length === 0 && <EmptyState title={he.maintenance.empty} body={he.maintenance.emptyBody} action={add} />}
       {list.data && <Groups tasks={list.data} onOpen={(task) => setDialog({ kind: 'detail', task })} actions={actions} />}
-      <Dialogs dialog={dialog} close={() => setDialog(null)} />
+      <Dialogs dialog={shown} close={closeDialog} />
     </Stack>
   )
 }

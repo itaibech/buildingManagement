@@ -3,9 +3,9 @@ import { useMemo } from 'react'
 import { he } from '../../lib/he'
 import { useAllApartments, useApartments, useResidents } from '../tenants/api'
 import { todayISO } from '../../lib/dates'
-import { useApartmentCharges, useSpecialPayments, useBalances, useBudgets, useExpenseReport, useExpenses, useFeeTimeline, useLedger, type ApartmentBalance } from './api'
+import { useApartmentCharges, useSpecialPayments, useBalances, useBudgetPlan, useExpenseReport, useExpenses, useFeeTimeline, useLedger, type ApartmentBalance, type PlannedBudget } from './api'
 import { currentMonth, nextChange, type TimelineRow } from './feeTimeline'
-import { budgetVsActual } from './ledger'
+import { budgetVsActual, type BudgetLine } from './ledger'
 import { ledgerBalance, settlementPlan } from './settlement'
 
 /** Desktop (≥768px) gets tables; mobile gets lists. */
@@ -38,21 +38,24 @@ export function useApartmentInfo(): Map<string, ApartmentOption> {
   return useMemo(() => new Map(options.map((o) => [o.value, o])), [options])
 }
 
-/** Planned vs actual for a year, from the budgets and expenses queries. */
+const planLines = (plan: PlannedBudget[]): BudgetLine[] =>
+  plan.map((b) => ({ year: b.year, category: b.category, amount: b.amount, categoryId: b.category_id, source: b.source }))
+
+/** Planned (budget_for_year: one-offs and recurring defaults) vs actual for a year, from the expenses. */
 export function useBudgetRows(year: number) {
-  const budgets = useBudgets(year)
+  const budgets = useBudgetPlan(year)
   const expenses = useExpenses(year)
-  const rows = useMemo(() => (budgets.data && expenses.data ? budgetVsActual(budgets.data, expenses.data, year) : undefined), [budgets.data, expenses.data, year])
+  const rows = useMemo(() => (budgets.data && expenses.data ? budgetVsActual(planLines(budgets.data), expenses.data, year) : undefined), [budgets.data, expenses.data, year])
   const refetch = () => { void budgets.refetch(); void expenses.refetch() }
   return { rows, isLoading: budgets.isLoading || expenses.isLoading, isError: budgets.isError || expenses.isError, refetch }
 }
 
 /** Planned vs actual from the aggregate report (residents with finance_reports: no raw expense rows). */
 export function useReportBudgetRows(year: number) {
-  const budgets = useBudgets(year)
+  const budgets = useBudgetPlan(year)
   const report = useExpenseReport(year)
   const rows = useMemo(() => (budgets.data && report.data
-    ? budgetVsActual(budgets.data, report.data.map((r) => ({ category: r.category, spent_on: r.month, amount: r.total })), year)
+    ? budgetVsActual(planLines(budgets.data), report.data.map((r) => ({ category: r.category, spent_on: r.month, amount: r.total })), year)
     : undefined), [budgets.data, report.data, year])
   const refetch = () => { void budgets.refetch(); void report.refetch() }
   return { rows, isLoading: budgets.isLoading || report.isLoading, isError: budgets.isError || report.isError, refetch }

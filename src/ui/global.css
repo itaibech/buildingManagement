@@ -200,6 +200,19 @@ body {
   display: none;
 }
 
+/* Narrow screens: the finance tabs wrap into a 3-column grid (two rows), so every tab is visible at once, with no
+   hidden tabs to discover; wider screens keep one row (scrolling sideways with the fade below if it ever overflows). */
+@media (max-width: 899px) {
+  .bm-tabs-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow-x: visible !important;
+  }
+  .bm-tabs-grid > [role='tab'] {
+    justify-content: center;
+  }
+}
+
 /* Sideways-scrolling tab list: fade the end edge (left in RTL) while more tabs are hidden there. */
 .bm-tabs-scroll[data-more] {
   -webkit-mask-image: linear-gradient(to left, transparent 0, #000 40px);

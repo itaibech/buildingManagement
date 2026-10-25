@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useAuth } from '../../auth/AuthProvider'
 import { todayISO } from '../../lib/dates'
 import { he } from '../../lib/he'
-import { useBudgets, useExpenses, useLedger } from '../finance/api'
+import { useBudgetPlan, useExpenses, useLedger } from '../finance/api'
 import { YearStepper } from '../finance/fields'
 import { useExpenseCategories } from '../maintenance/api'
 import { useAllApartments, useResidents } from '../tenants/api'
@@ -20,7 +20,7 @@ function YearBody() {
   const ledger = useLedger(year)
   const expenses = useExpenses(year)
   const categories = useExpenseCategories()
-  const budgets = useBudgets(year)
+  const budgets = useBudgetPlan(year)
   const all = [apartments, residents, ledger, expenses, categories, budgets]
   const failed = all.some((q) => q.isError)
   const getRows = () => {
