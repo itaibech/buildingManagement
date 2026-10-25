@@ -1324,6 +1324,8 @@ export const he = {
       attendeeName: 'שם הנוכח/ת',
       attendeeHint: 'בחירה מהדיירים או הקלדה',
       proxyName: 'שם מיופה הכוח',
+      proxyCommittee: 'ייפוי כוח לנציגות הוועד',
+      committeeHolder: 'נציגות הוועד',
       proxyFile: 'צירוף טופס ייפוי כוח',
       proxyFileAttached: 'טופס ייפוי כוח מצורף',
       proxyFileView: 'צפייה בטופס',

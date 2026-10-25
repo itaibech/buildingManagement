@@ -58,7 +58,7 @@ export function LiveMeeting({ meeting }: { meeting: MeetingDetail }) {
   const call = useMeetingCall()
   const [view, setView] = useState<'attendance' | 'agenda'>(meeting.status === 'in_progress' ? 'agenda' : 'attendance')
   const q = quorumState(ruleOf(meeting), lines.length, Object.values(live.attendance), meeting.postponed_at !== null)
-  const names = lines.flatMap((l) => [live.attendance[l.id]?.attendee_name, live.attendance[l.id]?.proxy_name]).filter((n): n is string => !!n?.trim())
+  const names = lines.flatMap((l) => [live.attendance[l.id]?.attendee_name, live.attendance[l.id]?.proxy_name]).filter((n): n is string => !!n?.trim() && n !== L.committeeHolder)
   const run = (fn: () => Promise<void>, done: string) => call.mutate(async () => { await live.flush(); await fn() }, { onSuccess: () => notifySuccess(done) })
   const open = (v: OpeningValues) => run(() => meetingRpc.open(meeting.id, v.openedAt, v.chair, v.secretary, v.override), L.opened)
   const inProgress = meeting.status === 'in_progress'

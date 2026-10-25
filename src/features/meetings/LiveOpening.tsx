@@ -98,6 +98,8 @@ interface OpeningProps { meeting: Meeting; q: QuorumState; names: string[]; busy
  */
 export function Opening({ meeting, q, names, busy, onOpen }: OpeningProps) {
   const now = useNow(meeting.postponed_to)
+  // One person can attend for one apartment and hold a proxy for another; Autocomplete rejects duplicate options.
+  const options = [...new Set(names.map((n) => n.trim()))]
   const [day] = useState(() => toInputs(new Date()).date)
   const [typed, setTyped] = useState<string | null>(null)
   const [chair, setChair] = useState(meeting.chair_name)
@@ -121,8 +123,8 @@ export function Opening({ meeting, q, names, busy, onOpen }: OpeningProps) {
           onChange={(e) => setTyped(e.currentTarget.value || null)} maw={200} />
         <TimeNotes postponedTo={waits ? meeting.postponed_to : null} left={left} early={early} future={future} />
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
-          <Autocomplete label={L.chair} placeholder={L.roleHint} data={names} value={chair} onChange={setChair} />
-          <Autocomplete label={L.secretary} placeholder={L.roleHint} data={names} value={secretary} onChange={setSecretary} />
+          <Autocomplete label={L.chair} placeholder={L.roleHint} data={options} value={chair} onChange={setChair} />
+          <Autocomplete label={L.secretary} placeholder={L.roleHint} data={options} value={secretary} onChange={setSecretary} />
         </SimpleGrid>
         {offerOverride && <OverrideQuorum checked={override} onChange={setOverride} />}
         {tried && missing && <Text c="debt.7" size="sm">{L.roleRequired}</Text>}
