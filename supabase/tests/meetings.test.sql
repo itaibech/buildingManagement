@@ -230,11 +230,12 @@ select throws_ok($$insert into public.meeting_attendance (meeting_id, apartment_
 select throws_ok($$update public.meetings set title = 'אחר' where id = 'e2400000-0000-0000-0000-000000000001'$$, '42501', null, 'locked: meeting details');
 select throws_ok($$delete from public.meetings where id = 'e2400000-0000-0000-0000-000000000001'$$, '42501', null, 'locked: a closed meeting cannot be deleted');
 
--- vote total re-checked at close: an attendee removed after the vote blocks closing
+-- 0022: a vote is validated against the attendance when it was entered, so a departure after it doesn't block closing
 update public.meeting_agenda_items set votes_for = 3, votes_against = 0, votes_abstain = 0, decision = 'אושר'
   where meeting_id = 'e2400000-0000-0000-0000-000000000003';
 update public.meeting_attendance set status = 'absent' where meeting_id = 'e2400000-0000-0000-0000-000000000003' and apartment_number = 3;
-select throws_like($$select public.close_meeting('e2400000-0000-0000-0000-000000000003', now())$$, 'meeting:votes%', 'close: refused when a vote exceeds the attendees');
+select ok((select bool_and(votes_for + votes_against + votes_abstain <= attendees_at_vote) from public.meeting_agenda_items
+  where meeting_id = 'e2400000-0000-0000-0000-000000000003' and votes_for is not null), 'a departure after the vote keeps the vote valid (attendees_at_vote)');
 
 -- ---------------------------------------------------------------- storage
 set local storage.allow_delete_query = 'true';

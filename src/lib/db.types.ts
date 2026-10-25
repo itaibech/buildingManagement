@@ -693,14 +693,14 @@ isOneToOne: false
                   ]
                 },"meeting_agenda_items": {
                   Row: {
-                    "added_during_meeting": boolean,"created_at": string,"decision": string,"decision_number": number | null,"discussion": string,"id": string,"item_status": string,"meeting_id": string,"position": number,"title": string,"updated_at": string,"votes_abstain": number | null,"votes_against": number | null,"votes_for": number | null
+                    "added_during_meeting": boolean,"attendees_at_vote": number | null,"created_at": string,"decision": string,"decision_number": number | null,"discussion": string,"id": string,"item_status": string,"meeting_id": string,"position": number,"title": string,"updated_at": string,"votes_abstain": number | null,"votes_against": number | null,"votes_for": number | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "added_during_meeting"?: boolean,"created_at"?: string,"decision"?: string,"decision_number"?: number | null,"discussion"?: string,"id"?: string,"item_status"?: string,"meeting_id": string,"position"?: number,"title": string,"updated_at"?: string,"votes_abstain"?: number | null,"votes_against"?: number | null,"votes_for"?: number | null
+                    "added_during_meeting"?: boolean,"attendees_at_vote"?: number | null,"created_at"?: string,"decision"?: string,"decision_number"?: number | null,"discussion"?: string,"id"?: string,"item_status"?: string,"meeting_id": string,"position"?: number,"title": string,"updated_at"?: string,"votes_abstain"?: number | null,"votes_against"?: number | null,"votes_for"?: number | null
                   }
                   Update: {
-                    "added_during_meeting"?: boolean,"created_at"?: string,"decision"?: string,"decision_number"?: number | null,"discussion"?: string,"id"?: string,"item_status"?: string,"meeting_id"?: string,"position"?: number,"title"?: string,"updated_at"?: string,"votes_abstain"?: number | null,"votes_against"?: number | null,"votes_for"?: number | null
+                    "added_during_meeting"?: boolean,"attendees_at_vote"?: number | null,"created_at"?: string,"decision"?: string,"decision_number"?: number | null,"discussion"?: string,"id"?: string,"item_status"?: string,"meeting_id"?: string,"position"?: number,"title"?: string,"updated_at"?: string,"votes_abstain"?: number | null,"votes_against"?: number | null,"votes_for"?: number | null
                   }
                   Relationships: [
                     {
@@ -713,14 +713,14 @@ isOneToOne: false
                   ]
                 },"meeting_attendance": {
                   Row: {
-                    "apartment_id": string | null,"apartment_number": number,"attendee_name": string,"id": string,"meeting_id": string,"proxy_file_path": string | null,"proxy_name": string,"status": string,"updated_at": string
+                    "apartment_id": string | null,"apartment_number": number,"arrived_at": string | null,"attendee_name": string,"id": string,"left_at": string | null,"meeting_id": string,"proxy_file_path": string | null,"proxy_name": string,"status": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "apartment_id"?: string | null,"apartment_number"?: number,"attendee_name"?: string,"id"?: string,"meeting_id": string,"proxy_file_path"?: string | null,"proxy_name"?: string,"status": string,"updated_at"?: string
+                    "apartment_id"?: string | null,"apartment_number"?: number,"arrived_at"?: string | null,"attendee_name"?: string,"id"?: string,"left_at"?: string | null,"meeting_id": string,"proxy_file_path"?: string | null,"proxy_name"?: string,"status": string,"updated_at"?: string
                   }
                   Update: {
-                    "apartment_id"?: string | null,"apartment_number"?: number,"attendee_name"?: string,"id"?: string,"meeting_id"?: string,"proxy_file_path"?: string | null,"proxy_name"?: string,"status"?: string,"updated_at"?: string
+                    "apartment_id"?: string | null,"apartment_number"?: number,"arrived_at"?: string | null,"attendee_name"?: string,"id"?: string,"left_at"?: string | null,"meeting_id"?: string,"proxy_file_path"?: string | null,"proxy_name"?: string,"status"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -791,14 +791,14 @@ isOneToOne: false
                   ]
                 },"meetings": {
                   Row: {
-                    "building_id": string,"chair_name": string,"closed_at": string | null,"created_at": string,"created_by": string | null,"id": string,"invite_announcement_id": string | null,"invited_at": string | null,"kind": string,"location": string,"opened_at": string | null,"postponed_at": string | null,"postponed_to": string | null,"publish_announcement_id": string | null,"published_at": string | null,"quorum_mode": string,"quorum_note": string,"quorum_value": number | null,"scheduled_at": string,"secretary_name": string,"status": string,"title": string,"updated_at": string
+                    "building_id": string,"chair_name": string,"closed_at": string | null,"created_at": string,"created_by": string | null,"id": string,"invite_announcement_id": string | null,"invited_at": string | null,"kind": string,"location": string,"opened_at": string | null,"opened_without_quorum": boolean,"postponed_at": string | null,"postponed_to": string | null,"publish_announcement_id": string | null,"published_at": string | null,"quick_started": boolean,"quorum_mode": string,"quorum_note": string,"quorum_value": number | null,"scheduled_at": string,"secretary_name": string,"status": string,"title": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "building_id"?: string,"chair_name"?: string,"closed_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"invite_announcement_id"?: string | null,"invited_at"?: string | null,"kind"?: string,"location"?: string,"opened_at"?: string | null,"postponed_at"?: string | null,"postponed_to"?: string | null,"publish_announcement_id"?: string | null,"published_at"?: string | null,"quorum_mode"?: string,"quorum_note"?: string,"quorum_value"?: number | null,"scheduled_at": string,"secretary_name"?: string,"status"?: string,"title": string,"updated_at"?: string
+                    "building_id"?: string,"chair_name"?: string,"closed_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"invite_announcement_id"?: string | null,"invited_at"?: string | null,"kind"?: string,"location"?: string,"opened_at"?: string | null,"opened_without_quorum"?: boolean,"postponed_at"?: string | null,"postponed_to"?: string | null,"publish_announcement_id"?: string | null,"published_at"?: string | null,"quick_started"?: boolean,"quorum_mode"?: string,"quorum_note"?: string,"quorum_value"?: number | null,"scheduled_at": string,"secretary_name"?: string,"status"?: string,"title": string,"updated_at"?: string
                   }
                   Update: {
-                    "building_id"?: string,"chair_name"?: string,"closed_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"invite_announcement_id"?: string | null,"invited_at"?: string | null,"kind"?: string,"location"?: string,"opened_at"?: string | null,"postponed_at"?: string | null,"postponed_to"?: string | null,"publish_announcement_id"?: string | null,"published_at"?: string | null,"quorum_mode"?: string,"quorum_note"?: string,"quorum_value"?: number | null,"scheduled_at"?: string,"secretary_name"?: string,"status"?: string,"title"?: string,"updated_at"?: string
+                    "building_id"?: string,"chair_name"?: string,"closed_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"invite_announcement_id"?: string | null,"invited_at"?: string | null,"kind"?: string,"location"?: string,"opened_at"?: string | null,"opened_without_quorum"?: boolean,"postponed_at"?: string | null,"postponed_to"?: string | null,"publish_announcement_id"?: string | null,"published_at"?: string | null,"quick_started"?: boolean,"quorum_mode"?: string,"quorum_note"?: string,"quorum_value"?: number | null,"scheduled_at"?: string,"secretary_name"?: string,"status"?: string,"title"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -1204,6 +1204,9 @@ isOneToOne: false
 "can_read_apartment_finance":
 { Args: { "p_apartment_id": string }; Returns: boolean
                            },
+"cancel_postponement":
+{ Args: { "p_meeting": string }; Returns: undefined
+                           },
 "close_meeting":
 { Args: { "p_closed_at"?: string,"p_meeting": string }; Returns: undefined
                            },
@@ -1363,6 +1366,9 @@ isOneToOne: false
 "meeting_announce":
 { Args: { "m": Omit<Database["public"]['Tables']["meetings"]['Row'], Database["public"]['Tables']["meetings"]['ComputedFields']>,"p_body": string,"p_pinned": boolean,"p_title": string }; Returns: string
                            },
+"meeting_do_open":
+{ Args: { "m": Omit<Database["public"]['Tables']["meetings"]['Row'], Database["public"]['Tables']["meetings"]['ComputedFields']>,"p_chair": string,"p_opened_at": string,"p_override": boolean,"p_quick": boolean,"p_secretary": string }; Returns: undefined
+                           },
 "meeting_file_status":
 { Args: { "p_name": string }; Returns: string
                            },
@@ -1388,10 +1394,12 @@ isOneToOne: false
 "kind": string,
 "location": string,
 "opened_at": string | null,
+"opened_without_quorum": boolean,
 "postponed_at": string | null,
 "postponed_to": string | null,
 "publish_announcement_id": string | null,
 "published_at": string | null,
+"quick_started": boolean,
 "quorum_mode": string,
 "quorum_note": string,
 "quorum_value": number | null,
@@ -1427,13 +1435,16 @@ isOneToOne: false
             }[]
                            },
 "open_meeting":
-{ Args: { "p_chair"?: string,"p_meeting": string,"p_opened_at"?: string,"p_secretary"?: string }; Returns: undefined
+{ Args: { "p_chair"?: string,"p_meeting": string,"p_opened_at"?: string,"p_override_quorum"?: boolean,"p_secretary"?: string }; Returns: undefined
                            },
 "postpone_meeting":
 { Args: { "p_meeting": string }; Returns: string
                            },
 "publish_meeting":
 { Args: { "p_meeting": string }; Returns: string
+                           },
+"quick_start_meeting":
+{ Args: { "p_chair": string,"p_meeting": string,"p_override_quorum"?: boolean,"p_secretary": string }; Returns: undefined
                            },
 "record_ev_reading":
 { Args: { "p_charger_id": string,"p_month": string,"p_note"?: string,"p_read_on"?: string,"p_reading": number }; Returns: Json
