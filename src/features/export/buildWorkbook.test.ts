@@ -5,8 +5,8 @@ import { SHEETS } from '../import/readWorkbook'
 import { apartmentsRows, balancesRows, buildYearWorkbook, expenseExportSheets, expensesRows, paymentsRows, toSheetRows, type YearData } from './buildWorkbook'
 
 const apartments = [
-  { id: 'a2', number: 2, floor: 1, notes: null, building_id: 'b', created_at: '', is_committee: false },
-  { id: 'a1', number: 1, floor: 0, notes: null, building_id: 'b', created_at: '', is_committee: false },
+  { id: 'a2', number: 2, floor: 1, notes: null, building_id: 'b', created_at: '', is_committee: false, archived_at: null },
+  { id: 'a1', number: 1, floor: 0, notes: null, building_id: 'b', created_at: '', is_committee: false, archived_at: null },
 ]
 const resident = (id: string, apartment_id: string, full_name: string, phone: string | null) =>
   ({ id, apartment_id, full_name, phone, email: null, is_owner: true, building_id: 'b', created_at: '' })
@@ -50,8 +50,8 @@ describe('toSheetRows', () => {
   it('adds payment method, committee and EV charger to the apartments export', () => {
     const base = { building_id: 'b', floor: 1, notes: null, created_at: '' }
     const rows = apartmentsRows([
-      { ...base, id: 'a1', number: 1, is_committee: true },
-      { ...base, id: 'a2', number: 2, is_committee: false },
+      { ...base, id: 'a1', number: 1, is_committee: true, archived_at: null },
+      { ...base, id: 'a2', number: 2, is_committee: false, archived_at: null },
     ], [], (id) => ({ standingOrder: id === 'a2', ev: id === 'a1' }))
     expect(rows[0].slice(-3)).toEqual(['אמצעי תשלום', 'נציג ועד', 'עמדת טעינה'])
     expect(rows.slice(1).map((r) => r.slice(-3))).toEqual([['רגיל', 'כן', 'כן'], ['הוראת קבע', '', '']])

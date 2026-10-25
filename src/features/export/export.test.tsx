@@ -20,7 +20,7 @@ const wrap = (ui: React.ReactElement) => render(<MantineProvider theme={theme}>{
 describe('toXlsxBytes', () => {
   const sheets = buildYearWorkbook({
     year: 2026,
-    apartments: [{ id: 'a1', number: 1, floor: 0, notes: null, building_id: 'b', created_at: '', is_committee: false }],
+    apartments: [{ id: 'a1', number: 1, floor: 0, notes: null, building_id: 'b', created_at: '', is_committee: false, archived_at: null }],
     residents: [{ id: 'r1', apartment_id: 'a1', full_name: 'דנה לוי', phone: '0501234567', email: null, is_owner: true, building_id: 'b', created_at: '' }],
     ledger: [{ apartment_id: 'a1', month: '2026-04-01', charged: 390, paid: 390 }],
     categories: [{ id: 'c1', name: 'ניקיון' }],

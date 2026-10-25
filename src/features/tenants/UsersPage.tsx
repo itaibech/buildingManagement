@@ -1,4 +1,5 @@
-import { Badge, Button, Card, Group, SegmentedControl, Select, Stack, Text, Title } from '@mantine/core'
+import { ActionIcon, Badge, Button, Card, Group, Menu, SegmentedControl, Select, Stack, Text, Title } from '@mantine/core'
+import { IconDots, IconTrash } from '@tabler/icons-react'
 import { useMemo, useState, type ReactNode } from 'react'
 import { useAuth } from '../../auth/AuthProvider'
 import { he } from '../../lib/he'
@@ -6,6 +7,7 @@ import { AptPlate, EmptyState, ListSkeleton, notifySuccess, PageHeader } from '.
 import { usersRows } from '../export/buildWorkbook'
 import { useExportAction } from '../export/useExport'
 import { useGroups, type Group as UserGroup } from '../permissions/api'
+import { DeleteUserDialog } from './DeleteUserDialog'
 import {
   useApproveProfile,
   useDirectory,
@@ -135,7 +137,27 @@ function summaryOf(p: Profile, linked: DirectoryEntry | undefined, groups: UserG
   ].join(' · ')
 }
 
-function UserRow({ p, residents, options, groups, isMe }: RowProps & { p: Profile; isMe: boolean }) {
+/** The user's ⋯ menu: "מחיקת משתמש", disabled for yourself and for the super admin. */
+function UserMenu({ p, isMe, onDelete }: { p: Profile; isMe: boolean; onDelete: () => void }) {
+  const blocked = isMe ? he.users.cannotDeleteSelf : p.is_super_admin ? he.users.cannotDeleteSuper : null
+  return (
+    <Menu position="bottom-start" withinPortal>
+      <Menu.Target>
+        <ActionIcon variant="subtle" color="stone.7" size={44} aria-label={he.users.actions(p.full_name || p.email || '')}>
+          <IconDots size={20} stroke={1.75} aria-hidden="true" />
+        </ActionIcon>
+      </Menu.Target>
+      <Menu.Dropdown>
+        <Menu.Item color="debt" leftSection={<IconTrash size={18} stroke={1.75} />} disabled={blocked !== null} onClick={onDelete}>
+          {he.users.deleteUser}
+          {blocked && <Text size="xs" c="dimmed">{blocked}</Text>}
+        </Menu.Item>
+      </Menu.Dropdown>
+    </Menu>
+  )
+}
+
+function UserRow({ p, residents, options, groups, isMe, onDelete }: RowProps & { p: Profile; isMe: boolean; onDelete: () => void }) {
   const [editing, setEditing] = useState(false)
   const linked = residents.find((r) => r.id === p.resident_id)
   const summary = summaryOf(p, linked, groups)
@@ -148,6 +170,7 @@ function UserRow({ p, residents, options, groups, isMe }: RowProps & { p: Profil
           <Button variant="subtle" px="xs" onClick={() => setEditing(!editing)} aria-expanded={editing}>
             {editing ? he.users.done : he.users.edit}
           </Button>
+          <UserMenu p={p} isMe={isMe} onDelete={onDelete} />
         </Identity>
         {editing ? <UserControls p={p} options={options} groups={groups} locked={p.is_super_admin || isMe} /> : <Text size="sm" c="dimmed">{summary}</Text>}
       </Stack>
@@ -174,6 +197,7 @@ export default function UsersPage() {
   const pending = profiles.data?.filter((p) => p.status === 'pending') ?? []
   const approved = profiles.data?.filter((p) => p.status === 'approved') ?? []
   const row: RowProps = { residents, options, groups: groups.data ?? [] }
+  const [deleting, setDeleting] = useState<Profile | null>(null)
   const exportAction = useExportAction(
     he.export.files.users,
     () => usersRows(profiles.data ?? [], (id) => residents.find((r) => r.id === id)?.apartmentNumber ?? null),
@@ -191,8 +215,9 @@ export default function UsersPage() {
               : pending.map((p) => <PendingRow key={p.user_id} p={p} {...row} />)}
           </Section>
           <Section title={he.users.approved}>
-            {approved.map((p) => <UserRow key={p.user_id} p={p} {...row} isMe={p.user_id === me?.user_id} />)}
+            {approved.map((p) => <UserRow key={p.user_id} p={p} {...row} isMe={p.user_id === me?.user_id} onDelete={() => setDeleting(p)} />)}
           </Section>
+          <DeleteUserDialog profile={deleting} onClose={() => setDeleting(null)} />
         </>
       )}
     </Stack>

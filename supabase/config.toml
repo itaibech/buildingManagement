@@ -428,3 +428,6 @@ enabled = true
 # The email function: callers must send a valid user JWT (the function then checks is_admin()).
 [functions.send-email]
 verify_jwt = true
+
+[functions.admin-delete-user]
+verify_jwt = true

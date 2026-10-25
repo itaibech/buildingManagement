@@ -1,13 +1,13 @@
-import { Alert, Autocomplete, Button, Group, Input, NumberInput, SegmentedControl, Stack, Text, TextInput } from '@mantine/core'
+import { Alert, Autocomplete, Button, Group, Input, NumberInput, SegmentedControl, Select, Stack, Text, TextInput } from '@mantine/core'
 import { he } from '../../lib/he'
 import { DateInput, focusFirstError, notifySuccess } from '../../ui'
 import { useApartments } from '../tenants/api'
 import { AgendaEditor } from './AgendaEditor'
 import { useSaveMeeting } from './api'
 import { meetingError } from './errors'
-import { toInput, useMeetingForm, type MeetingFormApi } from './formModel'
+import { defaultQuorum, toInput, useMeetingForm, type MeetingFormApi } from './formModel'
 import { requiredQuorum } from './quorum'
-import { MEETING_KINDS, QUORUM_MODES, type MeetingDetail } from './types'
+import { MEETING_KINDS, QUORUM_MODES, type MeetingDetail, type MeetingKind } from './types'
 
 const F = he.meetings.form
 
@@ -17,14 +17,15 @@ function QuorumFields({ form, total }: { form: MeetingFormApi; total: number }) 
   return (
     <Input.Wrapper label={F.quorum}>
       <Stack gap="xs" mt={4}>
-        <SegmentedControl fullWidth size="md" data={QUORUM_MODES.map((q) => ({ value: q, label: F.quorumModes[q] }))}
+        {/* Four options don't fit a segmented control at 375px: a select. */}
+        <Select aria-label={F.quorum} data={QUORUM_MODES.map((q) => ({ value: q, label: F.quorumModes[q] }))} allowDeselect={false}
           {...form.getInputProps('quorum_mode')} />
-        {mode !== 'majority' && (
+        {(mode === 'percent' || mode === 'fixed') && (
           <NumberInput label={mode === 'percent' ? F.quorumPercent : F.quorumFixed} min={1} max={mode === 'percent' ? 100 : 10000}
             allowDecimal={false} {...form.getInputProps('quorum_value')} />
         )}
         <Text size="sm" c="dimmed" className="bm-num">
-          {mode === 'majority' ? F.quorumMajorityHint(requiredQuorum(rule, total), total) : F.quorumRequired(requiredQuorum(rule, total), total)}
+          {mode === 'none' ? F.quorumNoneHint : mode === 'majority' ? F.quorumMajorityHint(requiredQuorum(rule, total), total) : F.quorumRequired(requiredQuorum(rule, total), total)}
         </Text>
         <TextInput label={F.quorumNote} placeholder={F.quorumNoteHint} {...form.getInputProps('quorum_note')} />
       </Stack>
@@ -45,7 +46,13 @@ export function MeetingForm({ meeting, onDone }: { meeting?: MeetingDetail; onDo
       <Stack>
         {meeting?.status === 'invited' && <Alert color="enamel">{F.invitedHint}</Alert>}
         <Input.Wrapper label={F.kind}>
-          <SegmentedControl fullWidth size="md" mt={4} data={MEETING_KINDS.map((k) => ({ value: k, label: he.meetings.kinds[k] }))} {...form.getInputProps('kind')} />
+          <SegmentedControl fullWidth size="md" mt={4} data={MEETING_KINDS.map((k) => ({ value: k, label: he.meetings.kinds[k] }))} {...form.getInputProps('kind')}
+            onChange={(v) => {
+              const kind: MeetingKind = v === 'general' ? 'general' : 'committee'
+              form.setFieldValue('kind', kind)
+              // A new meeting follows the type's default rule until the admin picks one.
+              if (!meeting && form.getValues().quorum_mode === defaultQuorum(kind === 'general' ? 'committee' : 'general')) form.setFieldValue('quorum_mode', defaultQuorum(kind))
+            }} />
         </Input.Wrapper>
         <TextInput label={F.title} withAsterisk data-autofocus {...form.getInputProps('title')} />
         <Group grow align="flex-start">

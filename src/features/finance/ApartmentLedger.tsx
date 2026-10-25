@@ -1,5 +1,4 @@
 import { Button, Group, Stack, Text } from '@mantine/core'
-import { FormModal } from '../tenants/dialogs'
 import { IconCash, IconChecklist, IconMail, IconSparkles } from '@tabler/icons-react'
 import { useState } from 'react'
 import { todayISO } from '../../lib/dates'
@@ -7,7 +6,7 @@ import { formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
 import { AptPlate, ListSkeleton, Money } from '../../ui'
 import { DebtReminderForm } from '../email/DebtReminder'
-import { useBalances, type ApartmentBalance, type ApartmentCharge } from './api'
+import type { ApartmentBalance, ApartmentCharge } from './api'
 import { BalanceBadges, LoadFailed } from './cards'
 import { YearStepper } from './fields'
 import { useApartmentFinance } from './hooks'
@@ -55,7 +54,7 @@ function BreakdownLine({ open, rows, charges }: { open: PlanRow[]; rows: readonl
 }
 
 /** Plate, residents, the balance once (with its state in words), what the debt is made of, badges. */
-function Hero({ apartment, fin }: { apartment: ApartmentBalance; fin: ReturnType<typeof useApartmentFinance> }) {
+export function LedgerHero({ apartment, fin }: { apartment: ApartmentBalance; fin: ReturnType<typeof useApartmentFinance> }) {
   return (
     <Group gap="md" wrap="nowrap" align="flex-start">
       <AptPlate number={apartment.number} size="lg" />
@@ -109,27 +108,9 @@ export function ApartmentLedger({ apartment }: { apartment: ApartmentBalance }) 
   if (sheet === 'settle') return fin.ready ? <SettleDebtForm apartmentId={apartment.apartmentId} rows={fin.rows} onDone={close} /> : <ListSkeleton rows={4} />
   return (
     <Stack gap="md">
-      <Hero apartment={apartment} fin={fin} />
+      <LedgerHero apartment={apartment} fin={fin} />
       <ApartmentYear apartmentId={apartment.apartmentId} admin />
       <Actions owes={apartment.balance > 0} onOpen={setSheet} />
     </Stack>
-  )
-}
-
-/** Apartment page (admin): the balance with a "לכרטסת" button that opens the apartment's ledger sheet. */
-export function ApartmentBalanceLine({ apartmentId }: { apartmentId: string }) {
-  const q = useBalances()
-  const [open, setOpen] = useState(false)
-  const row = q.data?.find((r) => r.apartmentId === apartmentId)
-  if (!row) return null
-  return (
-    <Group gap="sm" wrap="nowrap" mt={4}>
-      <Text size="sm" c="dimmed">{he.finance.balanceLabel}</Text>
-      <Money amount={row.balance} size="sm" />
-      <Button variant="subtle" px="xs" onClick={() => setOpen(true)}>{he.finance.toLedger}</Button>
-      <FormModal opened={open} title={he.apartment(row.number)} onClose={() => setOpen(false)}>
-        {open && <ApartmentLedger apartment={row} />}
-      </FormModal>
-    </Group>
   )
 }

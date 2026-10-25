@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { he } from '../../lib/he'
 import { AptPlate, notifyError } from '../../ui'
 import { fileProblem, uploadMeetingFile, useMeetingFileUrls, type AttendanceValue } from './api'
-import { ATTENDANCE_STATUSES } from './types'
+import { meetingTime } from './fmt'
+import { ATTENDANCE_STATUSES, type Attendance } from './types'
 
 const L = he.meetings.live
 
@@ -31,17 +32,21 @@ function ProxyFile({ meetingId, path, onPath }: { meetingId: string; path: strin
   )
 }
 
-interface RowProps { meetingId: string; apt: ApartmentLine; value: AttendanceValue; onChange: (v: AttendanceValue) => void }
+/** times: the stored arrival / departure during the meeting (server-set). */
+export type AttendanceTimes = Pick<Attendance, 'arrived_at' | 'left_at'>
+interface RowProps { meetingId: string; apt: ApartmentLine; value: AttendanceValue; times?: AttendanceTimes; onChange: (v: AttendanceValue) => void }
 
 /** One apartment: נוכח / ייפוי כוח / נעדר, then who attends or who holds the proxy (and its form). */
-function AttendanceRow({ meetingId, apt, value, onChange }: RowProps) {
+function AttendanceRow({ meetingId, apt, value, times, onChange }: RowProps) {
   const set = (patch: Partial<AttendanceValue>) => onChange({ ...value, ...patch })
   return (
     <Card padding="sm" data-testid={`attendance-${apt.number}`}>
       <Stack gap="xs">
         <Group gap="sm" wrap="nowrap">
           <AptPlate number={apt.number} size="sm" />
-          <Text size="sm" c="dimmed" truncate="end">{apt.residents.join(', ') || L.noResidents}</Text>
+          <Text size="sm" c="dimmed" truncate="end" style={{ flex: 1 }}>{apt.residents.join(', ') || L.noResidents}</Text>
+          {times?.left_at ? <Text size="xs" c="dimmed" className="bm-num">{L.leftAt(meetingTime(times.left_at))}</Text>
+            : times?.arrived_at && <Text size="xs" c="dimmed" className="bm-num">{L.arrivedAt(meetingTime(times.arrived_at))}</Text>}
         </Group>
         <SegmentedControl fullWidth size="md" value={value.status} aria-label={he.apartment(apt.number)}
           data={ATTENDANCE_STATUSES.map((s) => ({ value: s, label: L.statuses[s] }))}
@@ -65,16 +70,17 @@ export interface LiveAttendanceProps {
   meetingId: string
   apartments: ApartmentLine[]
   values: Record<string, AttendanceValue>
+  times?: Record<string, AttendanceTimes>
   absent: AttendanceValue
   onChange: (apartmentId: string, v: AttendanceValue) => void
 }
 
 /** Every apartment with its attendance (absent until marked). */
-export function LiveAttendance({ meetingId, apartments, values, absent, onChange }: LiveAttendanceProps) {
+export function LiveAttendance({ meetingId, apartments, values, times, absent, onChange }: LiveAttendanceProps) {
   return (
     <Stack gap="xs">
       {apartments.map((a) => (
-        <AttendanceRow key={a.id} meetingId={meetingId} apt={a} value={values[a.id] ?? absent} onChange={(v) => onChange(a.id, v)} />
+        <AttendanceRow key={a.id} meetingId={meetingId} apt={a} value={values[a.id] ?? absent} times={times?.[a.id]} onChange={(v) => onChange(a.id, v)} />
       ))}
     </Stack>
   )

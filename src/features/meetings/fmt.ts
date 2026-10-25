@@ -1,3 +1,5 @@
+import { he } from '../../lib/he'
+
 // Meeting dates and times, always in Israel time (the building's), whatever the device's zone.
 const TZ = 'Asia/Jerusalem'
 const partsFmt = new Intl.DateTimeFormat('en-GB', {
@@ -30,3 +32,27 @@ export function fromInputs(date: string, time: string): string {
 
 /** Whole days from now until the timestamp (for the short-notice warning). */
 export const daysUntil = (iso: string, now: Date = new Date()): number => Math.floor((new Date(iso).getTime() - now.getTime()) / 86_400_000)
+
+
+const DAY_MS = 86_400_000
+const dayNumber = (iso: string | Date): number => Date.parse(`${meetingISODate(iso)}T00:00:00Z`) / DAY_MS
+
+/** A time, with the day when it isn't today (Israel time): "21:00", "מחר 21:00", "24/10 21:00". */
+export function whenText(iso: string | Date, now: Date = new Date()): string {
+  const diff = dayNumber(iso) - dayNumber(now)
+  const time = meetingTime(iso)
+  if (diff === 0) return he.meetings.whenShort.today(time)
+  if (diff === 1) return he.meetings.whenShort.tomorrow(time)
+  return he.meetings.whenShort.other(meetingDate(iso).slice(0, 5), time)
+}
+
+/** A wait in hours and minutes, never thousands of minutes: "בעוד 37 שעות ו-21 דקות", "בעוד 5 דקות". */
+export function waitText(ms: number): string {
+  const W = he.meetings.wait
+  const total = Math.ceil(ms / 60_000)
+  if (total <= 1) return W.lessThanMinute
+  const h = Math.floor(total / 60)
+  const m = total % 60
+  if (h === 0) return W.single(W.minutes(m))
+  return m === 0 ? W.single(W.hours(h)) : W.join(W.hours(h), W.minutes(m))
+}

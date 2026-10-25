@@ -50,6 +50,8 @@ jobs:
       # After the migrations (it writes email_log). JWT verification stays on (supabase/config.toml). Its secrets are
       # set once by hand (README → Email setup); without them the function runs in dry run.
       - run: supabase functions deploy send-email --project-ref "$SUPABASE_PROJECT_REF"
+      # Deletes a user's login (needs the service role, which the platform provides). Admins only; JWT verification on.
+      - run: supabase functions deploy admin-delete-user --project-ref "$SUPABASE_PROJECT_REF"
   deploy:
     needs: [build, migrate]
     runs-on: ubuntu-latest

@@ -4,7 +4,7 @@ import { he } from '../../lib/he'
 import { decisionNumbers, sortAgenda } from './decisions'
 import { meetingDate, meetingTime } from './fmt'
 import { isAttending, requiredQuorum } from './quorum'
-import { ruleOf, votesOf, type AgendaItem, type MeetingDetail, type Signature } from './types'
+import { ruleOf, votesOf, type AgendaItem, type Attendance, type MeetingDetail, type Signature } from './types'
 
 const P = he.meetings.protocol
 
@@ -29,6 +29,17 @@ function Details({ m }: { m: MeetingDetail }) {
   return <Section title={P.details}><dl className="bm-protocol-dl">{rows.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl></Section>
 }
 
+/** Took part: attending at the close, or left during the meeting (left_at). */
+const tookPart = (a: Attendance): boolean => isAttending(a.status) || a.left_at !== null
+const MINUTE = 60_000
+
+/** "(הגיע/ה ב-20:15)" / "(יצא/ה ב-21:00)" when it differs from the opening. */
+function timesNote(a: Attendance, openedAt: string | null): string {
+  const late = a.arrived_at && (!openedAt || new Date(a.arrived_at).getTime() - new Date(openedAt).getTime() >= MINUTE)
+  return [late && a.arrived_at ? P.arrived(meetingTime(a.arrived_at)) : '', a.left_at ? P.left(meetingTime(a.left_at)) : '']
+    .filter(Boolean).map((t) => ` ${t}`).join('')
+}
+
 function Participants({ m }: { m: MeetingDetail }) {
   const att = [...m.attendance].sort((a, b) => a.apartment_number - b.apartment_number)
   return (
@@ -37,8 +48,8 @@ function Participants({ m }: { m: MeetingDetail }) {
       <p>{`${P.secretary}: ${m.secretary_name}`}</p>
       <p><strong>{P.present}</strong></p>
       <ul>
-        {att.filter((a) => isAttending(a.status)).map((a) => (
-          <li key={a.id}>{a.status === 'proxy' ? P.proxyLine(a.apartment_number, a.proxy_name) : P.presentLine(a.apartment_number, a.attendee_name)}</li>
+        {att.filter(tookPart).map((a) => (
+          <li key={a.id}>{(a.status === 'proxy' ? P.proxyLine(a.apartment_number, a.proxy_name) : P.presentLine(a.apartment_number, a.attendee_name)) + timesNote(a, m.opened_at)}</li>
         ))}
       </ul>
     </Section>
@@ -46,8 +57,15 @@ function Participants({ m }: { m: MeetingDetail }) {
 }
 
 function Absent({ m }: { m: MeetingDetail }) {
-  const numbers = m.attendance.filter((a) => !isAttending(a.status)).map((a) => a.apartment_number).sort((a, b) => a - b)
+  const numbers = m.attendance.filter((a) => !tookPart(a)).map((a) => a.apartment_number).sort((a, b) => a - b)
   return <Section title={P.absent}><p>{numbers.length ? P.absentLine(numbers.join(', ')) : P.noAbsent}</p></Section>
+}
+
+/** How the meeting came to open: the override, no rule, a postponement, or the quorum. */
+function quorumOutcome(m: MeetingDetail): string {
+  if (m.opened_without_quorum) return P.overrideStatement
+  if (m.quorum_mode === 'none') return P.noQuorumRule
+  return m.postponed_at ? P.postponedStatement : P.quorumMet
 }
 
 function Quorum({ m }: { m: MeetingDetail }) {
@@ -57,7 +75,8 @@ function Quorum({ m }: { m: MeetingDetail }) {
   return (
     <Section title={P.quorum}>
       <p>{P.quorumStatement(attending.length, total, proxies, requiredQuorum(ruleOf(m), total))}{m.quorum_note ? ` ${P.quorumRule(m.quorum_note)}` : ''}</p>
-      <p><strong>{m.postponed_at ? P.postponedStatement : P.quorumMet}</strong></p>
+      <p><strong>{quorumOutcome(m)}</strong></p>
+      {m.quick_started && <p><strong>{P.noInvitation}</strong></p>}
     </Section>
   )
 }

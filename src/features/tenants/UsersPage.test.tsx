@@ -14,7 +14,7 @@ interface Call {
   filters: [string, unknown][]
 }
 
-const db = vi.hoisted(() => ({ calls: [] as Call[], rows: {} as Record<string, unknown[]> }))
+const db = vi.hoisted(() => ({ calls: [] as Call[], rows: {} as Record<string, unknown[]>, invoked: [] as [string, unknown][] }))
 
 vi.mock('../../lib/supabase', () => {
   function query(table: string) {
@@ -34,7 +34,8 @@ vi.mock('../../lib/supabase', () => {
     }
     return q
   }
-  return { supabase: { from: query } }
+  const functions = { invoke: async (name: string, opts: { body: unknown }) => { db.invoked.push([name, opts.body]); return { data: { deleted: true }, error: null } } }
+  return { supabase: { from: query, functions } }
 })
 
 vi.mock('../../auth/AuthProvider', () => ({ useAuth: () => ({ profile: { user_id: 'me' }, isAdmin: true }) }))
@@ -59,6 +60,7 @@ function renderPage() {
 
 beforeEach(() => {
   db.calls = []
+  db.invoked = []
   db.rows = {
     profiles: [
       profile('p1', 'נועה ממתינה', { status: 'pending' }),
@@ -185,5 +187,31 @@ describe('UsersPage', () => {
       expect(update?.values).toEqual({ role: 'resident' })
       expect(update?.filters).toEqual([['user_id', 'a1']])
     })
+  })
+})
+
+describe('UsersPage delete user', () => {
+  const openMenu = async (id: string, name: string) => {
+    const row = await screen.findByTestId(`user-${id}`)
+    fireEvent.click(within(row).getByRole('button', { name: he.users.actions(name) }))
+    return screen.findByRole('menuitem', { name: new RegExp(he.users.deleteUser) })
+  }
+
+  it('the delete option is disabled for yourself and for the super admin', async () => {
+    renderPage()
+    expect(await openMenu('me', 'אני המנהל')).toBeDisabled()
+    expect(screen.getByText(he.users.cannotDeleteSelf)).toBeInTheDocument()
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+    expect(await openMenu('s1', 'ראש הוועד')).toBeDisabled()
+  })
+
+  it('confirms, then calls admin-delete-user (keeping the resident unless ticked)', async () => {
+    db.rows.profiles = [...db.rows.profiles, profile('r9', 'דיירת מקושרת', { resident_id: 'r1' })]
+    renderPage()
+    fireEvent.click(await openMenu('r9', 'דיירת מקושרת'))
+    expect(await screen.findByText(he.users.deleteUserBody('דיירת מקושרת'))).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('checkbox', { name: new RegExp(he.users.alsoRemoveResident) }))
+    fireEvent.click(screen.getByRole('button', { name: he.users.deleteUser }))
+    await waitFor(() => expect(db.invoked).toEqual([['admin-delete-user', { userId: 'r9', removeResident: true }]]))
   })
 })

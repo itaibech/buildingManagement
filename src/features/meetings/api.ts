@@ -55,7 +55,7 @@ async function agendaTitles(meetingId: string): Promise<AgendaItem[]> {
   fail(error)
   return (data ?? []).map((r) => ({
     id: r.id, meeting_id: meetingId, position: r.item_position, title: r.title, discussion: '', votes_for: null, votes_against: null,
-    votes_abstain: null, decision: '', decision_number: null, item_status: 'open', added_during_meeting: false, created_at: '',
+    votes_abstain: null, decision: '', decision_number: null, item_status: 'open', added_during_meeting: false, attendees_at_vote: null, created_at: '',
   }))
 }
 
@@ -138,9 +138,15 @@ export const meetingRpc = {
   invite: async (id: string, confirm: boolean) => rpcDone(await supabase.rpc('invite_meeting', { p_meeting: id, p_confirm_short_notice: confirm })),
   updateInvite: async (id: string) => rpcDone(await supabase.rpc('update_meeting_invitation', { p_meeting: id })),
   postpone: async (id: string) => rpcDone(await supabase.rpc('postpone_meeting', { p_meeting: id })),
-  /** openedAt null: the server records now(). */
-  open: async (id: string, openedAt: string | null, chair: string, secretary: string) =>
-    rpcDone(await supabase.rpc('open_meeting', { p_meeting: id, p_chair: chair, p_secretary: secretary, ...(openedAt ? { p_opened_at: openedAt } : {}) })),
+  /** openedAt null: the server records now(). override: "פתיחה ללא מניין". */
+  open: async (id: string, openedAt: string | null, chair: string, secretary: string, override = false) =>
+    rpcDone(await supabase.rpc('open_meeting', {
+      p_meeting: id, p_chair: chair, p_secretary: secretary, p_override_quorum: override, ...(openedAt ? { p_opened_at: openedAt } : {}),
+    })),
+  /** Draft → in progress now, without an invitation. */
+  quickStart: async (id: string, chair: string, secretary: string, override: boolean) =>
+    rpcDone(await supabase.rpc('quick_start_meeting', { p_meeting: id, p_chair: chair, p_secretary: secretary, p_override_quorum: override })),
+  cancelPostpone: async (id: string) => rpcDone(await supabase.rpc('cancel_postponement', { p_meeting: id })),
   close: async (id: string, closedAt: string) => rpcDone(await supabase.rpc('close_meeting', { p_meeting: id, p_closed_at: closedAt })),
   sign: async (id: string, role: SignatureRole, name: string, path: string, method: 'drawn' | 'scan') =>
     rpcDone(await supabase.rpc('sign_meeting', { p_meeting: id, p_role: role, p_signer_name: name, p_image_path: path, p_method: method })),

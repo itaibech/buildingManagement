@@ -87,7 +87,7 @@ async function reserve(db: SupabaseClient, r: Reservation): Promise<string | nul
 export function dataSource(db: SupabaseClient): DataSource {
   return {
     context: (userId) => context(db, userId),
-    apartments: async (b) => must<{ id: string; number: number }[]>(await db.from('apartments').select('id, number').eq('building_id', b)),
+    apartments: async (b) => must<{ id: string; number: number }[]>(await db.from('apartments').select('id, number').eq('building_id', b).is('archived_at', null)),
     residents: async (b) => must<Resident[]>(await db.from('residents').select('apartment_id, full_name, email').eq('building_id', b)),
     announcement: async (id, b) => maybe<{ title: string; body: string }>(
       await db.from('announcements').select('title, body').eq('id', id).eq('building_id', b).maybeSingle()),

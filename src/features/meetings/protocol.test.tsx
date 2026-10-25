@@ -67,4 +67,19 @@ describe('ProtocolDocument', () => {
     expect(screen.getByText(P.unsigned)).toBeInTheDocument()
     expect(screen.getByText('תיקון: שם הרושם הוא דני')).toBeInTheDocument()
   })
+
+  it('states a quick start, the no-quorum override, and late arrivals / departures (Task 25)', () => {
+    const m = meetingFixture()
+    renderDoc({
+      ...m, quick_started: true, opened_without_quorum: true,
+      attendance: m.attendance.map((a) => a.apartment_number === 2 ? { ...a, arrived_at: '2026-11-03T18:30:00Z' }
+        : a.apartment_number === 3 ? { ...a, attendee_name: 'גיל', left_at: '2026-11-03T19:00:00Z' } : a),
+    })
+    expect(screen.getByText(P.noInvitation)).toBeInTheDocument()
+    expect(screen.getByText(P.overrideStatement)).toBeInTheDocument()
+    const people = within(screen.getByRole('region', { name: P.participants }))
+    expect(people.getByText(`${P.presentLine(2, 'דני רושם')} ${P.arrived('20:30')}`)).toBeInTheDocument()
+    expect(people.getByText(`${P.presentLine(3, 'גיל')} ${P.left('21:00')}`)).toBeInTheDocument()
+    expect(screen.getByText(P.absentLine('5'))).toBeInTheDocument()
+  })
 })

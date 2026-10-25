@@ -1,4 +1,4 @@
-import { Card, Divider, Stack, Text, UnstyledButton } from '@mantine/core'
+import { Accordion, Card, Divider, Group, Stack, Text, UnstyledButton } from '@mantine/core'
 import { IconChevronLeft } from '@tabler/icons-react'
 import { Fragment, useMemo, useState } from 'react'
 import { Link } from 'react-router'
@@ -7,7 +7,7 @@ import { ApartmentTags, AptPlate, EmptyState, ListSkeleton, Money, PageHeader } 
 import { useChargers } from '../ev/api'
 import { useBalances } from '../finance/api'
 import { ApartmentForm } from './ApartmentForm'
-import { billingOf, useApartmentBilling, useApartments, useResidents, type Apartment, type Resident } from './api'
+import { billingOf, useApartmentBilling, useApartments, useArchivedApartments, useResidents, type Apartment, type Resident } from './api'
 import { apartmentsRows } from '../export/buildWorkbook'
 import { useExportAction } from '../export/useExport'
 import { FormModal } from './dialogs'
@@ -53,6 +53,30 @@ function useRowExtras(): (id: string) => RowExtras {
   return (id) => ({ fee: fees.get(id), ev: ev.has(id), standingOrder: billingOf(billing.data, id).paymentMethod === 'standing_order' })
 }
 
+/** Archived apartments, collapsed under "ארכיון (N)": each opens its page (where it can be restored). */
+function ArchivedSection() {
+  const archived = useArchivedApartments()
+  const list = archived.data ?? []
+  if (list.length === 0) return null
+  return (
+    <Accordion variant="contained" radius="md">
+      <Accordion.Item value="archive">
+        <Accordion.Control>{he.tenants.removal.archiveList(list.length)}</Accordion.Control>
+        <Accordion.Panel>
+          <Group gap="xs">
+            {list.map((a) => (
+              <UnstyledButton key={a.id} component={Link} to={`/apartments/${a.id}`} miw={44} mih={44} aria-label={he.apartment(a.number)}
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <AptPlate number={a.number} size="sm" />
+              </UnstyledButton>
+            ))}
+          </Group>
+        </Accordion.Panel>
+      </Accordion.Item>
+    </Accordion>
+  )
+}
+
 /** Admin: every apartment sorted by number; tap through to its residents. */
 export default function ApartmentsPage() {
   const apartments = useApartments()
@@ -79,6 +103,7 @@ export default function ApartmentsPage() {
           </Fragment>
         ))}
       </Card>
+      <ArchivedSection />
       <FormModal opened={adding} title={he.tenants.addApartment} onClose={() => setAdding(false)}>
         <ApartmentForm onDone={() => setAdding(false)} />
       </FormModal>

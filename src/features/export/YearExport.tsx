@@ -7,7 +7,7 @@ import { he } from '../../lib/he'
 import { useBudgets, useExpenses, useLedger } from '../finance/api'
 import { YearStepper } from '../finance/fields'
 import { useExpenseCategories } from '../maintenance/api'
-import { useApartments, useResidents } from '../tenants/api'
+import { useAllApartments, useResidents } from '../tenants/api'
 import { FormModal } from '../tenants/dialogs'
 import { buildYearWorkbook } from './buildWorkbook'
 import { ExportButton } from './ExportButton'
@@ -15,7 +15,7 @@ import { ExportButton } from './ExportButton'
 /** Loads the year with the same finance queries the pages use, then offers the import-compatible workbook. */
 function YearBody() {
   const [year, setYear] = useState(() => Number(todayISO().slice(0, 4)))
-  const apartments = useApartments()
+  const apartments = useAllApartments()
   const residents = useResidents()
   const ledger = useLedger(year)
   const expenses = useExpenses(year)

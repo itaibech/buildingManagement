@@ -1,10 +1,10 @@
 import type { MeetingStatus, Signature } from './types'
 
-export type MeetingAction = 'edit' | 'delete' | 'invite' | 'updateInvite' | 'run' | 'sign' | 'publish' | 'addendum' | 'print'
+export type MeetingAction = 'edit' | 'delete' | 'invite' | 'quickStart' | 'updateInvite' | 'run' | 'sign' | 'publish' | 'addendum' | 'print'
 export type MeetingTab = 'upcoming' | 'pending' | 'archive'
 
 const ACTIONS: Record<MeetingStatus, MeetingAction[]> = {
-  draft: ['edit', 'invite', 'delete'],
+  draft: ['edit', 'invite', 'quickStart', 'delete'],
   invited: ['run', 'edit', 'updateInvite'],
   in_progress: ['run'],
   closed: ['sign', 'publish', 'addendum', 'print'],

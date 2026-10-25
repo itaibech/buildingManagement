@@ -1,4 +1,5 @@
 import { Stack, Tabs, Text, Title } from '@mantine/core'
+import { IconBolt } from '@tabler/icons-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { useAuth } from '../../auth/AuthProvider'
@@ -11,6 +12,7 @@ import { tabOf, type MeetingTab } from './lifecycle'
 import { MeetingCard } from './MeetingCard'
 import { MeetingForm } from './MeetingForm'
 import { PublishReminders } from './PublishReminders'
+import { QuickStartDialog } from './QuickStart'
 import type { MeetingListItem } from './types'
 
 const byDateAsc = (a: MeetingListItem, b: MeetingListItem) => a.scheduled_at.localeCompare(b.scheduled_at)
@@ -59,10 +61,12 @@ export default function MeetingsPage() {
   const list = useMeetings()
   const navigate = useNavigate()
   const [creating, setCreating] = useState(false)
+  const [quick, setQuick] = useState(false)
   const add = isAdmin ? { label: he.meetings.newMeeting, onClick: () => setCreating(true) } : undefined
+  const quickStart = isAdmin ? { label: he.meetings.actions.quickStart, icon: <IconBolt size={18} stroke={1.75} />, onClick: () => setQuick(true) } : undefined
   return (
     <Stack gap="md">
-      <PageHeader title={isAdmin ? he.meetings.title : he.meetings.residentTitle} action={add} />
+      <PageHeader title={isAdmin ? he.meetings.title : he.meetings.residentTitle} action={add} secondaryAction={quickStart} />
       {list.isError && <Text c="debt.7">{he.meetings.loadFailed}</Text>}
       {list.isLoading && <ListSkeleton rows={4} />}
       {list.data && isAdmin && <PublishReminders meetings={list.data} />}
@@ -70,6 +74,7 @@ export default function MeetingsPage() {
       <FormModal opened={creating} title={he.meetings.form.newTitle} onClose={() => setCreating(false)}>
         {creating && <MeetingForm onDone={(id) => { setCreating(false); navigate(`/meetings/${id}`) }} />}
       </FormModal>
+      {isAdmin && <QuickStartDialog key={String(quick)} opened={quick} onClose={() => setQuick(false)} />}
     </Stack>
   )
 }

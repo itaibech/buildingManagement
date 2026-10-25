@@ -2,11 +2,11 @@
 import type { AgendaItem, Attendance, MeetingDetail } from './types'
 
 const att = (n: number, status: Attendance['status'], attendee_name = '', proxy_name = ''): Attendance =>
-  ({ id: `att${n}`, meeting_id: 'm1', apartment_id: `a${n}`, apartment_number: n, status, attendee_name, proxy_name, proxy_file_path: null })
+  ({ id: `att${n}`, meeting_id: 'm1', apartment_id: `a${n}`, apartment_number: n, status, attendee_name, proxy_name, proxy_file_path: null, arrived_at: null, left_at: null })
 
 const item = (id: string, position: number, o: Partial<AgendaItem>): AgendaItem => ({
   id, meeting_id: 'm1', position, title: '', discussion: '', votes_for: null, votes_against: null, votes_abstain: null, decision: '',
-  decision_number: null, item_status: 'open', added_during_meeting: false, created_at: '2026-10-01T10:00:00Z', ...o,
+  decision_number: null, item_status: 'open', added_during_meeting: false, attendees_at_vote: null, created_at: '2026-10-01T10:00:00Z', ...o,
 })
 
 export function meetingFixture(): MeetingDetail {
@@ -15,6 +15,7 @@ export function meetingFixture(): MeetingDetail {
     quorum_mode: 'majority', quorum_value: null, quorum_note: '', status: 'closed', invited_at: '2026-10-25T08:00:00Z',
     postponed_at: '2026-11-03T17:05:00Z', postponed_to: '2026-11-03T18:00:00Z', opened_at: '2026-11-03T18:02:00Z',
     chair_name: 'רות יו"ר', secretary_name: 'דני רושם', closed_at: '2026-11-03T19:30:00Z', published_at: null,
+    quick_started: false, opened_without_quorum: false,
     items: [
       item('i1', 1, { title: 'אישור תקציב 2027', discussion: 'נדונה הצעת התקציב', votes_for: 2, votes_against: 1, votes_abstain: 0, decision: 'התקציב אושר', decision_number: 1 }),
       item('i2', 2, { title: 'צביעת חדר המדרגות', item_status: 'removed' }),
