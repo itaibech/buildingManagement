@@ -11,14 +11,14 @@ one place, on phone and desktop. It's inspired by Hombi, Bllink and Darimpo.
 
 | | Feature | What it does |
 |---|---|---|
-| 1 | **דיירים** Tenants | Apartments, residents and the building directory. Admins approve new users and link each one to an apartment |
+| 1 | **דיירים** Tenants | Apartments, residents and the building directory. Admins approve new users and link each one to an apartment. Each apartment has one admin page with everything about it. See [Apartments and users](#apartments-and-users-דירות-ומשתמשים) |
 | 2 | **הודעות** Announcements | Committee posts with pinning, expiry dates and unread markers |
 | 3 | **קריאות ותקלות** Service calls | Residents report faults with photos and comments. Admins track each call: open → in progress → closed |
 | 4 | **משימות תחזוקה** Maintenance | Recurring tasks (elevator, fire safety, backflow preventers…) with due dates and a done log |
 | 5 | **הכנסות והוצאות** Finance | Monthly fees, levies, payments, debts per apartment, expenses by category, and budget vs actual |
 | 6 | **ייבוא מאקסל** Excel import | Imports the committee's existing payments and expenses workbook |
 | 7 | **מיילים** Email | Admins email an announcement or a service call to all or chosen apartments, and personalised debt reminders (one apartment or every debtor). See [Email setup](#email-setup) |
-| 8 | **ישיבות ועד** Meetings | Formal committee meetings and tenants' assemblies: invitation, quorum with a one-hour postponement, attendance with proxies, votes and numbered decisions, signatures, a printable protocol and an archive. See [Meetings](#meetings-ישיבות-ועד) |
+| 8 | **ישיבות ועד** Meetings | Formal committee meetings and tenants' assemblies: invitation (or an immediate start), quorum with a one-hour postponement or an explicit no-quorum opening, attendance with proxies, votes and numbered decisions, signatures, a printable protocol and an archive. See [Meetings](#meetings-ישיבות-ועד) |
 
 **Roles:** *admin* (committee, full access) and *resident* (read-only, plus
 opening service calls). A resident sees only their own apartment's finances.
@@ -46,15 +46,32 @@ After such a change, a settled month can show a small open amount again, or a cr
 
 The import preview warns when the target year contains settlements.
 
+## Apartments and users (דירות ומשתמשים)
+
+**The apartment page** (`#/apartments/:id`, admins only) holds everything about one apartment, in tabs on desktop and a stacked accordion on mobile. Each section loads when opened:
+סקירה (balance with its breakdown, current fee and its source, payment method, badges, the charger's last reading, and quick actions: רישום תשלום, חיוב מיוחד, הסדרת חוב, שליחת תזכורת חוב, עריכה) · תשלומים (by year, with source and totals) · חיובים ויתרה (the month-by-month ledger; "לכרטסת" opens it) · דמי ועד (the fee timeline) · טעינת רכב (only with a charger) · דיירים · קריאות שירות (opened by its residents) · ישיבות (attendance in published protocols) · היסטוריה (`admin_audit` and emails sent to it).
+
+**Deleting an apartment** ("מחיקה") first shows what it holds. With no history it is simply deleted. With history:
+- **העברה לארכיון** (recommended, `archive_apartment`): hidden from lists, balances, collection, meeting quorums and email recipients; monthly fees (and standing orders) stop after the archive month; past months stay in reports and the year export. It's listed under "ארכיון" on the apartments page and restored from its page (`restore_apartment`).
+- **מחיקה לצמיתות כולל כל ההיסטוריה** (`delete_apartment_cascade`): the admin types the apartment number. Payments, charges, fee timeline, billing, EV, residents (their logins stay, unlinked) and attendance in unfinished meetings go in one transaction. Closed protocols keep the apartment's number. Tickets belong to their openers and stay.
+
+**Deleting a user** (משתמשים → ⋯ → מחיקת משתמש) calls the Edge Function `admin-delete-user` (it needs the service role for `auth.admin.deleteUser`). It checks the caller is an admin and refuses the super admin and yourself. The login and profile go; the resident record stays unless "גם להסיר את הדייר" is ticked. Authorship columns are `on delete set null`, so history stays. Archive, restore, deletes and user deletions are logged in `admin_audit` (admins read it).
+
+**Standing orders never double-pay** (0022): a standing-order month's automatic payment is the fee minus that month's imported or manual fee payments (EV-noted, settlement and special-charge payments don't count). A fully paid month has no automatic row, and any later payment write re-syncs.
+
 ## Meetings (ישיבות ועד)
 
 Admins open **עוד → ישיבות ועד**. Tabs: קרובות (draft, invited, in progress), ממתינות לפרסום (closed) and ארכיון (published, searchable by subject, decision text and year). Every state change goes through an admin-only RPC in `0021_meetings.sql`, and triggers lock edits by state.
 
-1. **Draft.** Type (ישיבת ועד / אסיפת דיירים כללית), subject, date and time, place, the agenda (add, remove, reorder) and the quorum rule: more than half of the apartments by default, or a % or a fixed number, with a "לפי התקנון" note.
+1. **Draft.** Type (ישיבת ועד / אסיפת דיירים כללית), subject, date and time, place, the agenda (add, remove, reorder) and the quorum rule: ללא דרישת מניין (default for a ישיבת ועד), more than half of the apartments (default for an assembly), a % or a fixed number, with a "לפי התקנון" note.
 2. **שליחת זימון.** Posts a pinned announcement until the meeting date (it links to the meeting) and can email everyone (`send-email`, kind `meeting`). Under 5 days ahead, the app warns "לפי חוק המקרקעין יש להודיע 4–5 ימים מראש" and asks for a confirmation (the RPC refuses without it). After the invitation the details can still change, then **עדכון זימון** re-announces them. Every change is logged in the meeting's history.
 3. **ניהול הישיבה** (the live screen, built for a phone):
    - Attendance per apartment: נוכח / ייפוי כוח / נעדר, the attendee's name or the proxy holder (and the proxy form). A live meter shows "נוכחות: X מתוך N דירות · נדרש מניין: R".
-   - Without a quorum: **דחיית האסיפה בשעה**. After that the meeting may open with any attendance, and the protocol says so.
+   - Without a quorum: **דחיית האסיפה בשעה** (an hour from the later of now and the scheduled time). After that the meeting may open with any attendance, and the protocol says so. The screen shows when (with the day when it isn't today) and the wait in hours and minutes. **ביטול הדחייה** undoes a postponement made by mistake.
+   - **פתיחה ללא מניין**: open now without a quorum (also skipping a postponement's wait) after ticking "ידוע לי שהחלטות שיתקבלו ללא מניין חוקי עלולות שלא להיות מחייבות". It is logged and stated in the protocol.
+   - The rule **ללא דרישת מניין** (the default for a ישיבת ועד) opens at once. Attendance doesn't have to be filled in before opening.
+   - **פתיחת ישיבה מיידית** (from the list or a draft) skips the invitation and opens now; the protocol says "הישיבה התקיימה ללא זימון מוקדם", and a tenants' assembly gets a warning.
+   - Attendance stays editable during the meeting: late arrivals and departures get their time, shown live and in the protocol. Each vote is checked against the attendance when it was entered (`attendees_at_vote`).
    - Opening needs a chair and a recorder. Then, per item: discussion summary, בעד / נגד / נמנעו (the total can't exceed the attendees, proxies included; "פה אחד" fills it in), the decision wording and its number. Items can be marked ירד מסדר היום / נדחה לישיבה הבאה, and items can be added during the meeting.
    - Everything autosaves. Changes are kept on the device while offline and sync when the connection returns.
 4. **סיום הישיבה** records the closing time and the absent apartments, and numbers the decisions. From then on attendance, items and votes are locked; corrections go in a **תיקון לפרוטוקול**, printed as an appendix.
@@ -332,7 +349,7 @@ Before pushing: `npm test && npm run lint && npm run typecheck && npm run build 
 2. Merge the stack down into `main`. A push to `main` runs `deploy.yml`: it first runs the whole CI
    (`ci.yml` as a reusable workflow, pgTAP included); only when that passes does it build with the repo
    variables, apply new migrations in `supabase/migrations` to the hosted project (`supabase db push`),
-   deploy the `send-email` Edge Function (`supabase functions deploy`, JWT verification on), and publish
+   deploy the `send-email` and `admin-delete-user` Edge Functions (`supabase functions deploy`, JWT verification on), and publish
    GitHub Pages.
 3. Migrations are forward-only: fix a bad one with a new migration, never by editing an applied one.
    Protect `main` (Settings → Branches) so it only takes PRs with a green CI.
