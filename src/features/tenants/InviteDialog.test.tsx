@@ -16,6 +16,8 @@ const m = vi.hoisted(() => ({
 const dana = { id: 'r1', apartment_id: 'apt7', full_name: 'דנה', email: 'Dana@Example.test', apartmentNumber: 7, phone: null, is_owner: true, building_id: 'b1', created_at: '' }
 const linked = { ...dana, id: 'r2', full_name: 'יוסי', email: 'yossi@example.test' }
 
+// No Supabase env in CI: the real client is never used here (the hooks below are faked).
+vi.mock('../../lib/supabase', () => ({ supabase: {} }))
 vi.mock('./api', async (orig) => ({
   ...(await orig<typeof import('./api')>()),
   useDirectory: () => ({ data: [dana, linked] }),
