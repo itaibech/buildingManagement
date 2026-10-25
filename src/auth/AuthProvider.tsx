@@ -21,6 +21,8 @@ export interface AuthState {
   signOut(): Promise<void>
   /** The session came from a password-reset link: the app routes to #/reset-password until it is used. */
   recovery: boolean
+  /** The session came from an invite link (type=invite): the same route, titled "בחירת סיסמה". */
+  invited: boolean
   endRecovery(): void
 }
 
@@ -33,10 +35,15 @@ export function useAuth(): AuthState {
   return ctx
 }
 
-function useSession(): { session: Session | null; loaded: boolean; recovery: boolean; endRecovery: () => void } {
+// An invite link lands with #access_token=…&type=invite. GoTrue reports it as a plain SIGNED_IN (not PASSWORD_RECOVERY),
+// so read the hash now, at module load, before supabase-js consumes and clears it.
+const INVITE_LANDING = typeof window !== 'undefined' && /(?:^#|&)type=invite(?:&|$)/.test(window.location.hash)
+
+function useSession(): { session: Session | null; loaded: boolean; recovery: boolean; invited: boolean; endRecovery: () => void } {
   const [session, setSession] = useState<Session | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [recovery, setRecovery] = useState(false)
+  const [invited, setInvited] = useState(INVITE_LANDING)
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
@@ -49,12 +56,12 @@ function useSession(): { session: Session | null; loaded: boolean; recovery: boo
     })
     return () => data.subscription.unsubscribe()
   }, [])
-  const endRecovery = useCallback(() => setRecovery(false), [])
-  return { session, loaded, recovery, endRecovery }
+  const endRecovery = useCallback(() => { setRecovery(false); setInvited(false) }, [])
+  return { session, loaded, recovery, invited, endRecovery }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { session, loaded, recovery, endRecovery } = useSession()
+  const { session, loaded, recovery, invited, endRecovery } = useSession()
   const { profile, loading, error, retry } = useProfile(session?.user.id)
   const approved = profile?.status === 'approved'
   const isAdmin = approved && profile.role === 'admin'
@@ -73,9 +80,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await supabase.auth.signOut()
       },
       recovery,
+      invited,
       endRecovery,
     }),
-    [session, profile, isAdmin, permissions.granted, permissions.loading, permissions.failed, permissions.retry, loaded, loading, error, retry, recovery, endRecovery],
+    [session, profile, isAdmin, permissions.granted, permissions.loading, permissions.failed, permissions.retry, loaded, loading, error, retry, recovery, invited, endRecovery],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

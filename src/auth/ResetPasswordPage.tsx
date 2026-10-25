@@ -12,7 +12,7 @@ interface Values { password: string; confirm: string }
 
 function ResetForm() {
   const navigate = useNavigate()
-  const { endRecovery } = useAuth()
+  const { endRecovery, invited } = useAuth()
   const [state, setState] = useState<{ busy: boolean; failed: boolean }>({ busy: false, failed: false })
   const form = useForm<Values>({
     initialValues: { password: '', confirm: '' },
@@ -33,7 +33,8 @@ function ResetForm() {
   return (
     <form onSubmit={(e) => void submit(e)} noValidate>
       <Stack gap="md">
-        <Title order={2} size="h3">{he.reset.title}</Title>
+        <Title order={2} size="h3">{invited ? he.reset.inviteTitle : he.reset.title}</Title>
+        {invited && <Text c="dimmed">{he.reset.inviteBody}</Text>}
         <PasswordInput label={he.reset.newPassword} dir="ltr" autoComplete="new-password" data-autofocus {...form.getInputProps('password')} />
         <PasswordInput label={he.reset.confirm} dir="ltr" autoComplete="new-password" {...form.getInputProps('confirm')} />
         {state.failed && <Alert color="debt" role="alert">{he.reset.failed}</Alert>}
@@ -43,7 +44,7 @@ function ResetForm() {
   )
 }
 
-/** #/reset-password: reached from the reset mail (a recovery session); sets a new password. */
+/** #/reset-password: reached from the reset mail (a recovery session) or an invite (choosing a first password). */
 export default function ResetPasswordPage() {
   const { session, loading } = useAuth()
   return (

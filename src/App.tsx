@@ -36,11 +36,11 @@ const fallback = (
   </Box>
 )
 
-/** A password-reset link signs the user in with a recovery session: send them to choose a new password. */
+/** A password-reset or invite link signs the user in: send them to choose a (new) password. */
 function RecoveryRedirect() {
-  const { recovery } = useAuth()
+  const { recovery, invited } = useAuth()
   const { pathname } = useLocation()
-  return recovery && pathname !== '/reset-password' ? <Navigate to="/reset-password" replace /> : null
+  return (recovery || invited) && pathname !== '/reset-password' ? <Navigate to="/reset-password" replace /> : null
 }
 
 export default function App() {
