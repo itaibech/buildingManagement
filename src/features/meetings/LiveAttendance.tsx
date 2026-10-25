@@ -1,4 +1,4 @@
-import { Anchor, Autocomplete, Button, Card, FileButton, Group, SegmentedControl, Stack, Text, TextInput } from '@mantine/core'
+import { Anchor, Autocomplete, Button, Card, Checkbox, FileButton, Group, SegmentedControl, Stack, Text, TextInput } from '@mantine/core'
 import { IconPaperclip } from '@tabler/icons-react'
 import { useState } from 'react'
 import { he } from '../../lib/he'
@@ -57,7 +57,11 @@ function AttendanceRow({ meetingId, apt, value, times, onChange }: RowProps) {
         )}
         {value.status === 'proxy' && (
           <>
-            <TextInput label={L.proxyName} value={value.proxy_name} onChange={(e) => set({ proxy_name: e.currentTarget.value })} />
+            <Checkbox label={L.proxyCommittee} checked={value.proxy_name === L.committeeHolder}
+              onChange={(e) => set({ proxy_name: e.currentTarget.checked ? L.committeeHolder : '' })} />
+            {value.proxy_name !== L.committeeHolder && (
+              <TextInput label={L.proxyName} value={value.proxy_name} onChange={(e) => set({ proxy_name: e.currentTarget.value })} />
+            )}
             <ProxyFile meetingId={meetingId} path={value.proxy_file_path} onPath={(p) => set({ proxy_file_path: p })} />
           </>
         )}

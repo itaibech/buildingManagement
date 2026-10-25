@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { MantineProvider } from '@mantine/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, configure, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, configure, fireEvent, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -11,6 +11,7 @@ import { ClosedMeeting } from './ClosedMeeting'
 import { meetingFixture } from './fixture'
 import { InviteDialog } from './InviteDialog'
 import { LiveItem } from './LiveItem'
+import { LiveAttendance } from './LiveAttendance'
 import { Opening } from './LiveOpening'
 import { MeetingOverview } from './MeetingOverview'
 import { QuickStartDialog } from './QuickStart'
@@ -221,6 +222,25 @@ describe('opening without quorum', () => {
     expect(button).toBeEnabled()
     fireEvent.click(button)
     expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ override: true }))
+  })
+
+  it('a proxy to the committee needs no name: ticking it sets נציגות הוועד and hides the name field', () => {
+    const onChange = vi.fn()
+    const value = { status: 'proxy' as const, attendee_name: '', proxy_name: '', proxy_file_path: null }
+    wrap(<LiveAttendance meetingId="m1" apartments={[{ id: 'a1', number: 1, residents: [] }]} values={{ a1: value }} absent={value} onChange={onChange} />)
+    fireEvent.click(screen.getByRole('checkbox', { name: L.proxyCommittee }))
+    expect(onChange).toHaveBeenCalledWith('a1', { ...value, proxy_name: L.committeeHolder })
+    cleanup()
+    wrap(<LiveAttendance meetingId="m1" apartments={[{ id: 'a1', number: 1, residents: [] }]} values={{ a1: { ...value, proxy_name: L.committeeHolder } }} absent={value} onChange={onChange} />)
+    expect(screen.queryByLabelText(L.proxyName)).not.toBeInTheDocument()
+  })
+
+  it('the same person attending and holding a proxy appears once in the chair/secretary list (no duplicate-option crash)', () => {
+    const meeting = withStatus('invited', { chair_name: '', secretary_name: '', postponed_to: null })
+    wrap(<Opening meeting={meeting} q={noQuorum} names={['ענת וסוזי', 'ענת וסוזי ', 'דנה']} busy={false} onOpen={vi.fn()} />)
+    fireEvent.focus(screen.getAllByLabelText(L.chair)[0])
+    const count = (name: string) => screen.getAllByRole('option', { name, hidden: true }).length
+    expect(count('ענת וסוזי')).toBe(count('דנה'))
   })
 
   it('an override ticked before the quorum arrived is not sent', () => {
