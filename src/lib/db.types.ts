@@ -1455,6 +1455,9 @@ isOneToOne: false
 "restore_apartment":
 { Args: { "p_id": string }; Returns: undefined
                            },
+"restore_fee_gap":
+{ Args: { "p_apartment": string,"p_archived_at": string,"p_building": string }; Returns: undefined
+                           },
 "save_apartment":
 { Args: { "p_ev"?: boolean,"p_ev_initial"?: number,"p_fee"?: number,"p_floor"?: number,"p_id"?: string,"p_is_committee"?: boolean,"p_notes"?: string,"p_number"?: number,"p_payment_method"?: string,"p_standing_order_from"?: string }; Returns: string
                            },

@@ -60,6 +60,21 @@ function TimeNotes({ postponedTo, left, early, future }: NoteProps) {
   )
 }
 
+/**
+ * Mirrors open_meeting. The override applies only without a quorum and before the postponed time (after it any
+ * attendance is valid), so a box ticked before the quorum arrived is ignored. After a postponement without a quorum
+ * (and without the override) the meeting waits for the postponed time.
+ */
+function openingRules(postponedTo: string | null, met: boolean, override: boolean, now: Date, openedAt: string | null) {
+  const until = postponedTo ? new Date(postponedTo).getTime() - now.getTime() : 0
+  const offerOverride = !met && !(postponedTo && until <= 0)
+  const overriding = override && offerOverride
+  const waits = !overriding && !met
+  const left = waits && postponedTo ? Math.max(0, until) : 0
+  const early = waits && openedAt !== null && isTooEarly(postponedTo, openedAt)
+  return { offerOverride, overriding, waits, left, early }
+}
+
 /** openedAt null = now, by the server's clock (the recorder didn't type a time). override: "פתיחה ללא מניין". */
 export interface OpeningValues { openedAt: string | null; chair: string; secretary: string; override: boolean }
 
@@ -91,16 +106,12 @@ export function Opening({ meeting, q, names, busy, onOpen }: OpeningProps) {
   const [override, setOverride] = useState(false)
   const missing = !chair.trim() || !secretary.trim()
   const openedAt = typed ? fromInputs(day, typed) : null
-  // After a postponement the meeting waits for the postponed time (open_meeting checks the real clock too), unless
-  // opened without quorum.
-  const waits = !override
-  const left = waits && meeting.postponed_to ? Math.max(0, new Date(meeting.postponed_to).getTime() - now.getTime()) : 0
-  const early = waits && openedAt !== null && isTooEarly(meeting.postponed_to, openedAt)
+  const { offerOverride, overriding, waits, left, early } = openingRules(meeting.postponed_to, q.met, override, now, openedAt)
   const future = openedAt !== null && new Date(openedAt).getTime() > now.getTime() + FUTURE_LEEWAY_MS
-  const blocked = left > 0 || early || future || !(q.valid || override)
+  const blocked = left > 0 || early || future || !(q.valid || overriding)
   const submit = () => {
     setTried(true)
-    if (!missing && !blocked) onOpen({ openedAt, chair: chair.trim(), secretary: secretary.trim(), override: override && !q.met })
+    if (!missing && !blocked) onOpen({ openedAt, chair: chair.trim(), secretary: secretary.trim(), override: overriding })
   }
   return (
     <Card>
@@ -113,7 +124,7 @@ export function Opening({ meeting, q, names, busy, onOpen }: OpeningProps) {
           <Autocomplete label={L.chair} placeholder={L.roleHint} data={names} value={chair} onChange={setChair} />
           <Autocomplete label={L.secretary} placeholder={L.roleHint} data={names} value={secretary} onChange={setSecretary} />
         </SimpleGrid>
-        {!q.met && <OverrideQuorum checked={override} onChange={setOverride} />}
+        {offerOverride && <OverrideQuorum checked={override} onChange={setOverride} />}
         {tried && missing && <Text c="debt.7" size="sm">{L.roleRequired}</Text>}
         <Button size="md" onClick={submit} loading={busy} disabled={blocked}>{L.open}</Button>
       </Stack>

@@ -40,6 +40,7 @@ function Purge({ apartment, onBack, onDeleted }: { apartment: Apartment; onBack:
   return (
     <Stack>
       <Text>{t.purgeHint}</Text>
+      <Text size="sm" c="dimmed">{t.purgeKeeps}</Text>
       <TextInput label={t.typeNumber(apartment.number)} value={typed} onChange={(e) => setTyped(e.currentTarget.value)} inputMode="numeric" dir="ltr" />
       {purge.isError && <Alert color="debt">{he.tenants.errors.delete}</Alert>}
       <Group justify="flex-end" gap="sm">

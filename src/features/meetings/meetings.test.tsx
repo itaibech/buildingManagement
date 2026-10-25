@@ -124,7 +124,8 @@ describe('"פה אחד"', () => {
 })
 
 describe('opening after a postponement', () => {
-  const q = { total: 5, attending: 3, required: 3, met: true, postponed: true, valid: true, none: false }
+  // Postponed without a quorum: valid with whoever is present, once the postponed time has passed.
+  const q = { total: 5, attending: 1, required: 3, met: false, postponed: true, valid: true, none: false }
   // A fixed midday clock (Israel 14:00), so the typed times below never wrap around midnight.
   beforeEach(() => { vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] }); vi.setSystemTime(new Date('2026-11-03T12:00:00Z')) })
   afterEach(() => vi.useRealTimers())
@@ -136,7 +137,7 @@ describe('opening after a postponement', () => {
     render(at(3))
     expect(screen.getByText(he.meetings.live.opensIn(he.meetings.wait.single(he.meetings.wait.minutes(3))))).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText(he.meetings.live.openingTime), { target: { value: '14:03' } })
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByText(/שעת הפתיחה לא יכולה/)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: he.meetings.live.open })).toBeDisabled()
   })
 
@@ -150,6 +151,20 @@ describe('opening after a postponement', () => {
     expect(screen.getByLabelText(he.meetings.live.openingTime)).toHaveValue('14:02')
     fireEvent.click(open)
     expect(onOpen).toHaveBeenCalledWith({ openedAt: null, chair: 'א', secretary: 'ב', override: false })
+  })
+
+  it('once the quorum is met the postponement no longer binds: open at once', () => {
+    const onOpen = vi.fn()
+    wrap(<Opening meeting={withStatus('invited', { chair_name: 'א', secretary_name: 'ב', postponed_to: at(30) })}
+      q={{ ...q, attending: 3, met: true }} names={[]} busy={false} onOpen={onOpen} />)
+    expect(screen.queryByText(/אפשר לפתוח בעוד/)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: he.meetings.live.open }))
+    expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ override: false }))
+  })
+
+  it('past the postponed time no override is offered', () => {
+    render(at(-1))
+    expect(screen.queryByRole('checkbox', { name: he.meetings.live.overrideConfirm })).not.toBeInTheDocument()
   })
 
   it('a postponed time with seconds, passed 5 seconds ago, is open at once', () => {
@@ -206,6 +221,19 @@ describe('opening without quorum', () => {
     expect(button).toBeEnabled()
     fireEvent.click(button)
     expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ override: true }))
+  })
+
+  it('an override ticked before the quorum arrived is not sent', () => {
+    const onOpen = vi.fn()
+    const meeting = withStatus('invited', { chair_name: 'א', secretary_name: 'ב', postponed_to: null })
+    const view = wrap(<Opening meeting={meeting} q={noQuorum} names={[]} busy={false} onOpen={onOpen} />)
+    fireEvent.click(screen.getByRole('checkbox', { name: L.overrideConfirm }))
+    view.rerender(<MantineProvider theme={theme}><QueryClientProvider client={new QueryClient()}><MemoryRouter>
+      <Opening meeting={meeting} q={{ ...noQuorum, attending: 3, met: true, valid: true }} names={[]} busy={false} onOpen={onOpen} />
+    </MemoryRouter></QueryClientProvider></MantineProvider>)
+    expect(screen.queryByRole('checkbox', { name: L.overrideConfirm })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: L.open }))
+    expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ override: false }))
   })
 
   it('"ללא דרישת מניין": open at once, no override offered', () => {

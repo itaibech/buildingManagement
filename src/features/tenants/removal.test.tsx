@@ -80,6 +80,7 @@ describe('DeleteApartmentDialog', () => {
     db.history = { ...EMPTY, charges: 1 }
     const { onDeleted } = renderDialog()
     fireEvent.click(await screen.findByRole('button', { name: new RegExp(he.tenants.removal.purge) }))
+    expect(screen.getByText(he.tenants.removal.purgeKeeps)).toBeInTheDocument()
     const confirm = screen.getByRole('button', { name: he.tenants.removal.purgeConfirm })
     const input = screen.getByLabelText(he.tenants.removal.typeNumber(5))
     expect(confirm).toBeDisabled()

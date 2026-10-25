@@ -4,7 +4,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(31);
+select plan(35);
 
 insert into auth.users (id, email, aud, role) values
   ('a9900000-0000-0000-0000-000000000001', 'del-admin@test.local', 'authenticated', 'authenticated'),
@@ -79,8 +79,8 @@ select lives_ok($$select public.archive_apartment('b9900000-0000-0000-0000-00000
 select isnt((select archived_at from public.apartments where id = 'b9900000-0000-0000-0000-00000000000b'), null, 'archived_at is set');
 select is((select count(*)::int from public.apartment_balances where apartment_id = 'b9900000-0000-0000-0000-00000000000b'), 0,
   'an archived apartment is hidden from the balances');
-select is((select apartments_total from public.collection_summary(public.current_month())), 2,
-  'an archived apartment is not in the collection summary');
+select is((select apartments_total from public.collection_summary(public.current_month())), 3,
+  'the archive month is still billed, so the collection summary still counts it');
 reset role;
 update public.apartments set archived_at = (public.current_month() - interval '2 months')::timestamptz
   where id = 'b9900000-0000-0000-0000-00000000000b';
@@ -91,11 +91,22 @@ select is((select count(*)::int from public.monthly_fees where apartment_id = 'b
 select public.apply_standing_orders();
 select is((select count(*)::int from public.payments where apartment_id = 'b9900000-0000-0000-0000-00000000000b' and source = 'auto'), 0,
   'no standing-order payment after the archive');
+select is((select sum(charged) from public.apartment_ledger where apartment_id = 'b9900000-0000-0000-0000-00000000000b'), 200::numeric,
+  'while archived: billed through the archive month only');
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"a9900000-0000-0000-0000-000000000001","role":"authenticated"}';
+select is((select row(apartments_total, (select apartments_total from public.collection_summary((public.current_month() - interval '2 months')::date)))::text
+  from public.collection_summary(public.current_month())), '(2,3)', 'collection: counted in its archive month, not after');
+reset role;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"a9900000-0000-0000-0000-000000000001","role":"authenticated"}';
 select lives_ok($$select public.restore_apartment('b9900000-0000-0000-0000-00000000000b')$$, 'admin restores it');
 select is((select count(*)::int from public.apartment_balances where apartment_id = 'b9900000-0000-0000-0000-00000000000b'), 1,
   'a restored apartment is back in the balances');
+select is((select array_agg(amount order by month)::text from public.monthly_fees where apartment_id = 'b9900000-0000-0000-0000-00000000000b'),
+  '{100.00,100.00,0.00,100.00}', 'restore: the archived gap is exempt, fees resume from the restore month');
+select is((select sum(charged) from public.apartment_ledger where apartment_id = 'b9900000-0000-0000-0000-00000000000b'), 300::numeric,
+  'restore bills nothing for the archived gap (only the restore month is added)');
 select is((select array_agg(action order by created_at, action) from public.admin_audit
   where apartment_id = 'b9900000-0000-0000-0000-00000000000b'), array['archive_apartment', 'restore_apartment'],
   'archive and restore are logged');

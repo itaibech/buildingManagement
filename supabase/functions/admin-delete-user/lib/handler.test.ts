@@ -66,4 +66,11 @@ describe('admin-delete-user', () => {
     expect(r.body).toEqual({ deleted: true, residentRemoved: true })
     expect(d.residents).toEqual(['r1'])
   })
+
+  it('a failure after the delete still answers 200, with a warning (never a 500 after the login is gone)', async () => {
+    const d = { ...deps(), audit: async () => { throw new Error('db down') }, removeResident: async () => { throw new Error('locked') } }
+    const r = await handleDelete({ userId: USER, removeResident: true }, d)
+    expect(r).toEqual({ status: 200, body: { deleted: true, residentRemoved: false, warnings: ['resident', 'audit'] } })
+    expect(d.deleted).toEqual([USER])
+  })
 })

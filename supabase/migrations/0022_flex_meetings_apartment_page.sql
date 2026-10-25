@@ -102,7 +102,8 @@ left join public.apartment_ledger l on l.apartment_id = a.id
 where public.can_read_apartment_finance(a.id) and a.archived_at is null
 group by a.id;
 
--- Same as 0016, without apartments archived by p_month (an earlier month still counts them).
+-- Same as 0016, without apartments archived before p_month: the archive month is still billed and counted
+-- (as in monthly_fees), later months aren't.
 create or replace function public.collection_summary(p_month date)
 returns table (apartments_total int, apartments_paid_up int, amount_due_total numeric)
 language plpgsql stable security definer set search_path = ''
@@ -122,7 +123,7 @@ begin
     from public.apartments a
     left join public.apartment_ledger l on l.apartment_id = a.id and l.month <= m
     where a.building_id = v_building
-      and (a.archived_at is null or date_trunc('month', a.archived_at at time zone 'Asia/Jerusalem') > m)
+      and (a.archived_at is null or date_trunc('month', a.archived_at at time zone 'Asia/Jerusalem') >= m)
     group by a.id
   )
   select (count(*) filter (where not bal.exempt))::int,
@@ -188,6 +189,32 @@ begin
 end;
 $$;
 
+-- The months between the archive month and the restore month were never billed while archived; restoring writes
+-- them into the fee timeline as exempt (from the month after the archive), and resumes what applied before from the
+-- restore month, so the balance is the same before and after. A row already at either month is kept as it is.
+-- (Scalar arguments, not the apartments row: a function of the row would show up as a computed column in the API.)
+create function public.restore_fee_gap(p_apartment uuid, p_building uuid, p_archived_at timestamptz) returns void
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_from date := (date_trunc('month', p_archived_at at time zone 'Asia/Jerusalem') + interval '1 month')::date;
+  v_to date := public.current_month();
+  r record;
+begin
+  if v_from >= v_to then
+    return;
+  end if;
+  select * into r from public.apartment_fee_at(p_apartment, v_to) f;
+  insert into public.apartment_fee_overrides (building_id, apartment_id, effective_from, mode, amount)
+  values (p_building, p_apartment, v_to, r.fee_mode, case when r.fee_mode = 'custom' then r.amount end)
+  on conflict (apartment_id, effective_from) do nothing;
+  insert into public.apartment_fee_overrides (building_id, apartment_id, effective_from, mode)
+  values (p_building, p_apartment, v_from, 'exempt')
+  on conflict (apartment_id, effective_from) do nothing;
+end;
+$$;
+revoke execute on function public.restore_fee_gap(uuid, uuid, timestamptz) from public, anon, authenticated;
+
 create function public.restore_apartment(p_id uuid) returns void
 language plpgsql security definer set search_path = ''
 as $$
@@ -195,6 +222,7 @@ declare
   a public.apartments := public.apartment_lock(p_id);
 begin
   if a.archived_at is not null then
+    perform public.restore_fee_gap(a.id, a.building_id, a.archived_at);
     update public.apartments set archived_at = null where id = p_id;
     insert into public.admin_audit (building_id, action, target_id, apartment_id, details)
     values (a.building_id, 'restore_apartment', p_id, p_id, jsonb_build_object('number', a.number));
@@ -273,9 +301,10 @@ $$;
 -- ================================================================ B. meeting flexibility
 --   * quorum_mode 'none' ("ללא דרישת מניין"; the app's default for a ישיבת ועד): always met.
 --   * Opening needs no attendance first. open_meeting opens when the quorum is met, the rule is 'none', the meeting
---     was postponed (then, as before, not before the postponed time by the real clock), or p_override_quorum
---     ("פתיחה ללא מניין", confirmed in the app; only when the rule isn't met), which also skips a postponement's wait. The override is stored on the meeting
---     (opened_without_quorum, printed in the protocol) and logged in meeting_events.
+--     was postponed and the postponed time has passed (real clock, as before), or p_override_quorum ("פתיחה ללא
+--     מניין", confirmed in the app), which also skips a postponement's wait. The override counts only while the rule
+--     isn't met and the postponed time hasn't passed; then it is stored on the meeting (opened_without_quorum, printed
+--     in the protocol) and logged in meeting_events.
 --   * quick_start_meeting: draft → in_progress without an invitation, the time set to now (quick_started).
 --   * cancel_postponement: undoes a postponement made by mistake (logged).
 --   * Attendance stays editable while in progress; arrived_at / left_at record late arrivals and departures.
@@ -357,8 +386,13 @@ begin
 end;
 $$;
 
--- Votes entered before 0022: their attendance is the current one (the trigger fills attendees_at_vote).
-update public.meeting_agenda_items set updated_at = updated_at where votes_for is not null and attendees_at_vote is null;
+-- Votes entered before 0022: the current attendance, but never less than the vote's own total, so the backfill can't
+-- fail the vote check (the rules trigger is paused for it).
+alter table public.meeting_agenda_items disable trigger meeting_items_rules;
+update public.meeting_agenda_items i set attendees_at_vote = greatest(i.votes_for + i.votes_against + i.votes_abstain,
+  (select count(*) from public.meeting_attendance t where t.meeting_id = i.meeting_id and t.status in ('present', 'proxy')))
+where i.votes_for is not null and i.attendees_at_vote is null;
+alter table public.meeting_agenda_items enable trigger meeting_items_rules;
 
 -- Arrival / departure times while the meeting is in progress (before the opening the opening time applies).
 create function public.meeting_attendance_times() returns trigger
@@ -397,12 +431,14 @@ language plpgsql security definer set search_path = ''
 as $$
 declare
   v_rule_ok boolean := coalesce((select x.met from public.meeting_quorum(m.id) x), false) or m.quorum_mode = 'none';
-  v_override boolean := not v_rule_ok and coalesce(p_override, false);
+  -- Past the postponed time the meeting is valid with whoever is present: no override is needed (or recorded).
+  v_waited boolean := m.postponed_at is not null and now() >= m.postponed_to;
+  v_override boolean := not v_rule_ok and not v_waited and coalesce(p_override, false);
 begin
   perform public.meeting_require(v_rule_ok or v_override or m.postponed_at is not null, 'no_quorum');
-  -- After a postponement (unless overridden): not before the postponed time, by the real clock and by the recorded
-  -- opening time, as in 0021. A postponement made by mistake is undone with cancel_postponement.
-  perform public.meeting_require(m.postponed_at is null or v_override or (now() >= m.postponed_to
+  -- After a postponement without a quorum (and without the override): not before the postponed time, by the real
+  -- clock and by the recorded opening time, as in 0021. Once the quorum is met the postponement no longer binds.
+  perform public.meeting_require(m.postponed_at is null or v_rule_ok or v_override or (now() >= m.postponed_to
     and coalesce(p_opened_at, now()) >= m.postponed_to), 'too_early');
   perform public.meeting_require(coalesce(p_opened_at, now()) <= now() + interval '5 minutes', 'future');
   perform public.meeting_require(trim(coalesce(p_chair, '')) <> '' and trim(coalesce(p_secretary, '')) <> '', 'roles');

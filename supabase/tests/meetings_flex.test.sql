@@ -5,7 +5,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(36);
+select plan(38);
 
 insert into auth.users (id, email, aud, role) values
   ('a2500000-0000-0000-0000-000000000001', 'flex-admin@test.local', 'authenticated', 'authenticated'),
@@ -27,10 +27,11 @@ insert into public.meetings (id, building_id, kind, title, scheduled_at, quorum_
   ('e2500000-0000-0000-0000-000000000002', 'b2500000-0000-0000-0000-000000000001', 'general', 'אסיפה מיידית', now() + interval '3 days', 'majority'),
   ('e2500000-0000-0000-0000-000000000003', 'b2500000-0000-0000-0000-000000000001', 'general', 'אסיפה נדחית', now() + interval '10 days', 'majority'),
   ('e2500000-0000-0000-0000-000000000004', 'b2500000-0000-0000-0000-000000000001', 'general', 'אסיפה בזמן', now() + interval '10 days', 'majority'),
-  ('e2500000-0000-0000-0000-000000000005', 'b2500000-0000-0000-0000-000000000001', 'general', 'נדחתה ואז הגיעו', now() + interval '10 days', 'majority');
+  ('e2500000-0000-0000-0000-000000000005', 'b2500000-0000-0000-0000-000000000001', 'general', 'נדחתה ואז הגיעו', now() + interval '10 days', 'majority'),
+  ('e2500000-0000-0000-0000-000000000006', 'b2500000-0000-0000-0000-000000000001', 'general', 'נדחתה והזמן עבר', now() + interval '10 days', 'majority');
 insert into public.meeting_agenda_items (meeting_id, position, title) values
   ('e2500000-0000-0000-0000-000000000003', 1, 'סעיף'), ('e2500000-0000-0000-0000-000000000004', 1, 'סעיף'),
-  ('e2500000-0000-0000-0000-000000000005', 1, 'סעיף');
+  ('e2500000-0000-0000-0000-000000000005', 1, 'סעיף'), ('e2500000-0000-0000-0000-000000000006', 1, 'סעיף');
 
 -- ---------------------------------------------------------------- the "ללא דרישת מניין" rule
 select is((select row(total, required, met)::text from public.meeting_quorum('e2500000-0000-0000-0000-000000000001')),
@@ -85,17 +86,29 @@ select lives_ok($$select public.open_meeting('e2500000-0000-0000-0000-0000000000
 select is((select row(status, opened_without_quorum)::text from public.meetings where id = 'e2500000-0000-0000-0000-000000000003'),
   '(in_progress,t)', 'opened without quorum, recorded');
 
--- A postponed meeting waits for the postponed time even if the quorum arrives meanwhile (cancel the postponement
--- to open now).
+-- Once the quorum arrives, a postponement no longer binds: it opens before the postponed time (and isn't "without
+-- quorum", even if the override was ticked).
 select public.invite_meeting('e2500000-0000-0000-0000-000000000005');
 select public.postpone_meeting('e2500000-0000-0000-0000-000000000005');
 insert into public.meeting_attendance (meeting_id, apartment_id, status) select 'e2500000-0000-0000-0000-000000000005',
   ('b2500000-0000-0000-0000-00000000000' || n)::uuid, 'present' from generate_series(1, 3) n;
-select throws_like($$select public.open_meeting('e2500000-0000-0000-0000-000000000005', null, 'יו"ר', 'מזכירה')$$,
-  'meeting:too_early%', 'postponed, quorum met later: still not before the postponed time');
-select public.cancel_postponement('e2500000-0000-0000-0000-000000000005');
-select lives_ok($$select public.open_meeting('e2500000-0000-0000-0000-000000000005', null, 'יו"ר', 'מזכירה')$$,
-  'after cancelling the postponement it opens with its quorum');
+select lives_ok($$select public.open_meeting('e2500000-0000-0000-0000-000000000005', null, 'יו"ר', 'מזכירה', true)$$,
+  'postponed, then the quorum arrives: opens before the postponed time');
+select is((select row(opened_at < postponed_to, opened_without_quorum)::text from public.meetings
+  where id = 'e2500000-0000-0000-0000-000000000005'), '(t,f)', 'opened with its quorum, not recorded as without quorum');
+
+-- Past the postponed time the override is ignored: the meeting is valid with whoever is present.
+select public.invite_meeting('e2500000-0000-0000-0000-000000000006');
+select public.postpone_meeting('e2500000-0000-0000-0000-000000000006');
+reset role;
+update public.meetings set postponed_at = now() - interval '61 minutes', postponed_to = now() - interval '1 minute'
+  where id = 'e2500000-0000-0000-0000-000000000006';
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"a2500000-0000-0000-0000-000000000001","role":"authenticated"}';
+select lives_ok($$select public.open_meeting('e2500000-0000-0000-0000-000000000006', null, 'יו"ר', 'מזכירה', true)$$,
+  'past the postponed time it opens with whoever is present');
+select is((select opened_without_quorum from public.meetings where id = 'e2500000-0000-0000-0000-000000000006'), false,
+  'the override is ignored after the postponed time (the protocol says postponed, not without quorum)');
 
 -- ---------------------------------------------------------------- late arrivals and votes at the time of the vote
 select lives_ok($$select public.invite_meeting('e2500000-0000-0000-0000-000000000004')$$, 'invite the second assembly');
