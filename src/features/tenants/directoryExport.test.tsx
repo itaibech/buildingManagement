@@ -13,7 +13,7 @@ import { directoryRows, type DirectoryGroup } from './directoryExport'
 configure({ defaultIgnore: 'script, style, .bm-print, .bm-print *' })
 
 const apt = (id: string, number: number, floor: number, is_committee = false): Apartment =>
-  ({ id, number, floor, is_committee, notes: null, building_id: 'b', created_at: '' })
+  ({ id, number, floor, is_committee, archived_at: null, notes: null, building_id: 'b', created_at: '' })
 const res = (id: string, apartment_id: string, apartmentNumber: number, full_name: string, phone: string | null, is_owner = true): DirectoryEntry =>
   ({ id, apartment_id, apartmentNumber, full_name, phone, email: `${id}@example.test`, is_owner, building_id: 'b', created_at: '' })
 

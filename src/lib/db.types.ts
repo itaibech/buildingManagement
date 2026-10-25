@@ -23,7 +23,33 @@ export type Database = {
           }
         },"public": {
           Tables: {
-            "announcement_reads": {
+            "admin_audit": {
+                  Row: {
+                    "action": string,"actor": string | null,"apartment_id": string | null,"building_id": string,"created_at": string,"details": NonNullable<Json>,"id": string,"target_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "action": string,"actor"?: string | null,"apartment_id"?: string | null,"building_id"?: string,"created_at"?: string,"details"?: NonNullable<Json>,"id"?: string,"target_id"?: string | null
+                  }
+                  Update: {
+                    "action"?: string,"actor"?: string | null,"apartment_id"?: string | null,"building_id"?: string,"created_at"?: string,"details"?: NonNullable<Json>,"id"?: string,"target_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "admin_audit_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "admin_audit_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"announcement_reads": {
                   Row: {
                     "announcement_id": string,"building_id": string,"created_at": string,"user_id": string
                   }
@@ -171,14 +197,14 @@ isOneToOne: false
                   ]
                 },"apartments": {
                   Row: {
-                    "building_id": string,"created_at": string,"floor": number | null,"id": string,"is_committee": boolean,"notes": string | null,"number": number
+                    "archived_at": string | null,"building_id": string,"created_at": string,"floor": number | null,"id": string,"is_committee": boolean,"notes": string | null,"number": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "building_id"?: string,"created_at"?: string,"floor"?: number | null,"id"?: string,"is_committee"?: boolean,"notes"?: string | null,"number": number
+                    "archived_at"?: string | null,"building_id"?: string,"created_at"?: string,"floor"?: number | null,"id"?: string,"is_committee"?: boolean,"notes"?: string | null,"number": number
                   }
                   Update: {
-                    "building_id"?: string,"created_at"?: string,"floor"?: number | null,"id"?: string,"is_committee"?: boolean,"notes"?: string | null,"number"?: number
+                    "archived_at"?: string | null,"building_id"?: string,"created_at"?: string,"floor"?: number | null,"id"?: string,"is_committee"?: boolean,"notes"?: string | null,"number"?: number
                   }
                   Relationships: [
                     {
@@ -1132,8 +1158,31 @@ isOneToOne: false
               "amount": number,"fee_mode": string
             }[]
                            },
+"apartment_history":
+{ Args: { "p_id": string }; Returns: Json
+                           },
+"apartment_lock":
+{ Args: { "p_id": string }; Returns: {
+              "archived_at": string | null,
+"building_id": string,
+"created_at": string,
+"floor": number | null,
+"id": string,
+"is_committee": boolean,
+"notes": string | null,
+"number": number
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "apartments"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
 "apply_standing_orders":
 { Args: { "p_apartment_id"?: string }; Returns: number
+                           },
+"archive_apartment":
+{ Args: { "p_id": string }; Returns: undefined
                            },
 "building_cash_balance":
 { Args: { "p_building_id": string }; Returns: number
@@ -1168,6 +1217,9 @@ isOneToOne: false
                            },
 "default_building_id":
 { Args: Record<PropertyKey, never>; Returns: string
+                           },
+"delete_apartment_cascade":
+{ Args: { "p_confirm_number": number,"p_id": string }; Returns: Json
                            },
 "delete_ev_rate":
 { Args: { "p_id": string }; Returns: number
@@ -1388,6 +1440,9 @@ isOneToOne: false
                            },
 "reserve_email_quota":
 { Args: { "p_apartment_ids"?: (string)[],"p_building": string,"p_cap": number,"p_count": number,"p_kind": string,"p_ref_id"?: string,"p_sent_by": string }; Returns: string
+                           },
+"restore_apartment":
+{ Args: { "p_id": string }; Returns: undefined
                            },
 "save_apartment":
 { Args: { "p_ev"?: boolean,"p_ev_initial"?: number,"p_fee"?: number,"p_floor"?: number,"p_id"?: string,"p_is_committee"?: boolean,"p_notes"?: string,"p_number"?: number,"p_payment_method"?: string,"p_standing_order_from"?: string }; Returns: string

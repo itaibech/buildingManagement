@@ -7,7 +7,7 @@ import { directoryRows } from './directoryExport'
 
 describe('directory workbook', () => {
   it('keeps the phone a string with its leading 0 and the apartment a number', async () => {
-    const apartment: Apartment = { id: 'a1', number: 7, floor: 2, is_committee: false, notes: null, building_id: 'b', created_at: '' }
+    const apartment: Apartment = { id: 'a1', number: 7, floor: 2, is_committee: false, archived_at: null, notes: null, building_id: 'b', created_at: '' }
     const resident: DirectoryEntry = { id: 'r1', apartment_id: 'a1', apartmentNumber: 7, full_name: 'דנה', phone: '0501234567', email: null, is_owner: true, building_id: 'b', created_at: '' }
     const rows = directoryRows([{ apartmentId: 'a1', number: 7, entries: [resident] }], [apartment])
     const wb = XLSX.read(await toXlsxBytes({ [he.nav.directory]: rows }), { type: 'array' })

@@ -43,7 +43,7 @@ vi.mock('../../lib/supabase', () => {
 
 const APT: Apartment = {
   id: 'apt1', building_id: 'b1', number: 4, floor: 2, notes: null, created_at: '2026-01-01',
-  is_committee: false,
+  is_committee: false, archived_at: null,
 }
 
 function wrap(node: ReactNode) {

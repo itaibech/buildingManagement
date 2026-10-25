@@ -1,7 +1,7 @@
 import { useMediaQuery } from '@mantine/hooks'
 import { useMemo } from 'react'
 import { he } from '../../lib/he'
-import { useApartments, useResidents } from '../tenants/api'
+import { useAllApartments, useApartments, useResidents } from '../tenants/api'
 import { todayISO } from '../../lib/dates'
 import { useApartmentCharges, useSpecialPayments, useBalances, useBudgets, useExpenseReport, useExpenses, useFeeTimeline, useLedger, type ApartmentBalance } from './api'
 import { currentMonth, nextChange, type TimelineRow } from './feeTimeline'
@@ -20,9 +20,11 @@ export interface ApartmentOption {
   names: string
 }
 
-/** Apartments as select options: "דירה 3 · שם הדייר". */
-export function useApartmentOptions(): ApartmentOption[] {
-  const apartments = useApartments()
+/** Apartments as select options: "דירה 3 · שם הדייר". includeArchived: also archived ones (labels of past rows). */
+export function useApartmentOptions(includeArchived = false): ApartmentOption[] {
+  const activeOnly = useApartments()
+  const all = useAllApartments()
+  const apartments = includeArchived ? all : activeOnly
   const residents = useResidents()
   return useMemo(() => (apartments.data ?? []).map((a) => {
     const names = (residents.data ?? []).filter((r) => r.apartment_id === a.id).map((r) => r.full_name).join(', ')
@@ -32,7 +34,7 @@ export function useApartmentOptions(): ApartmentOption[] {
 
 /** Apartment id → number and residents, for plates in lists. */
 export function useApartmentInfo(): Map<string, ApartmentOption> {
-  const options = useApartmentOptions()
+  const options = useApartmentOptions(true)
   return useMemo(() => new Map(options.map((o) => [o.value, o])), [options])
 }
 

@@ -1,4 +1,4 @@
-import { ActionIcon, Anchor, Button, Card, Divider, Group, Menu, Stack, Text, Title } from '@mantine/core'
+import { ActionIcon, Alert, Anchor, Button, Card, Divider, Group, Menu, Stack, Text, Title } from '@mantine/core'
 import { IconDots, IconPencil, IconTrash } from '@tabler/icons-react'
 import { Fragment, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
@@ -10,7 +10,8 @@ import { useApartmentFee } from '../finance/api'
 import { ApartmentBalanceLine } from '../finance/ApartmentLedger'
 import { telHref } from '../settings/api'
 import { ApartmentForm } from './ApartmentForm'
-import { billingOf, isMoneyHistoryError, useApartmentBilling, useApartments, useDeleteApartment, useDeleteResident, useResidents, type Apartment, type Resident } from './api'
+import { billingOf, useAllApartments, useApartmentBilling, useDeleteResident, useResidents, useRestoreApartment, type Apartment, type Resident } from './api'
+import { DeleteApartmentDialog } from './DeleteApartmentDialog'
 import { ConfirmDialog, FormModal } from './dialogs'
 import { ResidentForm } from './ResidentForm'
 
@@ -84,6 +85,22 @@ function ApartmentSummary({ apartment, onEdit, onDelete }: { apartment: Apartmen
   )
 }
 
+/** An archived apartment: hidden from the lists, fees stopped; "שחזור מהארכיון" brings it back. */
+function ArchivedBanner({ apartmentId }: { apartmentId: string }) {
+  const restore = useRestoreApartment()
+  return (
+    <Alert color="signal" title={he.tenants.removal.archived}>
+      <Stack gap="xs" align="flex-start">
+        <Text size="sm">{he.tenants.removal.archivedBody}</Text>
+        <Button variant="light" loading={restore.isPending} onClick={() => restore.mutate(apartmentId, { onSuccess: () => notifySuccess(he.toast.apartmentRestored) })}>
+          {he.tenants.removal.restore}
+        </Button>
+        {restore.isError && <Text c="debt.7" size="sm">{he.toast.failed}</Text>}
+      </Stack>
+    </Alert>
+  )
+}
+
 function ResidentList({ residents, setDialog }: { residents: Resident[]; setDialog: (d: Dialog) => void }) {
   if (residents.length === 0) {
     return <EmptyState title={he.tenants.noResidents} action={{ label: he.tenants.addResident, onClick: () => setDialog({ kind: 'resident' }) }} />
@@ -96,9 +113,8 @@ function ResidentList({ residents, setDialog }: { residents: Resident[]; setDial
   ))
 }
 
-function Dialogs({ apartment, residents, dialog, close }: { apartment: Apartment; residents: Resident[]; dialog: Dialog; close: () => void }) {
+function Dialogs({ apartment, dialog, close }: { apartment: Apartment; dialog: Dialog; close: () => void }) {
   const navigate = useNavigate()
-  const deleteApartment = useDeleteApartment()
   const deleteResident = useDeleteResident()
   const target = dialog?.kind === 'deleteResident' ? dialog.resident : undefined
   return (
@@ -109,11 +125,9 @@ function Dialogs({ apartment, residents, dialog, close }: { apartment: Apartment
       <FormModal opened={dialog?.kind === 'resident'} title={dialog?.kind === 'resident' && dialog.resident ? he.tenants.editResident : he.tenants.addResident} onClose={close}>
         <ResidentForm apartmentId={apartment.id} resident={dialog?.kind === 'resident' ? dialog.resident : undefined} onDone={close} />
       </FormModal>
-      <ConfirmDialog opened={dialog?.kind === 'deleteApartment'} title={he.tenants.deleteApartmentConfirm(apartment.number)}
-        body={he.tenants.deleteApartmentCascade(residents.length)} confirmLabel={he.tenants.deleteApartment}
-        loading={deleteApartment.isPending} failed={deleteApartment.isError} onClose={close}
-        failedMessage={isMoneyHistoryError(deleteApartment.error) ? he.tenants.errors.hasMoney : undefined}
-        onConfirm={() => deleteApartment.mutate(apartment.id, { onSuccess: () => { notifySuccess(he.toast.apartmentDeleted); void navigate('/apartments', { replace: true }) } })} />
+      <DeleteApartmentDialog apartment={apartment} opened={dialog?.kind === 'deleteApartment'} onClose={close}
+        onDeleted={() => { notifySuccess(he.toast.apartmentDeleted); void navigate('/apartments', { replace: true }) }}
+        onArchived={() => { notifySuccess(he.toast.apartmentArchived); void navigate('/apartments', { replace: true }) }} />
       <ConfirmDialog opened={Boolean(target)} title={he.tenants.deleteResidentConfirm(target?.full_name ?? '')}
         body={he.tenants.deleteApartmentCascade(0)} confirmLabel={he.tenants.deleteResident}
         loading={deleteResident.isPending} failed={deleteResident.isError} onClose={close}
@@ -125,7 +139,7 @@ function Dialogs({ apartment, residents, dialog, close }: { apartment: Apartment
 /** Admin: one apartment, its residents, and every edit that belongs to them. */
 export default function ApartmentPage() {
   const { id = '' } = useParams()
-  const apartments = useApartments()
+  const apartments = useAllApartments()
   const residents = useResidents(id)
   const [dialog, setDialog] = useState<Dialog>(null)
   const apartment = apartments.data?.find((a) => a.id === id)
@@ -136,12 +150,13 @@ export default function ApartmentPage() {
     <Stack gap="md">
       <BackLink to="/apartments" label={he.tenants.back} />
       <PageHeader title={he.apartment(apartment.number)} action={{ label: he.tenants.addResident, onClick: () => setDialog({ kind: 'resident' }) }} />
+      {apartment.archived_at && <ArchivedBanner apartmentId={apartment.id} />}
       <ApartmentSummary apartment={apartment} onEdit={() => setDialog({ kind: 'editApartment' })} onDelete={() => setDialog({ kind: 'deleteApartment' })} />
       <Title order={2} size="h4">{he.tenants.residents}</Title>
       <Card padding={0}>
         {residents.isLoading ? <Stack p="md"><ListSkeleton /></Stack> : <ResidentList residents={list} setDialog={setDialog} />}
       </Card>
-      <Dialogs apartment={apartment} residents={list} dialog={dialog} close={() => setDialog(null)} />
+      <Dialogs apartment={apartment} dialog={dialog} close={() => setDialog(null)} />
     </Stack>
   )
 }
