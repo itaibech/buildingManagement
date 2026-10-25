@@ -135,12 +135,18 @@ describe('resident finance by permission', () => {
       { category_id: 'c1', category: 'ניקיון', sort_order: 1, month: `${year}-02-01`, total: 300 },
       { category_id: 'c1', category: 'ניקיון', sort_order: 1, month: `${year}-03-01`, total: 200 },
     ]
-    db.tables.budgets = [{ id: 'b1', year: Number(year), category_id: 'c1', amount: 1000, expense_categories: { name: 'ניקיון', sort_order: 1 } }]
+    db.rpc.budget_for_year = [{ category_id: 'c1', category: 'ניקיון', sort_order: 1, amount: 1000, source: 'default' }]
+    db.rpc.budget_summary = [{ expected_income: 12000, actual_income: 9000, actual_expenses: 500, projected_expenses: 0, expected_balance: 11500 }]
     db.tables.building_cash = [{ balance: 5000 }]
     wrap(<FinancePage />)
     expect(await screen.findByRole('heading', { name: he.finance.buildingReports })).toBeInTheDocument()
     expect(await screen.findByText(he.home.collected(4, 6))).toBeInTheDocument()
     expect(await screen.findByText('ניקיון')).toBeInTheDocument()
+    // Residents never see the building cash (admins only, 0023), nor the income received; they do see the yearly summary.
+    expect(screen.queryByText(he.finance.cash)).toBeNull()
+    expect(await screen.findByText(he.finance.budget.expectedBalance)).toBeInTheDocument()
+    expect(screen.queryByText(he.finance.budget.actualIncome)).toBeNull()
+    expect(screen.getByRole('heading', { name: he.finance.byMonth.title })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: he.finance.myMoney })).toBeNull()
     expect(screen.queryByText(he.home.myBalance)).toBeNull()
     expect(screen.queryAllByLabelText(/^דירה \d+$/)).toHaveLength(0)

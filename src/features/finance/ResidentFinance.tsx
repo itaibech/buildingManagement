@@ -7,7 +7,8 @@ import { ListSkeleton, PageHeader } from '../../ui'
 import { useCollectionSummary, useMyApartment } from './api'
 import { ApartmentYear } from './ApartmentLedger'
 import { BuildingBudget } from './BudgetTab'
-import { CashCard, HowToPay, LoadFailed, MyBalanceHero, MyFeeCard } from './cards'
+import { ExpenseMonthReport } from './ExpenseMonthReport'
+import { HowToPay, LoadFailed, MyBalanceHero, MyFeeCard } from './cards'
 import { monthOf } from './ledger'
 import { MyEvCard } from '../ev/MyEvCard'
 
@@ -77,9 +78,9 @@ export function ResidentFinance() {
         {can('finance_reports') && (
           <Stack gap="lg">
             <SectionTitle title={he.finance.buildingReports} hint={he.finance.buildingReportsHint} />
-            <CashCard />
             <CollectionCard />
             <BuildingBudget />
+            <ExpenseMonthReport />
           </Stack>
         )}
       </Stack>
