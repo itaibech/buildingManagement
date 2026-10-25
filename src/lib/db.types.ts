@@ -235,6 +235,38 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"budget_defaults": {
+                  Row: {
+                    "amount": number,"building_id": string,"category_id": string,"created_at": string,"effective_from_year": number,"id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount": number,"building_id"?: string,"category_id": string,"created_at"?: string,"effective_from_year": number,"id"?: string
+                  }
+                  Update: {
+                    "amount"?: number,"building_id"?: string,"category_id"?: string,"created_at"?: string,"effective_from_year"?: number,"id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "budget_defaults_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "budget_defaults_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "budget_defaults_category_id_fkey"
+      columns: ["category_id"]
+isOneToOne: false
+      referencedRelation: "expense_categories"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"budgets": {
                   Row: {
                     "amount": number,"building_id": string,"category_id": string,"created_at": string,"id": string,"year": number
@@ -1184,6 +1216,16 @@ isOneToOne: false
 "archive_apartment":
 { Args: { "p_id": string }; Returns: undefined
                            },
+"budget_for_year":
+{ Args: { "p_year": number }; Returns: {
+              "amount": number,"category": string,"category_id": string,"sort_order": number,"source": string
+            }[]
+                           },
+"budget_summary":
+{ Args: { "p_year": number }; Returns: {
+              "actual_expenses": number,"actual_income": number,"expected_balance": number,"expected_income": number,"projected_expenses": number
+            }[]
+                           },
 "building_cash_balance":
 { Args: { "p_building_id": string }; Returns: number
                            },
@@ -1472,6 +1514,9 @@ isOneToOne: false
                            },
 "set_apartment_fee":
 { Args: { "p_amount"?: number,"p_apartment_id": string,"p_effective_from": string,"p_mode": string }; Returns: boolean
+                           },
+"set_budgets":
+{ Args: { "p_lines": Json,"p_scope": string,"p_year": number }; Returns: number
                            },
 "set_default_group":
 { Args: { "p_group_id": string }; Returns: undefined

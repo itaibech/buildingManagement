@@ -159,7 +159,7 @@ select is((select array_agg(distinct apartment_id)::text from public.monthly_fee
   '{b9000000-0000-0000-0000-00000000000a}', 'resident: only own monthly fees');
 select is((select balance from public.apartment_balances), -1070::numeric, 'resident: own balance is right');
 select is((select count(*) from public.expenses), 0::bigint, 'resident: raw expense rows are admin-only (Task 18)');
-select is((select balance from public.building_cash), 3140::numeric, 'resident: reads building cash (all payments)');
+select is((select count(*) from public.building_cash), 0::bigint, 'resident: no building cash (admins only, 0023)');
 select is((select count(*) from public.expense_categories), 18::bigint, 'resident: reads categories');
 select is((select count(*) from public.budgets), 1::bigint, 'resident: reads budgets');
 select throws_ok($$insert into public.expenses (category_id, amount) select id, 1 from public.expense_categories limit 1$$,
