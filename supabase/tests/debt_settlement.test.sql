@@ -14,8 +14,8 @@ update public.profiles set role = 'admin', status = 'approved' where user_id = '
 delete from public.ev_readings;
 delete from public.ev_chargers;
 delete from public.charges;
-delete from public.payments;
 delete from public.apartment_billing;
+delete from public.payments;
 delete from public.apartment_fee_overrides;
 delete from public.fee_schedule;
 delete from public.apartments;
