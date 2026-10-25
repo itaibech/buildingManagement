@@ -12,6 +12,7 @@ export type Warning = 'approve' | 'link' | 'audit'
 export interface InviteResult { email: string; outcome: Outcome; error?: string; warnings?: Warning[] }
 
 export interface ExistingUser { userId: string; invitedAt: string | null; lastSignInAt: string | null }
+export interface PickedResident { apartmentId: string; email: string | null; linked: boolean }
 export interface Placement { apartmentId: string | null; residentId: string | null }
 export interface AuditRow {
   building_id: string
@@ -40,8 +41,8 @@ export interface InviteDeps {
   groupInBuilding(groupId: string, buildingId: string): Promise<boolean>
   /** The apartment if it is in the building and not archived. */
   apartmentOk(apartmentId: string, buildingId: string): Promise<boolean>
-  /** The resident's apartment if the resident is in the building and the apartment is not archived. */
-  residentApartment(residentId: string, buildingId: string): Promise<string | null>
+  /** The resident if it is in the building and its apartment is not archived: its apartment, email, and whether a login is linked. */
+  resident(residentId: string, buildingId: string): Promise<PickedResident | null>
   existing(email: string): Promise<ExistingUser | null>
   /** Sends the invite; the new (or re-invited) login's id. Throws AuthFailure. */
   invite(email: string, fullName: string | null): Promise<string>
@@ -121,8 +122,10 @@ interface Ctx { d: InviteDeps; actor: string; buildingId: string; groupId: strin
 /** Where the invitee goes: a picked resident's apartment, or the typed address's apartment; a string = the error. */
 async function place(inv: InviteInput, c: Ctx): Promise<Placement | string> {
   if (inv.residentId) {
-    const apartmentId = await c.d.residentApartment(inv.residentId, c.buildingId)
-    return apartmentId ? { apartmentId, residentId: inv.residentId } : ERR.resident
+    // Only a resident with no login whose address is the invite's: a pick can't attach to someone else's record.
+    const r = await c.d.resident(inv.residentId, c.buildingId)
+    const ok = r !== null && !r.linked && r.email !== null && normalizeEmail(r.email) === inv.email
+    return ok ? { apartmentId: r.apartmentId, residentId: inv.residentId } : ERR.resident
   }
   if (inv.apartmentId && !(await c.d.apartmentOk(inv.apartmentId, c.buildingId))) return ERR.apartment
   return { apartmentId: inv.apartmentId, residentId: null }
@@ -171,6 +174,11 @@ async function send(inv: InviteInput, c: Ctx): Promise<InviteResult> {
     userId = await c.d.invite(inv.email, inv.fullName)
   } catch (e) {
     return { email: inv.email, ...KIND_RESULT[classify(e)] }
+  }
+  // A race (another login created or signed in meanwhile): never approve or link someone else's account.
+  const after = await c.d.existing(inv.email)
+  if (!after || after.userId !== userId || after.lastSignInAt || (found && found.userId !== userId)) {
+    return { email: inv.email, outcome: 'exists', error: ERR.exists }
   }
   if (found) {
     const warnings: Warning[] = []

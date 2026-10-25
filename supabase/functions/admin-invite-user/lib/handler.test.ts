@@ -7,6 +7,7 @@ const ARCHIVED = 'aaaaaaaa-aaaa-4aaa-8aaa-bbbbbbbbbbbb'
 const RES = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
 const GROUP = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
 const OTHER = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'
+const LINKED = 'ffffffff-ffff-4fff-8fff-ffffffffffff'
 
 type Fake = InviteDeps & {
   invited: string[]; approved: [string, string | null][]; inserted: NewResident[]; links: [string, string][]; audits: AuditRow[]
@@ -25,9 +26,14 @@ function deps(over: Partial<InviteDeps> = {}, opts: { isAdmin?: boolean; signedI
     buildingOf: async () => 'b1',
     groupInBuilding: async (id, b) => id === GROUP && b === 'b1',
     apartmentOk: async (id) => id === APT,
-    residentApartment: async (id) => (id === RES ? APT : null),
+    resident: async (id) => (id === RES ? { apartmentId: APT, email: 'Dir@Example.test', linked: false }
+      : id === LINKED ? { apartmentId: APT, email: 'taken@example.test', linked: true } : null),
     existing: async (email) => users[email] ?? null,
-    invite: async (email) => { invited.push(email); return users[email]?.userId ?? `u-${email}` },
+    invite: async (email) => {
+      invited.push(email)
+      users[email] ??= { userId: `u-${email}`, invitedAt: 'now', lastSignInAt: null }
+      return users[email].userId
+    },
     approve: async (id, g) => { approved.push([id, g]) },
     findResident: async (apt, email) => (apt === APT && email === 'match@example.test' ? 'r-existing' : null),
     insertResident: async (row) => { inserted.push(row); return `r-new-${inserted.length}` },
@@ -120,6 +126,27 @@ describe('admin-invite-user: one invite', () => {
     expect(d.links).toEqual([['u-dir@example.test', RES]])
     expect(d.audits[0]).toMatchObject({ apartment_id: APT, details: { resident_id: RES } })
   })
+  it('a picked resident already linked to a login, or with another address, is refused', async () => {
+    const d = deps()
+    expect(results(await handleInvite(one('taken@example.test', { residentId: LINKED }), d)))
+      .toEqual([{ email: 'taken@example.test', outcome: 'failed', error: ERR.resident }])
+    expect(results(await handleInvite(one('someone-else@example.test', { residentId: RES }), d)))
+      .toEqual([{ email: 'someone-else@example.test', outcome: 'failed', error: ERR.resident }])
+    expect(d.invited).toEqual([])
+    expect(d.links).toEqual([])
+  })
+  it('a race after the invite (another login id, or already signed in) is "exists": nothing approved or linked', async () => {
+    const users: Record<string, ExistingUser> = {}
+    const swapped = deps({ invite: async () => 'u-someone-else', existing: async (e) => users[e] ?? null }, { users })
+    users['r@example.test'] = { userId: 'u-first', invitedAt: 'x', lastSignInAt: null }
+    expect(results(await handleInvite(one('r@example.test', { apartmentId: APT }), swapped)))
+      .toEqual([{ email: 'r@example.test', outcome: 'exists', error: ERR.exists }])
+    let calls = 0
+    const signedIn = deps({ existing: async () => (++calls === 1 ? null : { userId: 'u-s@example.test', invitedAt: null, lastSignInAt: 'now' }) })
+    expect(results(await handleInvite(one('s@example.test', { apartmentId: APT }), signedIn)))
+      .toEqual([{ email: 's@example.test', outcome: 'exists', error: ERR.exists }])
+    expect([...swapped.approved, ...signedIn.approved, ...swapped.links, ...signedIn.links]).toEqual([])
+  })
   it('steps that fail after the login exists become warnings, never a failure', async () => {
     const boom = async () => { throw new Error('db down') }
     const d = deps({ approve: boom, link: boom, audit: boom })
@@ -160,7 +187,12 @@ describe('admin-invite-user: batches', () => {
   })
   it('the rate limit stops the rest (לא נשלחה – מגבלת שליחה)', async () => {
     let n = 0
-    const d = deps({ invite: async (email) => { if (++n === 2) throw new AuthFailure('email rate limit exceeded', 429, 'over_email_send_rate_limit'); return `u-${email}` } })
+    const users: Record<string, ExistingUser> = {}
+    const d = deps({ invite: async (email) => {
+      if (++n === 2) throw new AuthFailure('email rate limit exceeded', 429, 'over_email_send_rate_limit')
+      users[email] = { userId: `u-${email}`, invitedAt: 'now', lastSignInAt: null }
+      return `u-${email}`
+    } }, { users })
     const r = await handleInvite({ invites: [{ email: 'a@example.test' }, { email: 'b@example.test' }, { email: 'c@example.test' }] }, d)
     expect(results(r)).toEqual([
       { email: 'a@example.test', outcome: 'sent' },

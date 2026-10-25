@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { AuthFailure, type ExistingUser, type InviteDeps } from './handler.ts'
+import { AuthFailure, type ExistingUser, type InviteDeps, type PickedResident } from './handler.ts'
 
 interface Result<T> { data: T | null; error: { message: string } | null }
 function maybe<T>(r: Result<T>): T | null {
@@ -20,10 +20,12 @@ async function existing(db: SupabaseClient, email: string): Promise<ExistingUser
   return u ? { userId: u.user_id, invitedAt: u.invited_at, lastSignInAt: u.last_sign_in_at } : null
 }
 
-async function residentApartment(db: SupabaseClient, residentId: string, buildingId: string): Promise<string | null> {
-  const r = maybe<{ apartment_id: string; apartments: { archived_at: string | null } }>(await db.from('residents')
-    .select('apartment_id, apartments!inner(archived_at)').eq('id', residentId).eq('building_id', buildingId).maybeSingle())
-  return r && !r.apartments.archived_at ? r.apartment_id : null
+async function resident(db: SupabaseClient, residentId: string, buildingId: string): Promise<PickedResident | null> {
+  const r = maybe<{ apartment_id: string; email: string | null; apartments: { archived_at: string | null } }>(await db.from('residents')
+    .select('apartment_id, email, apartments!inner(archived_at)').eq('id', residentId).eq('building_id', buildingId).maybeSingle())
+  if (!r || r.apartments.archived_at) return null
+  const links = maybe<{ user_id: string }[]>(await db.from('profiles').select('user_id').eq('resident_id', residentId).limit(1)) ?? []
+  return { apartmentId: r.apartment_id, email: r.email, linked: links.length > 0 }
 }
 
 /** A resident of the apartment with this email that no other login is linked to. */
@@ -52,7 +54,7 @@ export function inviteSource(db: SupabaseClient, appUrl: string): Omit<InviteDep
     buildingOf: async (userId) => must<{ building_id: string }>(await db.from('profiles').select('building_id').eq('user_id', userId).single()).building_id,
     groupInBuilding: async (id, b) => maybe(await db.from('user_groups').select('id').eq('id', id).eq('building_id', b).maybeSingle()) !== null,
     apartmentOk: async (id, b) => maybe(await db.from('apartments').select('id').eq('id', id).eq('building_id', b).is('archived_at', null).maybeSingle()) !== null,
-    residentApartment: (id, b) => residentApartment(db, id, b),
+    resident: (id, b) => resident(db, id, b),
     existing: (email) => existing(db, email),
     invite: inviter(db, appUrl),
     approve: async (userId, groupId) => { maybe(await db.from('profiles').update({ status: 'approved', group_id: groupId }).eq('user_id', userId)) },
