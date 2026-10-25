@@ -1,12 +1,14 @@
 import { ActionIcon, AppShell, Box, Divider, Group, NavLink, ScrollArea, Stack, Text, Tooltip } from '@mantine/core'
-import { IconLogout } from '@tabler/icons-react'
-import { Suspense, useEffect, type ReactNode } from 'react'
+import { useHotkeys, useLocalStorage } from '@mantine/hooks'
+import { IconLogout, IconSearch, IconShieldCog } from '@tabler/icons-react'
+import { Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Link, Outlet, useLocation } from 'react-router'
 import { useExit } from '../auth/useExit'
 import { useUnreadCount } from '../features/announcements/api'
 import { useUnseenTicketCount } from '../features/notifications/api'
 import { NotificationBell } from '../features/notifications/NotificationCenter'
 import { useRealtimeNotifications } from '../features/notifications/useRealtimeNotifications'
+import { QuickSearch } from '../features/search/QuickSearch'
 import { he } from '../lib/he'
 import { AptPlate, ListSkeleton } from '../ui'
 import { useAuth } from '../auth/AuthProvider'
@@ -54,14 +56,26 @@ function BuildingIdentity({ name, apartment, children }: { name: string; apartme
   )
 }
 
+/** Opens the quick search ("/" or Ctrl/⌘+K do too). */
+function SearchButton({ onOpen }: { onOpen: () => void }) {
+  return (
+    <Tooltip label={`${he.search.open} (/)`}>
+      <ActionIcon variant="subtle" color="stone.7" size={44} aria-label={he.search.open} aria-keyshortcuts="/ Control+K Meta+K" onClick={onOpen}>
+        <IconSearch {...ICON} aria-hidden="true" />
+      </ActionIcon>
+    </Tooltip>
+  )
+}
+
 function ExitIcon() {
   return <IconLogout {...ICON} className="bm-mirror" aria-hidden="true" />
 }
 
-function MobileHeader({ name, apartment, onExit }: { name: string; apartment: number | null; onExit: () => void }) {
+function MobileHeader({ name, apartment, onExit, onSearch }: { name: string; apartment: number | null; onExit: () => void; onSearch: () => void }) {
   return (
     <Box h="100%" px="md" className="bm-header" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
       <BuildingIdentity name={name} apartment={apartment}>
+        <SearchButton onOpen={onSearch} />
         <NotificationBell sheet />
         <Tooltip label={he.exit}>
           <ActionIcon variant="subtle" color="stone.7" size={44} aria-label={he.exit} onClick={onExit}>
@@ -80,32 +94,50 @@ function NavGroup({ items, pathname, unread, label }: { items: NavItem[]; pathna
   const current = bestMatch(pathname, ALL_NAV)
   return (
     <>
-      {label && <Divider my="xs" color="stone.1" label={label} labelPosition="right" />}
+      {/* RTL: the label sits at the start (right), like a section title. */}
+      {label && <Divider my={6} color="stone.1" label={label} labelPosition="left" />}
       {items.map(({ to, label: text, icon: I }) => {
         const active = current === to
         return (
           <NavLink key={to} component={Link} to={to} label={text} leftSection={<I {...ICON} />} rightSection={badgeFor(to, unread)}
-            active={active} aria-current={active ? 'page' : undefined} />
+            active={active} aria-current={active ? 'page' : undefined} py={7} />
         )
       })}
     </>
   )
 }
 
-function SideNav({ pathname, name, apartment, unread, onExit }: { pathname: string; name: string; apartment: number | null; unread: NavCounts; onExit: () => void }) {
-  const { isAdmin, can } = useAuth()
+/** Admin pages under one collapsible "ניהול" item; open while on one of them, otherwise as last left. */
+function AdminGroup({ pathname, unread }: { pathname: string; unread: NavCounts }) {
+  const inside = ADMIN_NAV.some((n) => bestMatch(pathname, ALL_NAV) === n.to)
+  const [open, setOpen] = useLocalStorage({ key: 'bm.nav.adminOpen', defaultValue: true })
   return (
-    <Stack h="100%" gap="xs" justify="space-between">
-      <Box px="xs" pt="xs" pb="sm">
+    <>
+      <Divider my={6} color="stone.1" />
+      <NavLink component="button" label={he.nav.admin} leftSection={<IconShieldCog {...ICON} />} opened={open || inside} onChange={setOpen} childrenOffset={0} py={7} fw={600}>
+        <NavGroup items={ADMIN_NAV} pathname={pathname} unread={unread} />
+      </NavLink>
+    </>
+  )
+}
+
+function SideNav({ pathname, name, apartment, unread, onExit, onSearch }: { pathname: string; name: string; apartment: number | null; unread: NavCounts; onExit: () => void; onSearch: () => void }) {
+  const { isAdmin, can } = useAuth()
+  // Desktop lists the secondary pages directly, so "עוד" (their mobile home) would only repeat them.
+  const main = permitted(MAIN_NAV, can).filter((n) => n.to !== '/more')
+  return (
+    <Stack h="100%" gap={4} justify="space-between">
+      <Box px="xs" pt={4} pb={4}>
         <BuildingIdentity name={name} apartment={apartment}>
+          <SearchButton onOpen={onSearch} />
           <NotificationBell />
         </BuildingIdentity>
       </Box>
       <ScrollArea style={{ flex: 1 }} type="auto">
         <nav aria-label={he.mainNav}>
-          <NavGroup items={permitted(MAIN_NAV, can)} pathname={pathname} unread={unread} />
+          <NavGroup items={main} pathname={pathname} unread={unread} />
           <NavGroup items={permitted(GENERAL_NAV, can)} pathname={pathname} unread={unread} label={he.nav.general} />
-          {isAdmin && <NavGroup items={ADMIN_NAV} pathname={pathname} unread={unread} label={he.nav.admin} />}
+          {isAdmin && <AdminGroup pathname={pathname} unread={unread} />}
         </nav>
       </ScrollArea>
       <NavLink component="button" label={he.exit} leftSection={<ExitIcon />} onClick={onExit} c="stone.8" />
@@ -154,6 +186,9 @@ export default function Shell() {
   const unread: NavCounts = { announcements: useUnreadCount(), tickets: useUnseenTicketCount() }
   const name = buildingName ?? he.appName
   const onExit = () => void exit()
+  const [searching, setSearching] = useState(false)
+  const openSearch = () => setSearching(true)
+  useHotkeys([['mod+K', openSearch], ['/', openSearch]])
   usePrefetchTabs()
   useRealtimeNotifications()
   return (
@@ -164,10 +199,10 @@ export default function Shell() {
       padding={{ base: 'md', sm: 'xl' }}
     >
       <AppShell.Header hiddenFrom="sm">
-        <MobileHeader name={name} apartment={apartmentNumber} onExit={onExit} />
+        <MobileHeader name={name} apartment={apartmentNumber} onExit={onExit} onSearch={openSearch} />
       </AppShell.Header>
       <AppShell.Navbar p="sm" visibleFrom="sm">
-        <SideNav pathname={pathname} name={name} apartment={apartmentNumber} unread={unread} onExit={onExit} />
+        <SideNav pathname={pathname} name={name} apartment={apartmentNumber} unread={unread} onExit={onExit} onSearch={openSearch} />
       </AppShell.Navbar>
       <AppShell.Main className="bm-main">
         <Box maw={1100} mx="auto">
@@ -177,6 +212,7 @@ export default function Shell() {
           </Suspense>
         </Box>
       </AppShell.Main>
+      <QuickSearch opened={searching} onClose={() => setSearching(false)} />
       <AppShell.Footer hiddenFrom="sm">
         <TabBar pathname={pathname} unread={unread} />
       </AppShell.Footer>

@@ -3,6 +3,7 @@ import { MantineProvider } from '@mantine/core'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { he } from '../lib/he'
 import { theme } from '../ui/theme'
 import Shell from './Shell'
 
@@ -21,6 +22,9 @@ vi.mock('../auth/AuthProvider', () => ({
     signOut, profile: { resident_id: 'r1' }, isAdmin: perms.admin,
     can: (need: string | string[]) => perms.admin || (typeof need === 'string' ? [need] : need).some((k) => perms.granted.includes(k)),
   }),
+}))
+vi.mock('../features/search/QuickSearch', () => ({
+  QuickSearch: ({ opened }: { opened: boolean }) => (opened ? <div role="dialog" aria-label="חיפוש מהיר" /> : null),
 }))
 vi.mock('./useShellInfo', () => ({
   useShellInfo: () => ({ buildingName: 'הבניין שלי', apartmentNumber: 7 }),
@@ -151,7 +155,24 @@ describe('Shell nav by permission', () => {
     perms.granted = ['home', 'announcements', 'tickets']
     renderShell()
     const links = within(sideNav()).getAllByRole('link').map((a) => a.textContent)
-    expect(links).toEqual(['בית', 'הודעות', 'תקלות', 'עוד'])
+    // Desktop lists the secondary pages directly, so "עוד" isn't repeated there (Task 26).
+    expect(links).toEqual(['בית', 'הודעות', 'תקלות'])
+  })
+
+  it('admin side nav: no "עוד", admin pages under a collapsible "ניהול", and a search button in both headers', () => {
+    perms.admin = true
+    renderShell()
+    const nav = within(sideNav())
+    expect(nav.queryByRole('link', { name: 'עוד' })).toBeNull()
+    expect(nav.getByRole('button', { name: he.nav.admin })).toBeInTheDocument()
+    expect(nav.getByRole('link', { name: he.nav.users })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: he.search.open })).toHaveLength(2)
+  })
+
+  it('"/" opens the quick search', async () => {
+    renderShell()
+    fireEvent.keyDown(document.documentElement, { key: '/' })
+    expect(await screen.findByRole('dialog', { name: he.search.title })).toBeInTheDocument()
   })
 
   it('finance shows for any finance key, and general pages per key', () => {

@@ -1,6 +1,7 @@
 import { ActionIcon, Button, Card, Divider, Group, Menu, Stack, Text, TextInput } from '@mantine/core'
 import { IconDots, IconMail, IconPencil, IconPhone, IconPlus, IconSearch, IconTrash } from '@tabler/icons-react'
 import { Fragment, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { useAuth } from '../../auth/AuthProvider'
 import { he } from '../../lib/he'
 import { AptPlate, EmptyState, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
@@ -189,7 +190,9 @@ export default function DirectoryPage() {
   const { isAdmin } = useAuth()
   const [dialog, setDialog] = useState<Dialog>(null)
   const actions: Actions = { admin: isAdmin, open: setDialog }
-  const [query, setQuery] = useState('')
+  // ?q= (the header search) starts the list filtered.
+  const [params] = useSearchParams()
+  const [query, setQuery] = useState(() => params.get('q') ?? '')
   const q = query.trim()
   const apartments = useApartments()
   const groups = useMemo(() => {

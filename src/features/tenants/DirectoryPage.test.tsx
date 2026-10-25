@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { MemoryRouter } from 'react-router'
 import { MantineProvider } from '@mantine/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -53,7 +54,7 @@ function renderPage() {
   return render(
     <MantineProvider theme={theme}>
       <QueryClientProvider client={new QueryClient()}>
-        <DirectoryPage />
+        <MemoryRouter><DirectoryPage /></MemoryRouter>
       </QueryClientProvider>
     </MantineProvider>,
   )
