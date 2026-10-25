@@ -28,7 +28,12 @@ function ApartmentRow({ apartment, residents, fee, ev, standingOrder }: { apartm
         <Text size="sm" c="dimmed">{meta}</Text>
         <ApartmentTags committee={apartment.is_committee} standingOrder={standingOrder} ev={ev} />
       </Stack>
-      {fee !== undefined && <Money amount={fee} tone="neutral" />}
+      {fee !== undefined && (
+        <Stack gap={0} align="flex-end">
+          <Text size="xs" c="dimmed">{he.tenants.monthlyFeeLabel}</Text>
+          <Money amount={fee} tone="neutral" />
+        </Stack>
+      )}
       <IconChevronLeft size={20} stroke={1.75} color="var(--mantine-color-stone-6)" aria-hidden="true" />
     </UnstyledButton>
   )
@@ -89,7 +94,7 @@ export default function ApartmentsPage() {
   const exportAction = useExportAction(he.export.files.apartments, () => apartmentsRows(list, residents.data ?? [], extras), !!apartments.data && !!residents.data)
   return (
     <Stack gap="md">
-      <PageHeader title={he.nav.apartments} action={add} secondaryAction={exportAction} />
+      <PageHeader title={he.nav.apartments} subtitle={he.nav.hints.apartments} action={add} secondaryAction={exportAction} />
       <Card padding={0}>
         {apartments.isError && <Text c="debt.7" p="md">{he.tenants.loadError}</Text>}
         {apartments.isLoading && <Stack p="md"><ListSkeleton rows={5} /></Stack>}

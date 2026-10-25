@@ -1,4 +1,4 @@
-import { ActionIcon, Button, Group, Menu, Title } from '@mantine/core'
+import { ActionIcon, Button, Group, Menu, Stack, Text, Title } from '@mantine/core'
 import { IconPlus } from '@tabler/icons-react'
 import type { ReactNode } from 'react'
 
@@ -19,6 +19,8 @@ export interface PageHeaderProps {
   secondaryAction?: SecondaryAction
   /** Extra header content before the actions, e.g. a link to a related page. */
   extra?: ReactNode
+  /** One dimmed line under the title saying what the page is for. */
+  subtitle?: string
 }
 
 function Secondary({ label, shortLabel, onClick, icon, loading, disabled, hint, items }: SecondaryAction) {
@@ -70,12 +72,15 @@ function Primary({ action }: { action: PrimaryAction }) {
 }
 
 /** Page title in Secular One; the optional primary action becomes a FAB above the tab bar on mobile. */
-export function PageHeader({ title, action, secondaryAction, extra }: PageHeaderProps) {
+export function PageHeader({ title, action, secondaryAction, extra, subtitle }: PageHeaderProps) {
   return (
     <Group justify="space-between" align="center" mb="lg" wrap="nowrap">
-      <Title order={1} fz={{ base: 'h2', sm: 'h1' }}>
-        {title}
-      </Title>
+      <Stack gap={2} style={{ minWidth: 0 }}>
+        <Title order={1} fz={{ base: 'h2', sm: 'h1' }}>
+          {title}
+        </Title>
+        {subtitle && <Text size="sm" c="dimmed">{subtitle}</Text>}
+      </Stack>
       {(secondaryAction || action || extra) && (
         <Group gap={4} wrap="nowrap">
           {extra}

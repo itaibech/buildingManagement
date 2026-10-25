@@ -7,7 +7,7 @@ import { he } from '../lib/he'
 import type { PermissionNeed } from '../lib/permissions'
 
 /** `need`: the permission (or any of several) the page requires; none = every approved user (home, עוד). */
-export interface NavItem { to: string; label: string; icon: Icon; need?: PermissionNeed }
+export interface NavItem { to: string; label: string; icon: Icon; need?: PermissionNeed; /** One line on the "עוד" page. */ hint?: string }
 
 /** "כספים" holds the own money, the building reports and the own EV card: any one of them opens it. */
 export const FINANCE_NEED: PermissionNeed = ['finance_own', 'finance_reports', 'ev_own']
@@ -23,7 +23,7 @@ export const MAIN_NAV: NavItem[] = [
 
 /** Secondary pages, each by its permission (under "עוד" on mobile). */
 export const GENERAL_NAV: NavItem[] = [
-  { to: '/directory', label: he.nav.directory, icon: IconAddressBook, need: 'directory' },
+  { to: '/directory', label: he.nav.directory, icon: IconAddressBook, need: 'directory', hint: he.nav.hints.directory },
   { to: '/maintenance', label: he.nav.maintenance, icon: IconCalendarCheck, need: 'maintenance' },
   { to: '/meetings', label: he.nav.meetings, icon: IconGavel, need: 'meetings' },
 ]
@@ -31,8 +31,8 @@ export const GENERAL_NAV: NavItem[] = [
 /** Admin pages (under "עוד" on mobile, a "ניהול" group in the desktop side nav). */
 export const ADMIN_NAV: NavItem[] = [
   { to: '/ev', label: he.nav.ev, icon: IconChargingPile },
-  { to: '/apartments', label: he.nav.apartments, icon: IconBuilding },
-  { to: '/users', label: he.nav.users, icon: IconUsers },
+  { to: '/apartments', label: he.nav.apartments, icon: IconBuilding, hint: he.nav.hints.apartments },
+  { to: '/users', label: he.nav.users, icon: IconUsers, hint: he.nav.hints.users },
   { to: '/import', label: he.nav.import, icon: IconFileImport },
   { to: '/settings', label: he.nav.settings, icon: IconSettings },
   { to: '/settings/permissions', label: he.permissions.title, icon: IconShieldLock },

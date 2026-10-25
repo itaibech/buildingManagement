@@ -203,7 +203,7 @@ export default function DirectoryPage() {
   const empty = directory.data?.length === 0 && !(isAdmin && apartments.data?.length)
   return (
     <Stack gap="md">
-      <PageHeader title={he.nav.directory} secondaryAction={exportAction} />
+      <PageHeader title={he.nav.directory} subtitle={he.nav.hints.directory} secondaryAction={exportAction} />
       <TextInput aria-label={he.tenants.search} placeholder={he.tenants.searchPlaceholder} value={query}
         onChange={(e) => setQuery(e.currentTarget.value)} leftSection={<IconSearch size={18} stroke={1.75} />} type="search" />
       <Card padding="md">
