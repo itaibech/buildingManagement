@@ -49,8 +49,8 @@ function BudgetFormFields({ year, categoryId, planned, onDone, categories }: Bud
   const { amount, scope } = form.values
   const submit = form.onSubmit((v) => {
     if (!(v.categoryId && typeof v.amount === 'number')) return
-    save.mutate(budgetPayload(year, v.scope, [{ category_id: v.categoryId, amount: v.amount }]), { onSuccess: () => notifySuccess(he.finance.budgetSaved) })
-    onDone()
+    // The table updates at once (optimistic); the dialog stays with the button loading until the server confirms.
+    save.mutate(budgetPayload(year, v.scope, [{ category_id: v.categoryId, amount: v.amount }]), { onSuccess: () => { notifySuccess(he.finance.budgetSaved); onDone() } })
   }, focusFirstError)
   return (
     <form onSubmit={submit} noValidate>

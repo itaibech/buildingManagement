@@ -8,7 +8,7 @@ import { ListSkeleton } from '../../ui'
 import { useExpenseReport } from './api'
 import { LoadFailed } from './cards'
 import { MonthStepper } from './fields'
-import { monthBreakdown, monthTotals, yearOverYear, type CategoryShare } from './expenseReport'
+import { monthBreakdown, monthTotals, yearOptions, yearOverYear, type CategoryShare } from './expenseReport'
 import { monthOf } from './ledger'
 
 const M = he.finance.byMonth
@@ -76,8 +76,6 @@ function MonthBars({ year, totals, selected, onSelect }: { year: number; totals:
   )
 }
 
-const yearOptions = (current: number): string[] => [current, current - 1, current - 2, current - 3].map(String)
-
 /**
  * "הוצאות לפי חודש" for admins and residents with finance_reports: month navigation, per-category totals with their
  * share, the comparison with last year and a 12-month chart. Only building_expense_report sums (never raw rows).
@@ -97,7 +95,7 @@ export function ExpenseMonthReport({ admin = false }: { admin?: boolean }) {
       <Stack gap="sm">
         <Group justify="space-between" wrap="wrap" gap="xs">
           <Title order={admin ? 2 : 3} size="h4">{M.title}</Title>
-          <Select aria-label={M.yearLabel} data={yearOptions(thisYear)} value={String(year)} allowDeselect={false} w={110}
+          <Select aria-label={M.yearLabel} data={yearOptions(thisYear, year)} value={String(year)} allowDeselect={false} w={110}
             onChange={(y) => y && setMonth(`${y}-${month.slice(5)}`)} />
         </Group>
         <MonthStepper value={month} onChange={setMonth} />

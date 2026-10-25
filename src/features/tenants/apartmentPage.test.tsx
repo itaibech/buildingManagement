@@ -2,7 +2,7 @@
 import { MantineProvider } from '@mantine/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router'
+import { Link, MemoryRouter, Route, Routes } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { he } from '../../lib/he'
 import { theme } from '../../ui/theme'
@@ -51,6 +51,22 @@ describe('ApartmentPage sections', () => {
     fireEvent.click(screen.getByRole('tab', { name: S.payments }))
     expect(screen.getByText('payments-body')).toBeInTheDocument()
     expect(screen.queryByText('overview-body')).not.toBeInTheDocument()
+  })
+
+  it('?tab= opens that section, also when it changes while the page is open', () => {
+    render(
+      <MantineProvider theme={theme}>
+        <QueryClientProvider client={new QueryClient()}>
+          <MemoryRouter initialEntries={['/apartments/a1?tab=ledger']}>
+            <Link to="/apartments/a1?tab=residents">to-residents</Link>
+            <Routes><Route path="/apartments/:id" element={<ApartmentPage />} /></Routes>
+          </MemoryRouter>
+        </QueryClientProvider>
+      </MantineProvider>,
+    )
+    expect(screen.getByRole('tab', { name: S.ledger })).toHaveAttribute('aria-selected', 'true')
+    fireEvent.click(screen.getByText('to-residents'))
+    expect(screen.getByRole('tab', { name: S.residents })).toHaveAttribute('aria-selected', 'true')
   })
 
   it('"טעינת רכב" only with a charger', () => {

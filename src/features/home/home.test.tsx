@@ -20,6 +20,7 @@ const m = vi.hoisted(() => ({
   balances: [] as unknown[],
   fees: [{ id: 'f1', effective_from: '2026-01-01', amount: 390 }] as unknown[],
   cash: 26269.42 as number | undefined,
+  balanceCalls: [] as boolean[],
   emailStatus: 'dryRun' as string,
   debtLog: [] as unknown[],
   charger: null as unknown,
@@ -49,7 +50,7 @@ vi.mock('../tickets/api', () => ({
   useUpdateTicket: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
 }))
 vi.mock('../finance/api', () => ({
-  useMyBalance: () => ({ data: { apartmentId: 'a1', balance: m.balance, scheduled: 0 }, isLoading: false, isError: false, refetch: vi.fn() }),
+  useMyBalance: (enabled = true) => { m.balanceCalls.push(enabled); return { data: enabled ? { apartmentId: 'a1', balance: m.balance, scheduled: 0 } : undefined, isLoading: false, isError: false, refetch: vi.fn() } },
   useCollectionSummary: () => ({ data: { total: 6, paidUp: 4, due: 1200 }, isLoading: false, isError: false, refetch: vi.fn() }),
   useFeeSchedule: () => ({ data: m.fees, isLoading: false, isError: false, isSuccess: true, refetch: vi.fn() }),
   useBalances: () => ({ data: m.balances, isLoading: false, isError: false, refetch: vi.fn() }),
@@ -236,7 +237,10 @@ describe('HomePage', () => {
   it('resident hero without finance_own: the plate and the committee phone, no balance', () => {
     m.granted = ['home', 'announcements']
     m.balance = 500
+    m.balanceCalls = []
     renderHome()
+    expect(m.balanceCalls.length).toBeGreaterThan(0)
+    expect(m.balanceCalls.every((on) => !on)).toBe(true)
     expect(screen.getByText(he.home.hero.title)).toBeInTheDocument()
     expect(screen.getByLabelText(he.apartment(7))).toBeInTheDocument()
     expect(screen.getByText(he.pay.call('050-0000009'))).toBeInTheDocument()

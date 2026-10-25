@@ -143,13 +143,13 @@ export function useMyApartment() {
   return { ...q, isLoading: mine.isLoading || q.isLoading, isError: mine.isError || q.isError, refetch: () => { void mine.refetch(); void q.refetch() } }
 }
 
-/** The resident's own balance and scheduled charges; null when they aren't linked to an apartment. */
-export function useMyBalance() {
+/** The resident's own balance and scheduled charges; null when they aren't linked. `enabled`: false without finance_own. */
+export function useMyBalance(enabled = true) {
   const mine = useMyApartmentId()
   const id = mine.data ?? null
   const q = useQuery({
     queryKey: [...KEY, 'my-balance', id],
-    enabled: mine.isSuccess,
+    enabled: enabled && mine.isSuccess,
     queryFn: async () => {
       if (!id) return null
       const rows = must(await supabase.from('apartment_balances').select(BALANCE_COLUMNS).eq('apartment_id', id))

@@ -139,7 +139,11 @@ function Sections(props: Omit<BodyProps, 'k' | 'setSection'>) {
   const keys = sectionsFor(hasCharger)
   // ?tab=<section> (e.g. ledger from the home debtors, the inbox and reminders) opens that section.
   const [params] = useSearchParams()
-  const [section, setSection] = useState<SectionKey | null>(() => keys.find((k) => k === params.get('tab')) ?? 'overview')
+  const linked = keys.find((k) => k === params.get('tab')) ?? null
+  const [section, setSection] = useState<SectionKey | null>(linked ?? 'overview')
+  // A new ?tab= while the page is open (e.g. from the header search) opens that section.
+  const [seenLink, setSeenLink] = useState(linked)
+  if (linked !== seenLink) { setSeenLink(linked); if (linked) setSection(linked) }
   const pick = (v: string | null) => setSection(keys.find((k) => k === v) ?? null)
   const body = (k: SectionKey) => section === k && <SectionBody k={k} setSection={setSection} {...props} />
   if (desktop) {

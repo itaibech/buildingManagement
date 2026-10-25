@@ -192,7 +192,11 @@ export default function DirectoryPage() {
   const actions: Actions = { admin: isAdmin, open: setDialog }
   // ?q= (the header search) starts the list filtered.
   const [params] = useSearchParams()
-  const [query, setQuery] = useState(() => params.get('q') ?? '')
+  const linked = params.get('q')
+  const [query, setQuery] = useState(linked ?? '')
+  // A new ?q= while the page is open (another search result) replaces the filter.
+  const [seenLink, setSeenLink] = useState(linked)
+  if (linked !== seenLink) { setSeenLink(linked); setQuery(linked ?? '') }
   const q = query.trim()
   const apartments = useApartments()
   const groups = useMemo(() => {

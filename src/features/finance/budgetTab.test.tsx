@@ -95,7 +95,10 @@ describe('budget table: inline edit', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: he.finance.save }))
     expect(await screen.findAllByText(t(he.finance.over(formatILS(100))))).not.toHaveLength(0)
     expect(screen.getByText(he.finance.budget.sources.one_off)).toBeInTheDocument()
+    // The dialog waits for the server with the save button loading, then closes.
+    expect(within(dialog).getByRole('button', { name: he.finance.save })).toHaveAttribute('data-loading', 'true')
     release()
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 
   it('total row: with category budgets, shows the expected income coverage', async () => {

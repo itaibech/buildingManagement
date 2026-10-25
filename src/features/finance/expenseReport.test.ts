@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { monthBreakdown, monthTotals, stepMonth, yearOverYear, type ReportRow } from './expenseReport'
+import { monthBreakdown, monthTotals, stepMonth, yearOptions, yearOverYear, type ReportRow } from './expenseReport'
 
 const rows: ReportRow[] = [
   { categoryId: 'c1', category: 'ניקיון', month: '2026-03-01', total: 600 },
@@ -50,5 +50,13 @@ describe('yearOverYear', () => {
   it('is null when last year has no data for that month', () => {
     expect(yearOverYear(650.5, lastYear, '2026-04-01')).toBeNull()
     expect(yearOverYear(1000, [], '2026-03-01')).toBeNull()
+  })
+})
+
+describe('yearOptions', () => {
+  it('always includes the selected year, so the select never goes blank', () => {
+    expect(yearOptions(2026, 2026)).toEqual(['2026', '2025', '2024', '2023'])
+    expect(yearOptions(2026, 2021)).toEqual(['2026', '2025', '2024', '2023', '2021'])
+    expect(yearOptions(2026, 2027)).toEqual(['2027', '2026', '2025', '2024', '2023'])
   })
 })

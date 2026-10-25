@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { MemoryRouter } from 'react-router'
+import { Link, MemoryRouter } from 'react-router'
 import { MantineProvider } from '@mantine/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -66,6 +66,22 @@ describe('DirectoryPage', () => {
     expect(await screen.findByText('דנה בדיקה')).toBeInTheDocument()
     expect(screen.getByLabelText(he.apartment(12))).toBeInTheDocument()
     expect(screen.getByRole('link', { name: he.tenants.call('דנה בדיקה') })).toHaveAttribute('href', 'tel:050-0000001')
+  })
+
+  it('starts filtered by ?q= and follows a new ?q= while open (header search)', async () => {
+    render(
+      <MantineProvider theme={theme}>
+        <QueryClientProvider client={new QueryClient()}>
+          <MemoryRouter initialEntries={['/directory?q=יוסי']}><Link to="/directory?q=דנה">next</Link><DirectoryPage /></MemoryRouter>
+        </QueryClientProvider>
+      </MantineProvider>,
+    )
+    expect(await screen.findByText('יוסי לדוגמה')).toBeInTheDocument()
+    expect(screen.queryByText('דנה בדיקה')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('next'))
+    expect(await screen.findByText('דנה בדיקה')).toBeInTheDocument()
+    expect(screen.queryByText('יוסי לדוגמה')).not.toBeInTheDocument()
+    expect(screen.getByLabelText(he.tenants.search)).toHaveValue('דנה')
   })
 
   it('filters by name or apartment number', async () => {

@@ -25,8 +25,12 @@ function List({ meetings, empty, body }: { meetings: MeetingListItem[]; empty: s
 
 function AdminTabs({ meetings }: { meetings: MeetingListItem[] }) {
   const [params] = useSearchParams()
-  const linked = params.get('tab')
-  const [tab, setTab] = useState<MeetingTab>(linked === 'pending' || linked === 'archive' ? linked : 'upcoming')
+  const raw = params.get('tab')
+  const linked: MeetingTab | null = raw === 'pending' || raw === 'archive' || raw === 'upcoming' ? raw : null
+  const [tab, setTab] = useState<MeetingTab>(linked ?? 'upcoming')
+  // A new ?tab= while the page is open (the home inbox) switches the tab.
+  const [seenLink, setSeenLink] = useState(linked)
+  if (linked !== seenLink) { setSeenLink(linked); if (linked) setTab(linked) }
   const of = (t: MeetingTab) => meetings.filter((m) => tabOf(m.status) === t)
   const label = (t: MeetingTab) => `${he.meetings.tabs[t]} (${of(t).length})`
   return (

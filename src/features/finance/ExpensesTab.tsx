@@ -125,8 +125,12 @@ function RemoveDialog({ removing, onClose }: { removing: Removing; onClose: () =
 /** Admin "הוצאות": month filter, expenses by category, recurring templates. The page FAB adds an expense. */
 export function ExpensesTab({ adding, onAdd, onAddingClose }: { adding: boolean; onAdd: () => void; onAddingClose: () => void }) {
   const [params] = useSearchParams()
-  // ?month=YYYY-MM-01 (the budget's "הוצאות לפי חודש" opens a month here).
-  const [month, setMonth] = useState(() => (/^\d{4}-\d{2}-01$/.test(params.get('month') ?? '') ? (params.get('month') ?? '') : monthOf(todayISO())))
+  // ?month=YYYY-MM-01 (the budget's "הוצאות לפי חודש" opens a month here), also when it changes while open.
+  const raw = params.get('month')
+  const linked = raw && /^\d{4}-\d{2}-01$/.test(raw) ? raw : null
+  const [month, setMonth] = useState(() => linked ?? monthOf(todayISO()))
+  const [seenLink, setSeenLink] = useState(linked)
+  if (linked !== seenLink) { setSeenLink(linked); if (linked) setMonth(linked) }
   const [sheet, setSheet] = useState<Sheet>(null)
   const [removing, setRemoving] = useState<Removing>(null)
   const [exporting, setExporting] = useState(false)

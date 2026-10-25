@@ -36,3 +36,8 @@ export function yearOverYear(total: number, lastYearRows: readonly ReportRow[], 
   if (last <= 0) return null
   return { last, change: (total - last) / last }
 }
+
+/** The year select's choices: this year and the three before, plus the selected year (the stepper can go past them). */
+export function yearOptions(current: number, selected: number): string[] {
+  return [...new Set([current, current - 1, current - 2, current - 3, selected])].sort((a, b) => b - a).map(String)
+}

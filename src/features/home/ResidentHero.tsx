@@ -53,7 +53,7 @@ function EvPart() {
 /** "איך משלמים" (while something is owed) and the committee's phone. Without finance_own: the phone only. */
 function HowToPayPart({ money }: { money: boolean }) {
   const building = useBuilding()
-  const balance = useMyBalance()
+  const balance = useMyBalance(money)
   const text = building.data?.payment_instructions
   const phone = building.data?.committee_contact
   const owes = money && (balance.data?.balance ?? 0) > 0
