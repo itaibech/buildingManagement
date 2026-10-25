@@ -59,6 +59,20 @@ The import preview warns when the target year contains settlements.
 
 **Standing orders never double-pay** (0022): a standing-order month's automatic payment is the fee minus that month's imported or manual fee payments (EV-noted, settlement and special-charge payments don't count). A fully paid month has no automatic row, and any later payment write re-syncs.
 
+## הזמנת משתמשים (inviting users)
+
+**משתמשים → הזמנת משתמש** (admins) opens one dialog for one or many invitations (up to 40 per send):
+- **נמענים:** pick residents from the directory who have an email and no login yet ("email · name · דירה N"; the invitee is linked to that resident), or type/paste new addresses (Enter, comma or a pasted list; invalid ones are refused).
+- **שם מלא** and **דירה** apply to typed addresses only (the name only when there is one of them). With an apartment, the invitee is linked to that apartment's resident with the same email if one exists and is unlinked, else a new resident is added. **קבוצה** applies to everyone.
+- The result is a summary toast; anything not sent (כבר רשום / נכשלה / לא נשלחה) stays listed in the dialog.
+- The directory has a small **הזמנה** action on residents with an email and no login; it opens the same dialog prefilled.
+
+The Edge Function `admin-invite-user` (admins only, service role) calls `auth.admin.inviteUserByEmail`, then approves the new profile (the invite is the admin's approval; role `resident`, the chosen group), links the resident, and writes `admin_audit` (`invite_user`). An address that already has a login is refused, except a login that was invited and never signed in: that one gets the invite again (also from **שליחה חוזרת** next to the "הוזמן · טרם נכנס" badge on the users page, which reads `user_sign_in_status()`, admins only). If a step after the invite fails, the result carries a warning and the user may show as pending, to approve by hand. The rate limit stops the rest of a batch.
+
+The invite link signs the user in and lands on the app, which detects `type=invite` and opens **בחירת סיסמה** (they may also sign in with Google using the same address). The link lands on `APP_URL` (an optional function secret, default the live site), which must be in the auth redirect allow-list.
+
+**One-time setup:** paste the Hebrew **Invite user** template (`docs/email/auth-templates/invite.html`, subject in `docs/email/auth-templates/README.md`) into Supabase → Authentication → Emails → Templates. Invitations are sent by Supabase Auth's mailer, so they need custom SMTP (see "Auth settings" → Mail delivery): the built-in mailer only reaches team members and allows very few emails per hour.
+
 ## Meetings (ישיבות ועד)
 
 Admins open **עוד → ישיבות ועד**. Tabs: קרובות (draft, invited, in progress), ממתינות לפרסום (closed) and ארכיון (published, searchable by subject, decision text and year). Every state change goes through an admin-only RPC in `0021_meetings.sql`, and triggers lock edits by state.

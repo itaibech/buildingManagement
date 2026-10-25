@@ -38,6 +38,7 @@ function setAuth(profile: Profile | null, granted: PermissionKey[] = ['home', 'a
     retry,
     signOut: async () => undefined,
     recovery: false,
+    invited: false,
     endRecovery: () => undefined,
   }
 }

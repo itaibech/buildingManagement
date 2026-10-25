@@ -1216,6 +1216,11 @@ isOneToOne: false
 "archive_apartment":
 { Args: { "p_id": string }; Returns: undefined
                            },
+"auth_user_by_email":
+{ Args: { "p_email": string }; Returns: {
+              "invited_at": string,"last_sign_in_at": string,"user_id": string
+            }[]
+                           },
 "budget_for_year":
 { Args: { "p_year": number }; Returns: {
               "amount": number,"category": string,"category_id": string,"sort_order": number,"source": string
@@ -1549,6 +1554,11 @@ isOneToOne: false
 "user_names":
 { Args: { "ids": (string)[] }; Returns: {
               "full_name": string,"user_id": string
+            }[]
+                           },
+"user_sign_in_status":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "invited_at": string,"last_sign_in_at": string,"user_id": string
             }[]
                            }
           }

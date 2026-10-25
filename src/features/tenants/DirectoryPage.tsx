@@ -1,14 +1,16 @@
 import { ActionIcon, Button, Card, Divider, Group, Menu, Stack, Text, TextInput } from '@mantine/core'
-import { IconDots, IconMail, IconPencil, IconPhone, IconPlus, IconSearch, IconTrash } from '@tabler/icons-react'
+import { IconDots, IconMail, IconMailPlus, IconPencil, IconPhone, IconPlus, IconSearch, IconTrash } from '@tabler/icons-react'
 import { Fragment, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { useAuth } from '../../auth/AuthProvider'
 import { he } from '../../lib/he'
 import { AptPlate, EmptyState, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
 import { ApartmentForm } from './ApartmentForm'
-import { useApartments, type Apartment, useDeleteResident, useDirectory, type DirectoryEntry } from './api'
+import { useApartments, type Apartment, useDeleteResident, useDirectory, type DirectoryEntry, useProfiles } from './api'
 import { ConfirmDialog, FormModal } from './dialogs'
 import { DirectoryPrintView } from './DirectoryPrintView'
+import { hasAccount } from './invite'
+import { InviteDialog } from './InviteDialog'
 import { ResidentForm } from './ResidentForm'
 import { useDirectoryExport } from './useDirectoryExport'
 
@@ -43,11 +45,23 @@ type Dialog =
   | { kind: 'apartment'; apartmentId: string }
   | { kind: 'resident'; apartmentId: string; resident?: DirectoryEntry }
   | { kind: 'remove'; resident: DirectoryEntry }
+  | { kind: 'invite'; resident: DirectoryEntry }
   | null
 
 interface Actions {
   admin: boolean
   open: (d: Dialog) => void
+  /** Admins: the resident has an email and no login yet ("הזמנה"). */
+  invitable: (r: DirectoryEntry) => boolean
+}
+
+function InviteAction({ r, open }: { r: DirectoryEntry; open: Actions['open'] }) {
+  return (
+    <Button variant="subtle" size="compact-md" mih={44} px="xs" leftSection={<IconMailPlus size={18} stroke={1.75} />}
+      aria-label={he.invite.directoryActionLabel(r.full_name)} onClick={() => open({ kind: 'invite', resident: r })}>
+      {he.invite.directoryAction}
+    </Button>
+  )
 }
 
 function ResidentMenu({ r, open }: { r: DirectoryEntry; open: Actions['open'] }) {
@@ -114,6 +128,7 @@ function ResidentLine({ r, actions }: { r: DirectoryEntry; actions: Actions }) {
       </Stack>
       <Group wrap="nowrap" gap={0} style={{ flexShrink: 0, maxWidth: '100%' }}>
         <ContactActions r={r} />
+        {actions.admin && actions.invitable(r) && <InviteAction r={r} open={actions.open} />}
         {actions.admin && <ResidentMenu r={r} open={actions.open} />}
       </Group>
     </Group>
@@ -168,8 +183,10 @@ function DirectoryDialogs({ dialog, close }: { dialog: Dialog; close: () => void
   const apartment = shown?.kind === 'apartment' ? apartments.data?.find((a) => a.id === shown.apartmentId) : undefined
   const target = shown?.kind === 'remove' ? shown.resident : undefined
   const editing = shown?.kind === 'resident' ? shown.resident : undefined
+  const invitee = useMemo(() => (shown?.kind === 'invite' ? [shown.resident] : undefined), [shown])
   return (
     <>
+      <InviteDialog opened={dialog?.kind === 'invite'} prefill={invitee} onClose={close} />
       <FormModal opened={dialog?.kind === 'apartment' && Boolean(apartment)} title={he.tenants.editApartment} onClose={close}>
         <ApartmentForm apartment={apartment} onDone={close} />
       </FormModal>
@@ -184,12 +201,18 @@ function DirectoryDialogs({ dialog, close }: { dialog: Dialog; close: () => void
   )
 }
 
+/** Admins: whether a resident can be invited (an email, no login yet). */
+function useInvitable(isAdmin: boolean): (r: DirectoryEntry) => boolean {
+  const profiles = useProfiles(isAdmin)
+  return (r) => Boolean(r.email && profiles.data && !hasAccount(r, profiles.data))
+}
+
 /** Everyone's phone book: residents grouped by apartment, searchable by name or apartment number. */
 export default function DirectoryPage() {
   const directory = useDirectory()
   const { isAdmin } = useAuth()
   const [dialog, setDialog] = useState<Dialog>(null)
-  const actions: Actions = { admin: isAdmin, open: setDialog }
+  const actions: Actions = { admin: isAdmin, open: setDialog, invitable: useInvitable(isAdmin) }
   // ?q= (the header search) starts the list filtered.
   const [params] = useSearchParams()
   const linked = params.get('q')

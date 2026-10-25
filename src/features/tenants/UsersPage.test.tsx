@@ -34,8 +34,9 @@ vi.mock('../../lib/supabase', () => {
     }
     return q
   }
-  const functions = { invoke: async (name: string, opts: { body: unknown }) => { db.invoked.push([name, opts.body]); return { data: { deleted: true }, error: null } } }
-  return { supabase: { from: query, functions } }
+  const functions = { invoke: async (name: string, opts: { body: unknown }) => { db.invoked.push([name, opts.body]); return { data: name === 'admin-invite-user' ? { results: [{ email: 'd1@example.test', outcome: 'resent' }] } : { deleted: true }, error: null } } }
+  const rpc = async (name: string) => ({ data: name === 'user_sign_in_status' ? [{ user_id: 'd1', invited_at: '2026-10-20', last_sign_in_at: null }, { user_id: 'a1', invited_at: '2026-10-01', last_sign_in_at: '2026-10-02' }] : null, error: null })
+  return { supabase: { from: query, functions, rpc } }
 })
 
 vi.mock('../../auth/AuthProvider', () => ({ useAuth: () => ({ profile: { user_id: 'me' }, isAdmin: true }) }))
@@ -213,5 +214,21 @@ describe('UsersPage delete user', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: new RegExp(he.users.alsoRemoveResident) }))
     fireEvent.click(screen.getByRole('button', { name: he.users.deleteUser }))
     await waitFor(() => expect(db.invoked).toEqual([['admin-delete-user', { userId: 'r9', removeResident: true }]]))
+  })
+
+  it('marks invited users who never signed in, and resends their invite', async () => {
+    renderPage()
+    const row = await screen.findByTestId('user-d1')
+    expect(await within(row).findByText(he.users.invitedBadge)).toBeInTheDocument()
+    expect(within(screen.getByTestId('user-a1')).queryByText(he.users.invitedBadge)).toBeNull()
+    fireEvent.click(within(row).getByRole('button', { name: he.users.resend }))
+    await waitFor(() => expect(db.invoked).toEqual([['admin-invite-user', { invites: [{ email: 'd1@example.test' }], groupId: null }]]))
+  })
+
+  it('opens the invite dialog from the header', async () => {
+    renderPage()
+    await screen.findByTestId('user-d1')
+    fireEvent.click(screen.getAllByRole('button', { name: he.invite.open })[0] as HTMLElement)
+    expect(await screen.findByText(he.invite.title)).toBeInTheDocument()
   })
 })

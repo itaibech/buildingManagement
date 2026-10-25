@@ -8,10 +8,11 @@ import ResetPasswordPage from './ResetPasswordPage'
 
 const m = vi.hoisted(() => ({
   session: { user: { id: 'u1' } } as unknown,
+  invited: false,
   endRecovery: vi.fn(),
   updateUser: vi.fn(async (_v: unknown) => ({ error: null })),
 }))
-vi.mock('./AuthProvider', () => ({ useAuth: () => ({ session: m.session, loading: false, endRecovery: m.endRecovery }) }))
+vi.mock('./AuthProvider', () => ({ useAuth: () => ({ session: m.session, loading: false, endRecovery: m.endRecovery, invited: m.invited }) }))
 vi.mock('../lib/supabase', () => ({ supabase: { auth: { updateUser: m.updateUser } } }))
 vi.mock('../ui', async (orig) => ({ ...(await orig<typeof import('../ui')>()), notifySuccess: vi.fn() }))
 
@@ -31,6 +32,14 @@ describe('ResetPasswordPage', () => {
     fireEvent.click(screen.getByRole('button', { name: he.reset.save }))
     await waitFor(() => expect(m.updateUser).toHaveBeenCalledWith({ password: 'long-enough-1' }))
     expect(m.endRecovery).toHaveBeenCalled()
+  })
+
+  it('an invite link: "בחירת סיסמה" with the Google hint', () => {
+    m.invited = true
+    renderPage()
+    expect(screen.getByRole('heading', { name: he.reset.inviteTitle })).toBeInTheDocument()
+    expect(screen.getByText(he.reset.inviteBody)).toBeInTheDocument()
+    m.invited = false
   })
 
   it('explains an expired link when there is no session', () => {

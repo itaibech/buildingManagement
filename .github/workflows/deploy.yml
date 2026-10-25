@@ -52,6 +52,9 @@ jobs:
       - run: supabase functions deploy send-email --project-ref "$SUPABASE_PROJECT_REF"
       # Deletes a user's login (needs the service role, which the platform provides). Admins only; JWT verification on.
       - run: supabase functions deploy admin-delete-user --project-ref "$SUPABASE_PROJECT_REF"
+      # Invites users by email (auth.admin.inviteUserByEmail needs the service role). Admins only; JWT verification on.
+      # APP_URL (optional secret) is where the invite link lands; it defaults to the live site.
+      - run: supabase functions deploy admin-invite-user --project-ref "$SUPABASE_PROJECT_REF"
   deploy:
     needs: [build, migrate]
     runs-on: ubuntu-latest

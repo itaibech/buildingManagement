@@ -1,17 +1,22 @@
 import { ActionIcon, Badge, Button, Card, Group, Menu, SegmentedControl, Select, Stack, Text, Title } from '@mantine/core'
-import { IconDots, IconTrash } from '@tabler/icons-react'
+import { IconDots, IconTrash, IconUserPlus } from '@tabler/icons-react'
 import { useMemo, useState, type ReactNode } from 'react'
 import { useAuth } from '../../auth/AuthProvider'
 import { he } from '../../lib/he'
-import { AptPlate, EmptyState, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
+import { AptPlate, EmptyState, ListSkeleton, notifyError, notifySuccess, PageHeader } from '../../ui'
 import { usersRows } from '../export/buildWorkbook'
 import { useExportAction } from '../export/useExport'
 import { useGroups, type Group as UserGroup } from '../permissions/api'
 import { DeleteUserDialog } from './DeleteUserDialog'
+import { InviteDialog } from './InviteDialog'
+import { summarize } from './invite'
 import {
+  awaitingFirstSignIn,
   useApproveProfile,
   useDirectory,
+  useInviteUsers,
   useProfiles,
+  useSignInStatus,
   useUpdateProfile,
   type DirectoryEntry,
   type Profile,
@@ -79,9 +84,24 @@ function Identity({ p, plate, children }: { p: Profile; plate: number | null; ch
   )
 }
 
-interface RowProps { residents: DirectoryEntry[]; options: Option[]; groups: UserGroup[] }
+interface RowProps { residents: DirectoryEntry[]; options: Option[]; groups: UserGroup[]; invited: ReadonlySet<string> }
 
-function PendingRow({ p, residents, options, groups }: RowProps & { p: Profile }) {
+/** Invited and never signed in: the badge and "שליחה חוזרת" (calls admin-invite-user again). */
+function InvitedMark({ p }: { p: Profile }) {
+  const invite = useInviteUsers()
+  const resend = () => p.email && invite.mutate({ invites: [{ email: p.email }], groupId: null }, {
+    onSuccess: (results) => (results.some((r) => r.outcome === 'resent' || r.outcome === 'sent') ? notifySuccess : notifyError)(summarize(results)),
+    onError: (e) => notifyError(e.message),
+  })
+  return (
+    <Group gap="xs" wrap="wrap">
+      <Badge color="signal" c="signal.9">{he.users.invitedBadge}</Badge>
+      {p.email && <Button variant="subtle" size="compact-md" mih={44} loading={invite.isPending} onClick={resend}>{he.users.resend}</Button>}
+    </Group>
+  )
+}
+
+function PendingRow({ p, residents, options, groups, invited }: RowProps & { p: Profile }) {
   const approve = useApproveProfile()
   const byEmail = residents.find((r) => r.email && r.email.toLowerCase() === p.email?.toLowerCase())
   const [residentId, setResidentId] = useState<string | null>(byEmail?.id ?? null)
@@ -97,6 +117,7 @@ function PendingRow({ p, residents, options, groups }: RowProps & { p: Profile }
     <Card padding="md" data-testid={`pending-${p.user_id}`}>
       <Stack gap="sm">
         <Identity p={p} plate={null} />
+        {invited.has(p.user_id) && <InvitedMark p={p} />}
         <Group align="flex-end" wrap="wrap" gap="sm">
           <ResidentSelect value={residentId} onChange={setResidentId} options={options} />
           <RoleControl value={role} onChange={setRole} />
@@ -157,7 +178,7 @@ function UserMenu({ p, isMe, onDelete }: { p: Profile; isMe: boolean; onDelete: 
   )
 }
 
-function UserRow({ p, residents, options, groups, isMe, onDelete }: RowProps & { p: Profile; isMe: boolean; onDelete: () => void }) {
+function UserRow({ p, residents, options, groups, invited, isMe, onDelete }: RowProps & { p: Profile; isMe: boolean; onDelete: () => void }) {
   const [editing, setEditing] = useState(false)
   const linked = residents.find((r) => r.id === p.resident_id)
   const summary = summaryOf(p, linked, groups)
@@ -172,6 +193,7 @@ function UserRow({ p, residents, options, groups, isMe, onDelete }: RowProps & {
           </Button>
           <UserMenu p={p} isMe={isMe} onDelete={onDelete} />
         </Identity>
+        {invited.has(p.user_id) && <InvitedMark p={p} />}
         {editing ? <UserControls p={p} options={options} groups={groups} locked={p.is_super_admin || isMe} /> : <Text size="sm" c="dimmed">{summary}</Text>}
       </Stack>
     </Card>
@@ -187,16 +209,24 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 
+/** Users invited by email who never signed in (user_sign_in_status). */
+function useInvitedIds(): ReadonlySet<string> {
+  const signIn = useSignInStatus()
+  return useMemo(() => new Set([...(signIn.data ?? [])].filter(([, s]) => awaitingFirstSignIn(s)).map(([id]) => id)), [signIn.data])
+}
+
 export default function UsersPage() {
   const { profile: me } = useAuth()
   const profiles = useProfiles()
   const directory = useDirectory()
   const groups = useGroups()
+  const invited = useInvitedIds()
+  const [inviting, setInviting] = useState(false)
   const residents = useMemo(() => directory.data ?? [], [directory.data])
   const options = useMemo(() => residents.map((r) => ({ value: r.id, label: he.users.residentOption(r.apartmentNumber, r.full_name) })), [residents])
   const pending = profiles.data?.filter((p) => p.status === 'pending') ?? []
   const approved = profiles.data?.filter((p) => p.status === 'approved') ?? []
-  const row: RowProps = { residents, options, groups: groups.data ?? [] }
+  const row: RowProps = { residents, options, groups: groups.data ?? [], invited }
   const [deleting, setDeleting] = useState<Profile | null>(null)
   const exportAction = useExportAction(
     he.export.files.users,
@@ -206,7 +236,8 @@ export default function UsersPage() {
   if (profiles.isError || directory.isError) return <Text c="debt.7">{he.tenants.loadError}</Text>
   return (
     <Stack gap="xl">
-      <PageHeader title={he.nav.users} subtitle={he.nav.hints.users} secondaryAction={exportAction} />
+      <PageHeader title={he.nav.users} subtitle={he.nav.hints.users} secondaryAction={exportAction}
+        action={{ label: he.invite.open, onClick: () => setInviting(true), icon: <IconUserPlus size={22} stroke={1.75} /> }} />
       {profiles.isLoading || directory.isLoading ? <ListSkeleton /> : (
         <>
           <Section title={he.users.pending}>
@@ -218,6 +249,7 @@ export default function UsersPage() {
             {approved.map((p) => <UserRow key={p.user_id} p={p} {...row} isMe={p.user_id === me?.user_id} onDelete={() => setDeleting(p)} />)}
           </Section>
           <DeleteUserDialog profile={deleting} onClose={() => setDeleting(null)} />
+          <InviteDialog opened={inviting} onClose={() => setInviting(false)} />
         </>
       )}
     </Stack>

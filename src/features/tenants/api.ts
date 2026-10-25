@@ -263,8 +263,8 @@ const profilesQuery = {
   queryFn: async () => rows(await supabase.from('profiles').select('*').order('created_at')),
 }
 
-export function useProfiles() {
-  return useQuery(profilesQuery)
+export function useProfiles(enabled = true) {
+  return useQuery({ ...profilesQuery, enabled })
 }
 
 export function usePendingProfiles() {
@@ -290,13 +290,13 @@ export function useApproveProfile(): (args: { userId: string; residentId: string
   )
 }
 
-/** The admin-delete-user function's Hebrew error (self, super admin, …), else a generic failure. */
-async function functionError(error: unknown): Promise<string> {
+/** An Edge Function's Hebrew error (self, super admin, …), else a generic failure. */
+async function functionError(error: unknown, fallback: string = he.users.deleteFailed): Promise<string> {
   if (error instanceof FunctionsHttpError && error.context instanceof Response) {
     const body: unknown = await error.context.json().catch(() => null)
     if (typeof body === 'object' && body !== null && typeof (body as { error?: unknown }).error === 'string') return (body as { error: string }).error
   }
-  return he.users.deleteFailed
+  return fallback
 }
 
 /** Deletes a user's login (Edge Function admin-delete-user); removeResident also removes their resident record. */
@@ -397,3 +397,51 @@ export function useApartmentLog(apartmentId: string, enabled = true) {
   })
 }
 
+
+// ---------------------------------------------------------------- inviting users (Edge Function admin-invite-user)
+
+/** One recipient: a directory pick (residentId) or a typed address (optional apartment and name). */
+export interface InviteInput { email: string; residentId?: string; apartmentId?: string; fullName?: string }
+export type InviteOutcome = 'sent' | 'resent' | 'exists' | 'failed' | 'skipped'
+export interface InviteResult { email: string; outcome: InviteOutcome; error?: string; warnings?: string[] }
+
+const OUTCOMES: readonly InviteOutcome[] = ['sent', 'resent', 'exists', 'failed', 'skipped']
+const isResult = (v: unknown): v is InviteResult => typeof v === 'object' && v !== null
+  && typeof (v as InviteResult).email === 'string' && OUTCOMES.includes((v as InviteResult).outcome)
+
+/** The function's per-recipient results (anything unrecognised is dropped). */
+export function toInviteResults(data: unknown): InviteResult[] {
+  const list = typeof data === 'object' && data !== null ? (data as { results?: unknown }).results : null
+  return Array.isArray(list) ? list.filter(isResult) : []
+}
+
+/** Sends invitations (or resends them); one call for the whole batch. */
+export function useInviteUsers() {
+  const invalidate = useInvalidate()
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { invites: InviteInput[]; groupId: string | null }): Promise<InviteResult[]> => {
+      const { data, error } = await supabase.functions.invoke('admin-invite-user', { body: args })
+      if (error) throw new Error(await functionError(error, he.invite.failed))
+      return toInviteResults(data)
+    },
+    onSuccess: () => Promise.all([invalidate('profiles', 'residents'), client.invalidateQueries({ queryKey: ['sign-in-status'] })]).then(() => undefined),
+  })
+}
+
+export interface SignInStatus { invitedAt: string | null; lastSignInAt: string | null }
+
+/** When each login was invited and last signed in (user_sign_in_status, admins only), by user id. */
+export function useSignInStatus() {
+  return useQuery({
+    queryKey: ['sign-in-status'],
+    queryFn: async (): Promise<ReadonlyMap<string, SignInStatus>> => {
+      const { data, error } = await supabase.rpc('user_sign_in_status')
+      check(error)
+      return new Map((data ?? []).map((r) => [r.user_id, { invitedAt: r.invited_at, lastSignInAt: r.last_sign_in_at }]))
+    },
+  })
+}
+
+/** Invited but never signed in: the "הוזמן · טרם נכנס" badge and the resend action. */
+export const awaitingFirstSignIn = (s: SignInStatus | undefined): boolean => Boolean(s?.invitedAt && !s.lastSignInAt)

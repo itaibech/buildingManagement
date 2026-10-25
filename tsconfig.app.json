@@ -23,5 +23,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "supabase/functions/send-email/lib", "supabase/functions/admin-delete-user/lib"]
+  "include": ["src", "supabase/functions/send-email/lib", "supabase/functions/admin-delete-user/lib", "supabase/functions/admin-invite-user/lib"]
 }

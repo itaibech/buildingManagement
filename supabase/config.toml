@@ -244,10 +244,26 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
-# Uncomment to customize email template
-# [auth.email.template.invite]
-# subject = "You have been invited"
-# content_path = "./supabase/templates/invite.html"
+# Local auth emails use the same Hebrew templates pasted in the hosted dashboard (docs/email/auth-templates).
+[auth.email.template.invite]
+subject = "הזמנה לאפליקציית ניהול הבניין"
+content_path = "./docs/email/auth-templates/invite.html"
+
+[auth.email.template.confirmation]
+subject = "אימות כתובת האימייל – ניהול בניין"
+content_path = "./docs/email/auth-templates/confirm-signup.html"
+
+[auth.email.template.recovery]
+subject = "איפוס סיסמה – ניהול בניין"
+content_path = "./docs/email/auth-templates/reset-password.html"
+
+[auth.email.template.magic_link]
+subject = "קישור כניסה – ניהול בניין"
+content_path = "./docs/email/auth-templates/magic-link.html"
+
+[auth.email.template.email_change]
+subject = "אישור שינוי אימייל – ניהול בניין"
+content_path = "./docs/email/auth-templates/change-email.html"
 
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
@@ -430,4 +446,7 @@ enabled = true
 verify_jwt = true
 
 [functions.admin-delete-user]
+verify_jwt = true
+
+[functions.admin-invite-user]
 verify_jwt = true
