@@ -127,4 +127,19 @@ describe('InviteDialog', () => {
     expect(screen.getByText(/נכשלה \(שליחת האימייל נכשלה\)/)).toBeInTheDocument()
     expect(onClose).not.toHaveBeenCalled()
   })
+
+  it('a skipped recipient shows its reason once', () => {
+    m.reply = [{ email: 'dana@example.test', outcome: 'skipped', error: 'לא נשלחה – מגבלת שליחה' }]
+    renderDialog([dana])
+    fireEvent.click(screen.getByRole('button', { name: he.invite.send(1) }))
+    const alert = screen.getByText(he.invite.resultsTitle).closest('.mantine-Alert-root')
+    expect(alert?.textContent).toContain('dana@example.test – לא נשלחה – מגבלת שליחה')
+    expect(alert?.textContent).not.toContain('(')
+  })
+
+  it('says so when the 40-recipient limit is reached', () => {
+    renderDialog()
+    for (let i = 0; i <= 40; i++) add(`u${i}@example.test`)
+    expect(screen.getByText(he.invite.tooMany(40))).toBeInTheDocument()
+  })
 })

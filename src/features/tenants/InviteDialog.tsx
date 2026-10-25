@@ -27,13 +27,19 @@ function useInviteData(prefill: DirectoryEntry[]) {
   return { suggestions, options, apartments: apartmentsList, groups: groups.data ?? [] }
 }
 
-function RecipientsField({ value, options, error, onChange }: { value: string[]; options: Option[]; error: string | null; onChange: (v: string[]) => void }) {
+function RecipientsField({ value, options, error, onChange, onMax }: {
+  value: string[]; options: Option[]; error: string | null; onChange: (v: string[]) => void; onMax: () => void
+}) {
   return (
     <TagsInput label={he.invite.recipients} description={he.invite.recipientsHint} placeholder={he.invite.recipientsPlaceholder}
-      data={options} value={value} onChange={onChange} error={error} splitChars={[',', ';', ' ']} maxTags={MAX_INVITES}
+      data={options} value={value} onChange={onChange} error={error} splitChars={[',', ';', ' ']} maxTags={MAX_INVITES} onMaxTags={onMax}
       clearable dir="ltr" data-autofocus comboboxProps={{ withinPortal: true }} />
   )
 }
+
+/** "נכשלה (reason)"; a skipped one already says why ("לא נשלחה – מגבלת שליחה"), so its reason alone. */
+const outcomeText = (r: InviteResult): string =>
+  r.outcome === 'skipped' && r.error ? r.error : `${he.invite.outcome[r.outcome]}${r.error ? ` (${r.error})` : ''}`
 
 function ResultsList({ results }: { results: InviteResult[] }) {
   return (
@@ -41,7 +47,7 @@ function ResultsList({ results }: { results: InviteResult[] }) {
       <Stack gap={4}>
         {results.map((r) => (
           <Text key={r.email} size="sm">
-            <bdi dir="ltr">{r.email}</bdi>{' – '}{he.invite.outcome[r.outcome]}{r.error ? ` (${r.error})` : ''}
+            <bdi dir="ltr">{r.email}</bdi>{' – '}{outcomeText(r)}
             {r.warnings?.map((w) => <Text key={w} span display="block" size="sm" c="dimmed">{he.invite.warning[w] ?? w}</Text>)}
           </Text>
         ))}
@@ -103,7 +109,8 @@ function InviteForm({ prefill, onDone }: { prefill: DirectoryEntry[]; onDone: ()
   }
   return (
     <Stack>
-      <RecipientsField value={recipients} options={data.options} error={error} onChange={onRecipients} />
+      <RecipientsField value={recipients} options={data.options} error={error} onChange={onRecipients}
+        onMax={() => setError(he.invite.tooMany(MAX_INVITES))} />
       <PlacementFields typed={typed} total={recipients.length} f={f} set={(p) => setFields({ ...f, ...p })} apartments={data.apartments} groups={data.groups} />
       {results.length > 0 && <ResultsList results={results} />}
       {invite.isError && <Alert color="debt">{invite.error.message}</Alert>}
