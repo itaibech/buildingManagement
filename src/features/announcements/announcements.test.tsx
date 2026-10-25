@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { MemoryRouter } from 'react-router'
 import { MantineProvider } from '@mantine/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -43,7 +44,7 @@ vi.mock('../../ui', async (orig) => ({ ...(await orig<typeof import('../../ui')>
 const wrap = (node: ReactNode) =>
   render(
     <MantineProvider theme={theme}>
-      <QueryClientProvider client={new QueryClient()}>{node}</QueryClientProvider>
+      <QueryClientProvider client={new QueryClient()}><MemoryRouter>{node}</MemoryRouter></QueryClientProvider>
     </MantineProvider>,
   )
 
@@ -144,5 +145,13 @@ describe('AnnouncementsPage admin menu', () => {
     fireEvent.click(await screen.findByRole('button', { name: he.announcements.delete }))
     await waitFor(() => expect(db.deletes).toEqual(['a1']))
     expect(toast.success).toHaveBeenCalledWith(he.announcements.deleted)
+  })
+})
+
+describe('deep link (?open=)', () => {
+  it('a focused read item opens expanded instead of showing the preview', () => {
+    wrap(<AnnouncementItem item={item({ id: 'r1', isRead: true })} focused />)
+    expect(screen.queryByTestId('announcement-preview')).toBeNull()
+    expect(screen.getByRole('button', { expanded: true })).toBeInTheDocument()
   })
 })

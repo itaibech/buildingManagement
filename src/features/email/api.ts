@@ -5,6 +5,7 @@ import { he } from '../../lib/he'
 import { supabase } from '../../lib/supabase'
 import { notifyError, notifyInfo, notifySuccess } from '../../ui/notify'
 import { planCalls } from './chunks'
+import type { DebtLogRow, EmailStatus } from './reminders'
 
 export type EmailKind = 'announcement' | 'ticket' | 'debt' | 'test' | 'meeting'
 export type MeetingEmailVariant = 'invite' | 'update' | 'published'
@@ -149,6 +150,33 @@ export function useEmailLog() {
     queryFn: async (): Promise<EmailLogRow[]> => {
       const { data, error } = await supabase.from('email_log')
         .select('id, created_at, kind, recipients, sent, failed, dry_run').order('created_at', { ascending: false }).limit(20)
+      if (error) throw new Error(error.message)
+      return data
+    },
+  })
+}
+
+/** Whether send-email can send: from the preview of a test email (no email is sent). Unreachable = 'unavailable'. */
+export function useEmailStatus(): EmailStatus {
+  const q = useQuery({
+    queryKey: ['email', 'status'],
+    retry: false,
+    staleTime: 10 * 60_000,
+    queryFn: async (): Promise<boolean> => (await invoke({ kind: 'test', preview: true })).dryRun === true,
+  })
+  if (q.isLoading) return 'loading'
+  if (q.isError) return 'unavailable'
+  return q.data ? 'dryRun' : 'live'
+}
+
+/** The debt reminders sent (email_log; RLS: admins only), for "נשלחה תזכורת לפני X ימים". */
+export function useDebtReminderLog(enabled = true) {
+  return useQuery({
+    queryKey: ['email', 'debt-log'],
+    enabled,
+    queryFn: async (): Promise<DebtLogRow[]> => {
+      const { data, error } = await supabase.from('email_log').select('created_at, apartment_ids, dry_run')
+        .eq('kind', 'debt').order('created_at', { ascending: false }).limit(500)
       if (error) throw new Error(error.message)
       return data
     },

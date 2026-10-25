@@ -1,7 +1,7 @@
 import { Accordion, ActionIcon, Alert, Anchor, Button, Card, Divider, Group, Menu, Stack, Tabs, Text } from '@mantine/core'
 import { IconDots, IconPencil, IconPlus, IconTrash } from '@tabler/icons-react'
 import { Fragment, useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { he } from '../../lib/he'
 import { AptPlate, BackLink, EmptyState, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
 import { useChargers } from '../ev/api'
@@ -137,7 +137,9 @@ function Sections(props: Omit<BodyProps, 'k' | 'setSection'>) {
   const desktop = useDesktop()
   const hasCharger = !!useChargers().data?.some((c) => c.apartment_id === props.apartment.id)
   const keys = sectionsFor(hasCharger)
-  const [section, setSection] = useState<SectionKey | null>('overview')
+  // ?tab=<section> (e.g. ledger from the home debtors, the inbox and reminders) opens that section.
+  const [params] = useSearchParams()
+  const [section, setSection] = useState<SectionKey | null>(() => keys.find((k) => k === params.get('tab')) ?? 'overview')
   const pick = (v: string | null) => setSection(keys.find((k) => k === v) ?? null)
   const body = (k: SectionKey) => section === k && <SectionBody k={k} setSection={setSection} {...props} />
   if (desktop) {

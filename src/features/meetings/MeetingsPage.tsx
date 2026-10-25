@@ -1,6 +1,7 @@
 import { Stack, Tabs, Text, Title } from '@mantine/core'
 import { IconBolt } from '@tabler/icons-react'
 import { useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { useNavigate } from 'react-router'
 import { useAuth } from '../../auth/AuthProvider'
 import { he } from '../../lib/he'
@@ -23,7 +24,9 @@ function List({ meetings, empty, body }: { meetings: MeetingListItem[]; empty: s
 }
 
 function AdminTabs({ meetings }: { meetings: MeetingListItem[] }) {
-  const [tab, setTab] = useState<MeetingTab>('upcoming')
+  const [params] = useSearchParams()
+  const linked = params.get('tab')
+  const [tab, setTab] = useState<MeetingTab>(linked === 'pending' || linked === 'archive' ? linked : 'upcoming')
   const of = (t: MeetingTab) => meetings.filter((m) => tabOf(m.status) === t)
   const label = (t: MeetingTab) => `${he.meetings.tabs[t]} (${of(t).length})`
   return (

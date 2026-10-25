@@ -19,6 +19,17 @@ const m = vi.hoisted(() => ({
   balance: 0,
   balances: [] as unknown[],
   fees: [{ id: 'f1', effective_from: '2026-01-01', amount: 390 }] as unknown[],
+  cash: 26269.42 as number | undefined,
+  emailStatus: 'dryRun' as string,
+  debtLog: [] as unknown[],
+  charger: null as unknown,
+  meetings: [] as unknown[],
+  unseen: 0,
+  groups: [] as unknown[],
+  pending: [] as unknown[],
+  apartments: [{ id: 'a1', number: 1 }] as unknown[],
+  residents: [{ id: 'r1', apartment_id: 'a1', full_name: 'משלם', email: 'a@example.test' }] as unknown[],
+  billing: new Map() as unknown,
   building: { id: 'b1', name: 'בניין', address: null, payment_instructions: 'העברה לחשבון 12-345-678' as string | null, committee_contact: '050-0000009' as string | null },
 }))
 
@@ -42,6 +53,26 @@ vi.mock('../finance/api', () => ({
   useCollectionSummary: () => ({ data: { total: 6, paidUp: 4, due: 1200 }, isLoading: false, isError: false, refetch: vi.fn() }),
   useFeeSchedule: () => ({ data: m.fees, isLoading: false, isError: false, isSuccess: true, refetch: vi.fn() }),
   useBalances: () => ({ data: m.balances, isLoading: false, isError: false, refetch: vi.fn() }),
+  useMyApartment: () => ({ data: { id: 'a1', number: 7 }, isLoading: false, isError: false }),
+  useBuildingCash: () => ({ data: m.cash, isLoading: false, isError: false }),
+}))
+vi.mock('../email/api', () => ({
+  useEmailStatus: () => m.emailStatus,
+  useDebtReminderLog: () => ({ data: m.debtLog }),
+  useEmailPreview: () => ({ data: undefined, isLoading: true, isError: false }),
+  useSendEmail: () => ({ mutate: vi.fn(), isPending: false }),
+  sendableCount: () => 0,
+}))
+vi.mock('../ev/api', () => ({ useMyCharger: () => ({ data: m.charger, isLoading: false, isError: false }) }))
+vi.mock('../meetings/api', () => ({ useMeetings: () => ({ data: m.meetings, isLoading: false }) }))
+vi.mock('../notifications/api', () => ({ useUnseenTicketCount: () => m.unseen }))
+vi.mock('../permissions/api', () => ({ useGroups: () => ({ data: m.groups }) }))
+vi.mock('../tenants/api', async (orig) => ({
+  ...(await orig<typeof import('../tenants/api')>()),
+  usePendingProfiles: () => ({ data: m.pending, isLoading: false }),
+  useApartments: () => ({ data: m.apartments }),
+  useResidents: () => ({ data: m.residents }),
+  useApartmentBilling: () => ({ data: m.billing }),
 }))
 vi.mock('../settings/api', async (orig) => ({
   ...(await orig<typeof import('../settings/api')>()),
@@ -191,7 +222,7 @@ describe('HomePage', () => {
   it('a group without announcements or tickets sees neither section (and no report button)', () => {
     m.granted = ['home', 'finance_own']
     renderHome()
-    expect(screen.getByText(he.home.myBalance)).toBeInTheDocument()
+    expect(screen.getByText(he.home.hero.title)).toBeInTheDocument()
     expect(screen.queryByText(he.home.latestAnnouncement)).not.toBeInTheDocument()
     expect(screen.queryByText(he.home.reportTicket)).not.toBeInTheDocument()
   })
@@ -200,5 +231,72 @@ describe('HomePage', () => {
     m.granted = ['home']
     renderHome()
     expect(screen.getByText(he.permissions.homeEmpty)).toBeInTheDocument()
+  })
+
+  it('resident hero without finance_own: the plate and the committee phone, no balance', () => {
+    m.granted = ['home', 'announcements']
+    m.balance = 500
+    renderHome()
+    expect(screen.getByText(he.home.hero.title)).toBeInTheDocument()
+    expect(screen.getByLabelText(he.apartment(7))).toBeInTheDocument()
+    expect(screen.getByText(he.pay.call('050-0000009'))).toBeInTheDocument()
+    expect(screen.queryByText(he.pay.title)).toBeNull()
+  })
+
+  it('admin inbox: counts with deep links, and the cheer when nothing is open', () => {
+    m.isAdmin = true
+    m.tasks = []
+    m.balances = []
+    renderHome()
+    expect(screen.getByText(he.home.inbox.empty)).toBeInTheDocument()
+    cleanup()
+    m.pending = [{ user_id: 'u1' }, { user_id: 'u2' }]
+    m.unseen = 3
+    m.meetings = [{ id: 'm1', status: 'closed', scheduled_at: '2026-01-01T10:00:00Z' }]
+    renderHome()
+    const card = screen.getByRole('heading', { name: he.home.inbox.title }).closest('.mantine-Card-root') as HTMLElement
+    expect(within(card).getByRole('link', { name: new RegExp(he.home.inbox.rows.users(2)) })).toHaveAttribute('href', '/users')
+    expect(within(card).getByRole('link', { name: new RegExp(he.home.inbox.rows.tickets(3)) })).toHaveAttribute('href', '/tickets')
+    expect(within(card).getByRole('link', { name: new RegExp(he.home.inbox.rows.publish(1)) })).toHaveAttribute('href', '/meetings?tab=pending')
+  })
+
+  it('admin inbox hints at finance_own while the default group lacks it', () => {
+    m.isAdmin = true
+    m.groups = [{ id: 'g1', isDefault: true, permissions: new Set(['home', 'announcements']) }]
+    renderHome()
+    expect(screen.getByText(he.home.inbox.financeOwnHint)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: he.home.inbox.financeOwnAction })).toHaveAttribute('href', '/settings/permissions')
+  })
+
+  it('admin setup checklist: progress, deep links, dismiss', () => {
+    m.isAdmin = true
+    localStorage.clear()
+    renderHome()
+    const card = screen.getByRole('heading', { name: new RegExp(he.home.setup.title) }).closest('.mantine-Card-root') as HTMLElement
+    // name, payment, contact, fees, residents done; address, email (dry run), permissions not yet.
+    expect(within(card).getByText('5/8')).toBeInTheDocument()
+    expect(within(card).getByRole('link', { name: `${he.home.setup.steps.address}: ${he.home.setup.todo}` })).toHaveAttribute('href', '/settings')
+    fireEvent.click(within(card).getByRole('button', { name: he.home.setup.dismissLabel }))
+    expect(screen.queryByRole('heading', { name: new RegExp(he.home.setup.title) })).toBeNull()
+  })
+
+  it('admin home rows are links: debtor to the apartment ledger, task to its detail, announcement to the item', () => {
+    m.isAdmin = true
+    renderHome()
+    expect(screen.getByRole('button', { name: he.home.openDebtor(3) })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: he.home.openTask('בדיקת מעלית') })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: he.home.openAnnouncement('הודעה ראשונה') })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: he.home.cashLink })).toBeInTheDocument()
+  })
+
+  it('reminder envelope: test mode when email is in dry run, disabled without a resident email', () => {
+    m.isAdmin = true
+    m.residents = [{ id: 'r3', apartment_id: 'a3', full_name: 'חייב גדול', email: 'big@example.test' }]
+    m.debtLog = [{ created_at: new Date(Date.now() - 5 * 86_400_000).toISOString(), apartment_ids: ['a3'], dry_run: false }]
+    renderHome()
+    expect(screen.getByRole('button', { name: he.mail.debt.remindTest(3) })).toBeEnabled()
+    expect(screen.getByRole('button', { name: he.mail.debt.remind(5) })).toBeDisabled()
+    expect(screen.getByText(he.mail.debt.noEmail)).toBeInTheDocument()
+    expect(screen.getByText(he.mail.debt.sentAgo(5))).toBeInTheDocument()
   })
 })

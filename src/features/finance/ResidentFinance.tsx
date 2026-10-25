@@ -40,6 +40,7 @@ function CollectionCard() {
       {rate && rate.total > 0 && (
         <Stack gap="xs" mt="xs">
           <Text className="bm-display bm-num" fz="h2">{he.home.collected(rate.paidUp, rate.total)}</Text>
+          <Text fw={600}>{he.home.collectedCaption}</Text>
           <Progress value={(rate.paidUp / rate.total) * 100} color="paid.7" size="lg" radius="xl" aria-label={he.home.collected(rate.paidUp, rate.total)} />
           {rate.due > 0 && <Text size="sm" c="dimmed" className="bm-num">{he.home.amountDue(formatILS(rate.due))}</Text>}
         </Stack>

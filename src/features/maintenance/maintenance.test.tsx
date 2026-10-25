@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { MemoryRouter } from 'react-router'
 import { MantineProvider } from '@mantine/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -28,7 +29,7 @@ vi.mock('../../ui/notify', () => ({ notifySuccess: toast.success, notifyError: t
 vi.mock('../../ui', async (orig) => ({ ...(await orig<typeof import('../../ui')>()), notifySuccess: toast.success }))
 
 const wrap = (node: React.ReactNode) =>
-  render(<MantineProvider theme={theme}><QueryClientProvider client={new QueryClient()}>{node}</QueryClientProvider></MantineProvider>)
+  render(<MantineProvider theme={theme}><QueryClientProvider client={new QueryClient()}><MemoryRouter>{node}</MemoryRouter></QueryClientProvider></MantineProvider>)
 
 const task = (o: Partial<Task> = {}): Task => ({
   id: 't1', building_id: 'b', title: 'בדיקת מעלית', vendor: 'ספק', frequency: 'yearly', next_due: '2020-01-01', created_at: '2020-01-01T00:00:00Z', ...o,

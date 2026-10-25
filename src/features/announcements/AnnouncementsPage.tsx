@@ -1,5 +1,6 @@
 import { Stack, Text, Title } from '@mantine/core'
 import { useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { useAuth } from '../../auth/AuthProvider'
 import { he } from '../../lib/he'
 import { EmptyState, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
@@ -45,6 +46,9 @@ export default function AnnouncementsPage() {
   const list = useAnnouncements()
   const markRead = useMarkRead()
   const [dialog, setDialog] = useState<Dialog>(null)
+  // ?open=<id> (the home "הודעה אחרונה" row) opens that item expanded, marks it read and scrolls to it.
+  const [params] = useSearchParams()
+  const openId = params.get('open')
   const add = isAdmin ? { label: he.announcements.add, onClick: () => setDialog({ kind: 'add' }) } : undefined
   const actions: AdminActions | undefined = isAdmin
     ? {
@@ -58,7 +62,7 @@ export default function AnnouncementsPage() {
       {list.isError && <Text c="debt.7">{he.announcements.errors.load}</Text>}
       {list.isLoading && <ListSkeleton rows={4} />}
       {list.data?.length === 0 && <EmptyState title={he.announcements.empty} body={he.announcements.emptyBody} action={add} />}
-      {list.data?.map((a) => <AnnouncementItem key={a.id} item={a} actions={actions} onOpen={(i) => markRead.mutate(i.id)} />)}
+      {list.data?.map((a) => <AnnouncementItem key={a.id} item={a} actions={actions} focused={a.id === openId} onOpen={(i) => markRead.mutate(i.id)} />)}
       {isAdmin && <ExpiredSection actions={actions} />}
       <Dialogs dialog={dialog} close={() => setDialog(null)} />
     </Stack>

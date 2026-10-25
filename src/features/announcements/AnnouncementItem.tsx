@@ -45,6 +45,8 @@ export interface AnnouncementItemProps {
   onOpen?: (item: Item) => void
   /** Admin only: shows the edit/delete menu. */
   actions?: AdminActions
+  /** Deep-linked (?open=): opens expanded (so it is marked read) and scrolls into view. */
+  focused?: boolean
 }
 
 function Header({ item, expired, opened, onToggle }: { item: Item; expired: boolean; opened: boolean; onToggle: () => void }) {
@@ -69,8 +71,12 @@ function Header({ item, expired, opened, onToggle }: { item: Item; expired: bool
  * One announcement. Pinned and unread items open with their full body (an unread one is marked read once,
  * as it is shown); read items show a 2-line preview and expand on tap.
  */
-export function AnnouncementItem({ item, expired = false, onOpen, actions }: AnnouncementItemProps) {
-  const [opened, setOpened] = useState(() => item.pinned || (!item.isRead && !expired))
+export function AnnouncementItem({ item, expired = false, onOpen, actions, focused = false }: AnnouncementItemProps) {
+  const [opened, setOpened] = useState(() => focused || item.pinned || (!item.isRead && !expired))
+  const card = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (focused) card.current?.scrollIntoView?.({ block: 'start' })
+  }, [focused])
   const reported = useRef(false)
   const report = useRef(onOpen)
   useEffect(() => {
@@ -83,7 +89,7 @@ export function AnnouncementItem({ item, expired = false, onOpen, actions }: Ann
     }
   }, [opened, item])
   return (
-    <Card padding={0} data-testid={`announcement-${item.id}`} style={expired ? { opacity: 0.8 } : undefined}>
+    <Card ref={card} padding={0} data-testid={`announcement-${item.id}`} style={expired ? { opacity: 0.8 } : undefined}>
       <Group wrap="nowrap" gap={0} align="center">
         <Header item={item} expired={expired} opened={opened} onToggle={() => setOpened(!opened)} />
         {actions && <ItemMenu item={item} actions={actions} />}
