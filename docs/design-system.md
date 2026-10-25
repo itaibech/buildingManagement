@@ -33,6 +33,7 @@ Status mapping (never deviate):
 - balance: > 0 is owed (`debt`), 0 is settled (`paid`), < 0 is credit (`paid` with the label "זיכוי")
 - fee source: building = `stone`, custom amount = `enamel`, exempt = `stone` (a neutral state)
 - meetings: טיוטה = `stone`, זימון נשלח = `enamel`, מתקיימת / ממתינה לפרסום = `signal`, פורסם = `paid`
+- budget line source: קבוע (recurring yearly default) = `enamel`, חד פעמי = `stone`
 - apartment tags (`ApartmentTags`): נציג ועד = `stone`, הוראת קבע = `enamel`, עמדת טעינה = `stone` with a bolt icon
 - `paid` and `debt` may also be used for success progress (e.g. the collection bar) and for destructive actions / error alerts.
 

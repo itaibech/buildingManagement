@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { isFeeMode, type FeeMode } from '../../ui/feeBadge'
 import { notifyError } from '../../ui/notify'
 import { billingOf, useApartmentBilling, useApartments, useResidents } from '../tenants/api'
+import { isBudgetSource, type BudgetPayload, type BudgetSource, type BudgetSummary } from './budget'
 import type { TimelineRow } from './feeTimeline'
 import { RECEIPT_BUCKET, receiptMime, receiptPath, shiftMonth, sortBalances, type LedgerRow } from './ledger'
 
@@ -185,14 +186,14 @@ export function useCollectionSummary(month: string, enabled = true) {
   })
 }
 
-export interface ExpenseReportRow { category: string; month: string; total: number }
+export interface ExpenseReportRow { categoryId: string; category: string; month: string; total: number }
 
 /** rpc('building_expense_report'): what the building spent in `year` per category and month (sums only). */
 export function useExpenseReport(year: number) {
   return useQuery({
     queryKey: [...KEY, 'expense-report', year],
     queryFn: async (): Promise<ExpenseReportRow[]> =>
-      must(await supabase.rpc('building_expense_report', { p_year: year })).map((r) => ({ category: r.category, month: r.month, total: num(r.total) })),
+      must(await supabase.rpc('building_expense_report', { p_year: year })).map((r) => ({ categoryId: r.category_id, category: r.category, month: r.month, total: num(r.total) })),
   })
 }
 
@@ -542,8 +543,63 @@ export function useBudgets(year: number) {
   })
 }
 
-/** Sets a category's planned amount for a year (one line per year and category). */
-export function useSaveBudget() {
-  return useFinanceMutation(async (values: { year: number; category_id: string; amount: number }) =>
-    fail((await supabase.from('budgets').upsert(values, { onConflict: 'year,category_id' })).error))
+export interface PlannedBudget extends Budget { source: BudgetSource }
+
+const planKey = (year: number) => [...KEY, 'budget-plan', year] as const
+
+/** rpc('budget_for_year'): each category's planned amount for `year` (one-off, else the recurring default). */
+export function useBudgetPlan(year: number) {
+  return useQuery({
+    queryKey: planKey(year),
+    queryFn: async (): Promise<PlannedBudget[]> =>
+      must(await supabase.rpc('budget_for_year', { p_year: year })).map((r) => ({
+        id: `${r.category_id}:${year}`, year, category_id: r.category_id, category: r.category, amount: num(r.amount),
+        source: isBudgetSource(r.source) ? r.source : 'default',
+      })),
+  })
+}
+
+/** Applies a write to the cached plan at once, so the table's difference column updates before the server answers. */
+function applyToPlan(plan: PlannedBudget[], p: BudgetPayload, names: ReadonlyMap<string, string>): PlannedBudget[] {
+  const source: BudgetSource = p.scope === 'once' ? 'one_off' : 'default'
+  const next = plan.filter((b) => !p.lines.some((l) => l.category_id === b.category_id))
+  const added = p.lines.map((l) => ({ id: `${l.category_id}:${p.year}`, year: p.year, category_id: l.category_id, category: names.get(l.category_id) ?? '', amount: l.amount, source }))
+  return [...next, ...added]
+}
+
+/** rpc('set_budgets'): writes lines for a year as a recurring default or a one-off (admins only; the server checks). */
+export function useSetBudgets(names: ReadonlyMap<string, string> = new Map()) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: BudgetPayload): Promise<number> => {
+      const { data, error } = await supabase.rpc('set_budgets', { p_year: p.year, p_scope: p.scope, p_lines: p.lines.map((l) => ({ ...l })) })
+      fail(error)
+      return data ?? 0
+    },
+    onMutate: async (p: BudgetPayload) => {
+      await client.cancelQueries({ queryKey: planKey(p.year) })
+      const before = client.getQueryData<PlannedBudget[]>(planKey(p.year))
+      if (before) client.setQueryData(planKey(p.year), applyToPlan(before, p, names))
+      return { before }
+    },
+    onError: (_e, p, ctx) => {
+      if (ctx?.before) client.setQueryData(planKey(p.year), ctx.before)
+      notifyError(he.toast.failed)
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: KEY }),
+  })
+}
+
+/** rpc('budget_summary'): the year's expected income, actual income and expenses, and the expected balance. */
+export function useBudgetSummary(year: number) {
+  return useQuery({
+    queryKey: [...KEY, 'budget-summary', year],
+    queryFn: async (): Promise<BudgetSummary> => {
+      const r = must(await supabase.rpc('budget_summary', { p_year: year }))[0]
+      return {
+        expectedIncome: num(r?.expected_income), actualIncome: num(r?.actual_income), actualExpenses: num(r?.actual_expenses),
+        projectedExpenses: num(r?.projected_expenses), expectedBalance: num(r?.expected_balance),
+      }
+    },
+  })
 }

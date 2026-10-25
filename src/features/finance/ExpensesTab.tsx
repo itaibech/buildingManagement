@@ -1,6 +1,7 @@
 import { ActionIcon, Button, Card, Divider, Group, Menu, Stack, Text, Title } from '@mantine/core'
 import { IconDots, IconPaperclip, IconPencil, IconTrash } from '@tabler/icons-react'
 import { Fragment, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { todayISO } from '../../lib/dates'
 import { formatDate, formatILS, monthLabel } from '../../lib/format'
 import { he } from '../../lib/he'
@@ -123,7 +124,9 @@ function RemoveDialog({ removing, onClose }: { removing: Removing; onClose: () =
 
 /** Admin "הוצאות": month filter, expenses by category, recurring templates. The page FAB adds an expense. */
 export function ExpensesTab({ adding, onAdd, onAddingClose }: { adding: boolean; onAdd: () => void; onAddingClose: () => void }) {
-  const [month, setMonth] = useState(() => monthOf(todayISO()))
+  const [params] = useSearchParams()
+  // ?month=YYYY-MM-01 (the budget's "הוצאות לפי חודש" opens a month here).
+  const [month, setMonth] = useState(() => (/^\d{4}-\d{2}-01$/.test(params.get('month') ?? '') ? (params.get('month') ?? '') : monthOf(todayISO())))
   const [sheet, setSheet] = useState<Sheet>(null)
   const [removing, setRemoving] = useState<Removing>(null)
   const [exporting, setExporting] = useState(false)
