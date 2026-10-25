@@ -119,6 +119,19 @@ describe('handle: ticket, debt, test', () => {
     expect(r.body).toMatchObject({ sent: 1, skipped: [2] })
     expect(d.data.logs[0]).toMatchObject({ kind: 'debt', skipped: 1 })
   })
+  it('status: answers whether sending is live, without reading data, sending or logging (no profile email needed)', async () => {
+    const d = deps({ data: fakeData({ context: async () => { throw new Error('must not read') } }) })
+    const r = await handle({ kind: 'test', preview: true, status: true }, d)
+    expect(r).toEqual({ status: 200, body: { status: true, dryRun: true, reason: 'not_configured' } })
+    expect(d.transport.sent).toEqual([])
+    expect(d.data.logs).toEqual([])
+    const live = await handle({ kind: 'test', preview: true, status: true }, deps({ transport: fakeTransport(false) }))
+    expect(live.body).toEqual({ status: true, dryRun: false, reason: null })
+  })
+  it('status: still admin only', async () => {
+    const r = await handle({ kind: 'test', preview: true, status: true }, deps({ caller: async () => ({ userId: 'u2', isAdmin: false }) }))
+    expect(r.status).toBe(403)
+  })
   it("test: one email to the admin's own address", async () => {
     const d = deps()
     await handle({ kind: 'test' }, d)

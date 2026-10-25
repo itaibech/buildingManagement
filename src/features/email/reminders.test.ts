@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { daysSince, lastReminders, reminderState } from './reminders'
+import { daysSince, emailStatusOf, lastReminders, reminderState } from './reminders'
 
 const log = [
   { created_at: '2026-10-20T08:00:00Z', apartment_ids: ['a1', 'a2'], dry_run: false },
@@ -38,5 +38,19 @@ describe('reminderState', () => {
   })
   it('while the status is loading it waits (disabled, no reason)', () => {
     expect(reminderState({ hasEmail: true, status: 'loading' })).toEqual({ disabled: true, reason: null, testMode: false })
+  })
+})
+
+describe('emailStatusOf (send-email status reply)', () => {
+  it('any HTTP reply is reachable; dryRun comes from the body', () => {
+    expect(emailStatusOf(200, { status: true, dryRun: false })).toBe('live')
+    expect(emailStatusOf(200, { status: true, dryRun: true })).toBe('dryRun')
+    expect(emailStatusOf(400, { error: 'לא נמצאה כתובת מייל בפרופיל שלכם' })).toBe('dryRun')
+    expect(emailStatusOf(403, { dryRun: false })).toBe('live')
+  })
+  it('only a network error or a 5xx is unavailable', () => {
+    expect(emailStatusOf(null, null)).toBe('unavailable')
+    expect(emailStatusOf(500, { error: 'x' })).toBe('unavailable')
+    expect(emailStatusOf(503, null)).toBe('unavailable')
   })
 })

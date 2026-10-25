@@ -32,3 +32,14 @@ export function reminderState({ hasEmail, status }: { hasEmail: boolean; status:
   if (status === 'loading') return { disabled: true, reason: null, testMode: false }
   return { disabled: false, reason: null, testMode: status === 'dryRun' }
 }
+
+/**
+ * send-email's availability from its status reply. Any HTTP answer (4xx included) means the function is reachable;
+ * dryRun is read from the body (when it isn't there, sending is treated as test mode). Only a network error (no
+ * status) or a 5xx is 'unavailable'.
+ */
+export function emailStatusOf(httpStatus: number | null, body: unknown): Exclude<EmailStatus, 'loading'> {
+  if (httpStatus === null || httpStatus >= 500) return 'unavailable'
+  const dryRun = typeof body === 'object' && body !== null && 'dryRun' in body ? body.dryRun : undefined
+  return dryRun === false ? 'live' : 'dryRun'
+}

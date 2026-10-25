@@ -5,7 +5,7 @@ import { he } from '../../lib/he'
 import { supabase } from '../../lib/supabase'
 import { notifyError, notifyInfo, notifySuccess } from '../../ui/notify'
 import { planCalls } from './chunks'
-import type { DebtLogRow, EmailStatus } from './reminders'
+import { emailStatusOf, type DebtLogRow, type EmailStatus } from './reminders'
 
 export type EmailKind = 'announcement' | 'ticket' | 'debt' | 'test' | 'meeting'
 export type MeetingEmailVariant = 'invite' | 'update' | 'published'
@@ -156,17 +156,21 @@ export function useEmailLog() {
   })
 }
 
-/** Whether send-email can send: from the preview of a test email (no email is sent). Unreachable = 'unavailable'. */
+/** send-email's status reply (kind 'test', preview, status): the HTTP status (null on a network error) and the body. */
+async function fetchEmailStatus(): Promise<Exclude<EmailStatus, 'loading'>> {
+  const { data, error } = await supabase.functions.invoke<unknown>('send-email', { body: { kind: 'test', preview: true, status: true } })
+  if (!error) return emailStatusOf(200, data)
+  if (error instanceof FunctionsHttpError && error.context instanceof Response) {
+    return emailStatusOf(error.context.status, await error.context.json().catch(() => null))
+  }
+  return emailStatusOf(null, null)
+}
+
+/** Whether send-email can send (no email is sent): live, dry run (test mode), or unreachable. */
 export function useEmailStatus(): EmailStatus {
-  const q = useQuery({
-    queryKey: ['email', 'status'],
-    retry: false,
-    staleTime: 10 * 60_000,
-    queryFn: async (): Promise<boolean> => (await invoke({ kind: 'test', preview: true })).dryRun === true,
-  })
+  const q = useQuery({ queryKey: ['email', 'status'], retry: false, staleTime: 10 * 60_000, queryFn: fetchEmailStatus })
   if (q.isLoading) return 'loading'
-  if (q.isError) return 'unavailable'
-  return q.data ? 'dryRun' : 'live'
+  return q.data ?? 'unavailable'
 }
 
 /** The debt reminders sent (email_log; RLS: admins only), for "נשלחה תזכורת לפני X ימים". */
