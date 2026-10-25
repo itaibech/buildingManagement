@@ -45,8 +45,8 @@ function EditButton({ row, onEdit }: { row: BudgetRow; onEdit?: (r: BudgetRow) =
 /** The planned amount with its "קבוע" / "חד פעמי" badge and, for admins, the ✏️ button. */
 function Planned({ row, onEdit }: { row: BudgetRow; onEdit?: (r: BudgetRow) => void }) {
   return (
-    <Group gap={6} wrap="nowrap" justify="flex-end">
-      {row.source && <StatusBadge kind="budget" value={row.source} />}
+    <Group gap={6} wrap="wrap" justify="flex-end">
+      {row.source && <span style={{ flexShrink: 0 }}><StatusBadge kind="budget" value={row.source} /></span>}
       <span>{formatILS(row.planned)}</span>
       <EditButton row={row} onEdit={onEdit} />
     </Group>

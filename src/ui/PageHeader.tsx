@@ -74,8 +74,8 @@ function Primary({ action }: { action: PrimaryAction }) {
 /** Page title in Secular One; the optional primary action becomes a FAB above the tab bar on mobile. */
 export function PageHeader({ title, action, secondaryAction, extra, subtitle }: PageHeaderProps) {
   return (
-    <Group justify="space-between" align="center" mb="lg" wrap="nowrap">
-      <Stack gap={2} style={{ minWidth: 0 }}>
+    <Group justify="space-between" align="center" mb="lg" wrap="wrap" style={{ rowGap: 8 }}>
+      <Stack gap={2} style={{ minWidth: 0, flexShrink: 0, maxWidth: '100%' }}>
         <Title order={1} fz={{ base: 'h2', sm: 'h1' }}>
           {title}
         </Title>
