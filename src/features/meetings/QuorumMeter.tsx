@@ -8,7 +8,7 @@ const L = he.meetings.live
 /** "נוכחות: 9 מתוך 17 דירות · נדרש מניין: 9 ✓", live, pinned at the top while scrolling the list. */
 export function QuorumMeter({ q }: { q: QuorumState }) {
   const color = q.valid ? 'paid' : 'debt'
-  const label = q.met ? L.quorumMet : q.valid ? L.quorumPostponed : L.quorumMissing
+  const label = q.none ? L.quorumNone : q.met ? L.quorumMet : q.valid ? L.quorumPostponed : L.quorumMissing
   return (
     <Card padding="sm" className="bm-sticky" aria-live="polite">
       <Group justify="space-between" wrap="wrap" gap="xs">

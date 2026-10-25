@@ -1,10 +1,15 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { saveAttendance, saveItem, type AttendanceValue, type ItemPatch } from './api'
 import { useAutosave } from './autosave'
-import { voteError } from './votes'
+import { voteError, voteLimit } from './votes'
 import { ABSENT, attKey, attendanceFrom, heldIds, itemKey, itemPatchFrom, itemPatchOf, mergeAttendance, mergeItems, releasable } from './liveDraft'
 import { attendingCount } from './quorum'
 import { votesOf, type AgendaItem, type MeetingDetail } from './types'
+
+const VOTE_KEYS = ['votes_for', 'votes_against', 'votes_abstain'] as const
+/** The item after a patch; new counts are checked against the attendance now (the server stores it with the vote). */
+const applyPatch = (cur: AgendaItem, patch: ItemPatch): AgendaItem =>
+  ({ ...cur, ...patch, ...(VOTE_KEYS.some((k) => k in patch) ? { attendees_at_vote: null } : {}) })
 
 /**
  * The live meeting's editable state (attendance and agenda items), autosaved row by row with a device draft.
@@ -36,11 +41,11 @@ export function useLiveMeeting(meeting: MeetingDetail) {
   const setItem = (id: string, patch: ItemPatch) => {
     const cur = items.find((i) => i.id === id)
     if (!cur) return
-    const next = { ...cur, ...patch }
+    const next = applyPatch(cur, patch)
     setEdited((cur) => ({ ...cur, [id]: next }))
     const votes = votesOf(next)
     // Always kept on the device; sent once the vote fits the attendee count (the server would refuse it).
-    const over = !!votes && !!voteError(votes, attending)
+    const over = !!votes && !!voteError(votes, voteLimit(next, attending))
     if (over) {
       held.current.add(id)
       hold(itemKey(id), { ...itemPatchOf(next) })

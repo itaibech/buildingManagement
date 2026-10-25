@@ -13,6 +13,7 @@ import { InviteDialog } from './InviteDialog'
 import { LiveItem } from './LiveItem'
 import { Opening } from './LiveOpening'
 import { MeetingOverview } from './MeetingOverview'
+import { QuickStartDialog } from './QuickStart'
 import type { MeetingDetail } from './types'
 
 const mutate = vi.fn()
@@ -38,8 +39,9 @@ const button = (name: string) => screen.queryByRole('button', { name })
 beforeEach(() => mutate.mockReset())
 
 describe('buttons per state', () => {
-  it('draft: edit, invite and delete; no run', () => {
+  it('draft: edit, invite, quick start and delete; no run', () => {
     wrap(<MeetingOverview meeting={withStatus('draft', { invited_at: null })} isAdmin onRun={vi.fn()} />)
+    expect(button(A.quickStart)).toBeInTheDocument()
     expect(button(A.edit)).toBeInTheDocument()
     expect(button(A.invite)).toBeInTheDocument()
     expect(button(A.delete)).toBeInTheDocument()
@@ -122,7 +124,7 @@ describe('"פה אחד"', () => {
 })
 
 describe('opening after a postponement', () => {
-  const q = { total: 5, attending: 3, required: 3, met: true, postponed: true, valid: true }
+  const q = { total: 5, attending: 3, required: 3, met: true, postponed: true, valid: true, none: false }
   // A fixed midday clock (Israel 14:00), so the typed times below never wrap around midnight.
   beforeEach(() => { vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] }); vi.setSystemTime(new Date('2026-11-03T12:00:00Z')) })
   afterEach(() => vi.useRealTimers())
@@ -132,7 +134,7 @@ describe('opening after a postponement', () => {
 
   it('stays disabled, with a countdown, until the postponed time has passed (even with the postponed time typed)', () => {
     render(at(3))
-    expect(screen.getByText(he.meetings.live.opensIn(3))).toBeInTheDocument()
+    expect(screen.getByText(he.meetings.live.opensIn(he.meetings.wait.single(he.meetings.wait.minutes(3))))).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText(he.meetings.live.openingTime), { target: { value: '14:03' } })
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: he.meetings.live.open })).toBeDisabled()
@@ -147,7 +149,7 @@ describe('opening after a postponement', () => {
     expect(open).toBeEnabled()
     expect(screen.getByLabelText(he.meetings.live.openingTime)).toHaveValue('14:02')
     fireEvent.click(open)
-    expect(onOpen).toHaveBeenCalledWith({ openedAt: null, chair: 'א', secretary: 'ב' })
+    expect(onOpen).toHaveBeenCalledWith({ openedAt: null, chair: 'א', secretary: 'ב', override: false })
   })
 
   it('a postponed time with seconds, passed 5 seconds ago, is open at once', () => {
@@ -170,5 +172,74 @@ describe('opening after a postponement', () => {
     fireEvent.change(time, { target: { value: '15:00' } })
     expect(screen.getByRole('alert')).toHaveTextContent(he.meetings.live.future)
     expect(open).toBeDisabled()
+  })
+})
+
+describe('opening without quorum', () => {
+  const L = he.meetings.live
+  const noQuorum = { total: 5, attending: 1, required: 3, met: false, postponed: false, valid: false, none: false }
+  beforeEach(() => { vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] }); vi.setSystemTime(new Date('2026-11-03T12:00:00Z')) })
+  afterEach(() => vi.useRealTimers())
+  const open = (q: typeof noQuorum, o: Partial<MeetingDetail> = {}, onOpen = vi.fn()) => {
+    wrap(<Opening meeting={withStatus('invited', { chair_name: 'א', secretary_name: 'ב', postponed_to: null, ...o })} q={q} names={[]} busy={false} onOpen={onOpen} />)
+    return onOpen
+  }
+
+  it('"פתיחה ללא מניין" opens only once confirmed, and says so', () => {
+    const onOpen = open(noQuorum)
+    const button = screen.getByRole('button', { name: L.open })
+    expect(button).toBeDisabled()
+    fireEvent.click(screen.getByRole('checkbox', { name: L.overrideConfirm }))
+    expect(button).toBeEnabled()
+    fireEvent.click(button)
+    expect(onOpen).toHaveBeenCalledWith({ openedAt: null, chair: 'א', secretary: 'ב', override: true })
+  })
+
+  it('a postponed meeting shows the wait in hours and minutes, and the override skips it', () => {
+    const postponed_to = new Date(Date.now() + 2241 * 60_000).toISOString()
+    const onOpen = open({ ...noQuorum, postponed: true, valid: true }, { postponed_at: new Date().toISOString(), postponed_to })
+    expect(screen.getByText(L.opensIn('בעוד 37 שעות ו-21 דקות'))).toBeInTheDocument()
+    expect(screen.getByText(L.earliest('05/11 03:21'))).toBeInTheDocument()
+    const button = screen.getByRole('button', { name: L.open })
+    expect(button).toBeDisabled()
+    fireEvent.click(screen.getByRole('checkbox', { name: L.overrideConfirm }))
+    expect(button).toBeEnabled()
+    fireEvent.click(button)
+    expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ override: true }))
+  })
+
+  it('"ללא דרישת מניין": open at once, no override offered', () => {
+    open({ total: 5, attending: 0, required: 0, met: true, postponed: false, valid: true, none: true }, { kind: 'committee', quorum_mode: 'none' })
+    expect(screen.getByRole('button', { name: L.open })).toBeEnabled()
+    expect(screen.queryByRole('checkbox', { name: L.overrideConfirm })).not.toBeInTheDocument()
+  })
+})
+
+describe('quick start', () => {
+  const Q = he.meetings.quick
+  const fill = () => {
+    fireEvent.change(screen.getByLabelText(new RegExp(he.meetings.live.chair)), { target: { value: 'יו"ר' } })
+    fireEvent.change(screen.getByLabelText(new RegExp(he.meetings.live.secretary)), { target: { value: 'מזכיר' } })
+  }
+
+  it('from the list, a committee meeting starts with just the roles (no quorum rule)', () => {
+    wrap(<QuickStartDialog opened onClose={vi.fn()} />)
+    const start = screen.getByRole('button', { name: Q.start })
+    expect(start).toBeDisabled()
+    fill()
+    expect(screen.queryByText(Q.generalWarning)).not.toBeInTheDocument()
+    expect(start).toBeEnabled()
+    fireEvent.click(start)
+    expect(mutate).toHaveBeenCalled()
+  })
+
+  it('a tenants\' assembly warns (non-blocking) and needs the override, since no attendance is taken yet', () => {
+    wrap(<QuickStartDialog opened meeting={withStatus('draft', { kind: 'general', quorum_mode: 'majority' })} onClose={vi.fn()} />)
+    fill()
+    expect(screen.getByText(Q.generalWarning)).toBeInTheDocument()
+    const start = screen.getByRole('button', { name: Q.start })
+    expect(start).toBeDisabled()
+    fireEvent.click(screen.getByRole('checkbox', { name: he.meetings.live.overrideConfirm }))
+    expect(start).toBeEnabled()
   })
 })

@@ -1,5 +1,5 @@
 import { Button, Group, Stack } from '@mantine/core'
-import { IconPencil, IconPlayerPlay, IconSend, IconTrash } from '@tabler/icons-react'
+import { IconBolt, IconPencil, IconPlayerPlay, IconSend, IconTrash } from '@tabler/icons-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { he } from '../../lib/he'
@@ -13,12 +13,13 @@ import { actionsFor, type MeetingAction } from './lifecycle'
 import { MeetingDetails } from './MeetingDetails'
 import { MeetingEmailDialog } from './MeetingEmailDialog'
 import { MeetingForm } from './MeetingForm'
+import { QuickStartDialog } from './QuickStart'
 import type { MeetingDetail } from './types'
 
-type Dialog = 'edit' | 'invite' | 'updateInvite' | 'delete' | 'emailInvite' | 'emailUpdate' | null
+type Dialog = 'edit' | 'invite' | 'updateInvite' | 'delete' | 'quickStart' | 'emailInvite' | 'emailUpdate' | null
 const A = he.meetings.actions
 const ICON = { size: 18, stroke: 1.75 } as const
-const ICONS: Partial<Record<MeetingAction, typeof IconPencil>> = { edit: IconPencil, invite: IconSend, updateInvite: IconSend, run: IconPlayerPlay, delete: IconTrash }
+const ICONS: Partial<Record<MeetingAction, typeof IconPencil>> = { edit: IconPencil, invite: IconSend, updateInvite: IconSend, run: IconPlayerPlay, delete: IconTrash, quickStart: IconBolt }
 
 function Actions({ meeting, onAction }: { meeting: MeetingDetail; onAction: (a: MeetingAction) => void }) {
   return (
@@ -49,6 +50,7 @@ function Dialogs({ meeting, dialog, setDialog }: { meeting: MeetingDetail; dialo
         onSent={(email) => setDialog(email ? (dialog === 'invite' ? 'emailInvite' : 'emailUpdate') : null)} />
       <MeetingEmailDialog opened={dialog === 'emailInvite' || dialog === 'emailUpdate'} onClose={close} meetingId={meeting.id}
         title={meeting.title} variant={dialog === 'emailUpdate' ? 'update' : 'invite'} />
+      <QuickStartDialog opened={dialog === 'quickStart'} meeting={meeting} onClose={close} />
       <ConfirmDialog opened={dialog === 'delete'} title={he.meetings.deleteTitle} body={he.meetings.deleteBody} confirmLabel={A.delete}
         loading={call.isPending} failed={call.isError} onConfirm={remove} onClose={close} />
     </>
@@ -59,7 +61,7 @@ function Dialogs({ meeting, dialog, setDialog }: { meeting: MeetingDetail; dialo
 export function MeetingOverview({ meeting, isAdmin, onRun }: { meeting: MeetingDetail; isAdmin: boolean; onRun: () => void }) {
   const apartments = useApartments()
   const [dialog, setDialog] = useState<Dialog>(null)
-  const onAction = (a: MeetingAction) => (a === 'run' ? onRun() : setDialog(a === 'edit' || a === 'invite' || a === 'updateInvite' || a === 'delete' ? a : null))
+  const onAction = (a: MeetingAction) => (a === 'run' ? onRun() : setDialog(a === 'edit' || a === 'invite' || a === 'updateInvite' || a === 'delete' || a === 'quickStart' ? a : null))
   return (
     <Stack gap="md">
       {isAdmin && <Actions meeting={meeting} onAction={onAction} />}

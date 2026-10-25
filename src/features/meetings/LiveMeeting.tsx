@@ -60,7 +60,7 @@ export function LiveMeeting({ meeting }: { meeting: MeetingDetail }) {
   const q = quorumState(ruleOf(meeting), lines.length, Object.values(live.attendance), meeting.postponed_at !== null)
   const names = lines.flatMap((l) => [live.attendance[l.id]?.attendee_name, live.attendance[l.id]?.proxy_name]).filter((n): n is string => !!n?.trim())
   const run = (fn: () => Promise<void>, done: string) => call.mutate(async () => { await live.flush(); await fn() }, { onSuccess: () => notifySuccess(done) })
-  const open = (v: OpeningValues) => run(() => meetingRpc.open(meeting.id, v.openedAt, v.chair, v.secretary), L.opened)
+  const open = (v: OpeningValues) => run(() => meetingRpc.open(meeting.id, v.openedAt, v.chair, v.secretary, v.override), L.opened)
   const inProgress = meeting.status === 'in_progress'
   return (
     <Stack gap="md">
@@ -72,9 +72,11 @@ export function LiveMeeting({ meeting }: { meeting: MeetingDetail }) {
         <SegmentedControl fullWidth size="md" value={view} onChange={(v) => setView(v === 'agenda' ? 'agenda' : 'attendance')}
           data={[{ value: 'agenda', label: L.agenda }, { value: 'attendance', label: L.attendance }]} />
       )}
-      {!inProgress && <Postponement meeting={meeting} q={q} busy={call.isPending} onPostpone={() => run(() => meetingRpc.postpone(meeting.id), L.postponedToast)} />}
+      {!inProgress && <Postponement meeting={meeting} q={q} busy={call.isPending} onPostpone={() => run(() => meetingRpc.postpone(meeting.id), L.postponedToast)}
+        onCancel={() => run(() => meetingRpc.cancelPostpone(meeting.id), L.postponeCancelled)} />}
       {(view === 'attendance' || !inProgress) && (
-        <LiveAttendance meetingId={meeting.id} apartments={lines} values={live.attendance} absent={live.absent} onChange={live.setApartment} />
+        <LiveAttendance meetingId={meeting.id} apartments={lines} values={live.attendance} absent={live.absent} onChange={live.setApartment}
+          times={Object.fromEntries(meeting.attendance.flatMap((a) => (a.apartment_id ? [[a.apartment_id, a]] : [])))} />
       )}
       {!inProgress && <Opening key={meeting.postponed_to ?? 'now'} meeting={meeting} q={q} names={names} busy={call.isPending} onOpen={open} />}
       {inProgress && view === 'agenda' && <Agenda live={live} meetingId={meeting.id} />}

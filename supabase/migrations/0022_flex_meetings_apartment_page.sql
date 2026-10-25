@@ -273,8 +273,8 @@ $$;
 -- ================================================================ B. meeting flexibility
 --   * quorum_mode 'none' ("ללא דרישת מניין"; the app's default for a ישיבת ועד): always met.
 --   * Opening needs no attendance first. open_meeting opens when the quorum is met, the rule is 'none', the meeting
---     was postponed and the postponed time has passed (real clock, as before), or p_override_quorum ("פתיחה ללא
---     מניין", confirmed in the app), which also skips a postponement's wait. The override is stored on the meeting
+--     was postponed (then, as before, not before the postponed time by the real clock), or p_override_quorum
+--     ("פתיחה ללא מניין", confirmed in the app; only when the rule isn't met), which also skips a postponement's wait. The override is stored on the meeting
 --     (opened_without_quorum, printed in the protocol) and logged in meeting_events.
 --   * quick_start_meeting: draft → in_progress without an invitation, the time set to now (quick_started).
 --   * cancel_postponement: undoes a postponement made by mistake (logged).
@@ -400,9 +400,9 @@ declare
   v_override boolean := not v_rule_ok and coalesce(p_override, false);
 begin
   perform public.meeting_require(v_rule_ok or v_override or m.postponed_at is not null, 'no_quorum');
-  -- The postponement path (no quorum, no override): not before the postponed time, by the real clock and by the
-  -- recorded opening time.
-  perform public.meeting_require(v_rule_ok or v_override or (now() >= m.postponed_to
+  -- After a postponement (unless overridden): not before the postponed time, by the real clock and by the recorded
+  -- opening time, as in 0021. A postponement made by mistake is undone with cancel_postponement.
+  perform public.meeting_require(m.postponed_at is null or v_override or (now() >= m.postponed_to
     and coalesce(p_opened_at, now()) >= m.postponed_to), 'too_early');
   perform public.meeting_require(coalesce(p_opened_at, now()) <= now() + interval '5 minutes', 'future');
   perform public.meeting_require(trim(coalesce(p_chair, '')) <> '' and trim(coalesce(p_secretary, '')) <> '', 'roles');

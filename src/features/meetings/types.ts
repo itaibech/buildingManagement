@@ -4,7 +4,8 @@ export const MEETING_STATUSES = ['draft', 'invited', 'in_progress', 'closed', 'p
 export type MeetingStatus = (typeof MEETING_STATUSES)[number]
 export const MEETING_KINDS = ['committee', 'general'] as const
 export type MeetingKind = (typeof MEETING_KINDS)[number]
-export const QUORUM_MODES = ['majority', 'percent', 'fixed'] as const
+/** 'none' = ללא דרישת מניין (always met; the default for a ישיבת ועד). */
+export const QUORUM_MODES = ['none', 'majority', 'percent', 'fixed'] as const
 export type QuorumMode = (typeof QUORUM_MODES)[number]
 export const ATTENDANCE_STATUSES = ['present', 'proxy', 'absent'] as const
 export type AttendanceStatus = (typeof ATTENDANCE_STATUSES)[number]
@@ -33,6 +34,10 @@ export interface Meeting {
   secretary_name: string
   closed_at: string | null
   published_at: string | null
+  /** Opened right away from a draft, without an invitation. */
+  quick_started: boolean
+  /** Opened with "פתיחה ללא מניין". */
+  opened_without_quorum: boolean
 }
 
 export interface AgendaItem {
@@ -48,6 +53,8 @@ export interface AgendaItem {
   decision_number: number | null
   item_status: ItemStatus
   added_during_meeting: boolean
+  /** The attendance when the vote was entered (the vote is validated against it). */
+  attendees_at_vote: number | null
   created_at: string
 }
 
@@ -60,6 +67,9 @@ export interface Attendance {
   attendee_name: string
   proxy_name: string
   proxy_file_path: string | null
+  /** Arrival / departure during the meeting (null = from the opening). */
+  arrived_at: string | null
+  left_at: string | null
 }
 
 export interface Signature {

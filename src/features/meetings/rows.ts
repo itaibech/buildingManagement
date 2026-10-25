@@ -19,7 +19,7 @@ export const toMeeting = (r: MeetingRow): Meeting => ({
   quorum_mode: pick(QUORUM_MODES, r.quorum_mode, 'majority'), quorum_value: r.quorum_value, quorum_note: r.quorum_note,
   status: pick(MEETING_STATUSES, r.status, 'draft'), invited_at: r.invited_at, postponed_at: r.postponed_at,
   postponed_to: r.postponed_to, opened_at: r.opened_at, chair_name: r.chair_name, secretary_name: r.secretary_name,
-  closed_at: r.closed_at, published_at: r.published_at,
+  closed_at: r.closed_at, published_at: r.published_at, quick_started: r.quick_started, opened_without_quorum: r.opened_without_quorum,
 })
 
 export const toItem = (r: ItemRow): AgendaItem => ({ ...r, item_status: pick(ITEM_STATUSES, r.item_status, 'open') })
@@ -27,7 +27,7 @@ export const toItem = (r: ItemRow): AgendaItem => ({ ...r, item_status: pick(ITE
 export const toAttendance = (r: AttendanceRow): Attendance => ({
   id: r.id, meeting_id: r.meeting_id, apartment_id: r.apartment_id, apartment_number: r.apartment_number,
   status: pick(ATTENDANCE_STATUSES, r.status, 'absent'), attendee_name: r.attendee_name, proxy_name: r.proxy_name,
-  proxy_file_path: r.proxy_file_path,
+  proxy_file_path: r.proxy_file_path, arrived_at: r.arrived_at, left_at: r.left_at,
 })
 
 export const toSignature = (r: SignatureRow): Signature => ({

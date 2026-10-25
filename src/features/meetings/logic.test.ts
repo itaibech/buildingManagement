@@ -46,7 +46,7 @@ describe('decision numbering', () => {
 
 describe('lifecycle', () => {
   it('offers the actions of each state', () => {
-    expect(actionsFor('draft')).toEqual(['edit', 'invite', 'delete'])
+    expect(actionsFor('draft')).toEqual(['edit', 'invite', 'quickStart', 'delete'])
     expect(actionsFor('invited')).toEqual(['run', 'edit', 'updateInvite'])
     expect(actionsFor('in_progress')).toEqual(['run'])
     expect(actionsFor('closed')).toEqual(['sign', 'publish', 'addendum', 'print'])
@@ -95,7 +95,7 @@ describe('Israel time', () => {
 describe('live draft', () => {
   it('applies device drafts over server rows, field-checked', async () => {
     const { mergeAttendance, itemPatchFrom } = await import('./liveDraft')
-    const rows = [{ id: 'r', meeting_id: 'm', apartment_id: 'a1', apartment_number: 1, status: 'present', attendee_name: 'א', proxy_name: '', proxy_file_path: null }] as const
+    const rows = [{ id: 'r', meeting_id: 'm', apartment_id: 'a1', apartment_number: 1, status: 'present', attendee_name: 'א', proxy_name: '', proxy_file_path: null, arrived_at: null, left_at: null }] as const
     const merged = mergeAttendance(rows, { 'att:a1': { status: 'proxy', proxy_name: 'ב' }, 'att:a2': { status: 'bogus' } })
     expect(merged.a1).toEqual({ status: 'proxy', attendee_name: 'א', proxy_name: 'ב', proxy_file_path: null })
     expect(merged.a2?.status).toBe('absent')
@@ -115,3 +115,22 @@ describe('held votes', () => {
     expect([...heldIds({ 'item:x': { __held: true }, 'item:y': {}, 'att:z': { __held: true } })]).toEqual(['x'])
   })
 })
+
+describe('postponement times', () => {
+  it('a wait in hours and minutes, never thousands of minutes', async () => {
+    const { waitText } = await import('./fmt')
+    expect(waitText(2241 * 60_000)).toBe('בעוד 37 שעות ו-21 דקות')
+    expect(waitText(60 * 60_000)).toBe('בעוד שעה')
+    expect(waitText(125 * 60_000)).toBe('בעוד שעתיים ו-5 דקות')
+    expect(waitText(5 * 60_000)).toBe('בעוד 5 דקות')
+    expect(waitText(20_000)).toBe('בעוד פחות מדקה')
+  })
+  it('the day is shown when it is not today (Israel time)', async () => {
+    const { whenText } = await import('./fmt')
+    const now = new Date('2026-10-23T09:00:00Z')
+    expect(whenText('2026-10-23T18:00:00Z', now)).toBe('21:00')
+    expect(whenText('2026-10-24T18:00:00Z', now)).toBe('מחר 21:00')
+    expect(whenText('2026-10-26T18:00:00Z', now)).toBe('26/10 20:00') // winter time from 25/10
+  })
+})
+
