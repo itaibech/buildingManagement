@@ -2,7 +2,7 @@
 import { Link, MemoryRouter } from 'react-router'
 import { MantineProvider } from '@mantine/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { he } from '../../lib/he'
 import { theme } from '../../ui/theme'
@@ -15,7 +15,7 @@ const rows: Record<string, unknown[]> = {
   apartments: [
     { id: 'a1', number: 1, floor: 1 },
     { id: 'a5', number: 5, floor: 2 },
-    { id: 'a12', number: 12, floor: 4 },
+    { id: 'a12', number: 12, floor: 4, is_committee: true },
   ],
   residents: [
     { id: 'r1', apartment_id: 'a1', full_name: 'דנה בדיקה', phone: '050-0000001', is_owner: true },
@@ -50,11 +50,11 @@ vi.mock('../../lib/supabase', () => ({
   },
 }))
 
-function renderPage() {
+function renderPage(path = '/directory') {
   return render(
     <MantineProvider theme={theme}>
       <QueryClientProvider client={new QueryClient()}>
-        <MemoryRouter><DirectoryPage /></MemoryRouter>
+        <MemoryRouter initialEntries={[path]}><DirectoryPage /></MemoryRouter>
       </QueryClientProvider>
     </MantineProvider>,
   )
@@ -82,6 +82,24 @@ describe('DirectoryPage', () => {
     expect(await screen.findByText('דנה בדיקה')).toBeInTheDocument()
     expect(screen.queryByText('יוסי לדוגמה')).not.toBeInTheDocument()
     expect(screen.getByLabelText(he.tenants.search)).toHaveValue('דנה')
+  })
+
+  it('marks the committee apartment and filters to it with "נציגי ועד" (also from ?committee=1)', async () => {
+    auth.isAdmin = false
+    renderPage()
+    await screen.findByText('דנה בדיקה')
+    expect(screen.getAllByText(he.tags.committee)).toHaveLength(1)
+    const toggle = screen.getByRole('button', { name: he.tenants.committeeOnly })
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(toggle)
+    expect(screen.queryByText('דנה בדיקה')).toBeNull()
+    expect(screen.getByText('יוסי לדוגמה')).toBeInTheDocument()
+    expect(toggle).toHaveAttribute('aria-pressed', 'true')
+    cleanup()
+    renderPage('/directory?committee=1')
+    expect(await screen.findByText('יוסי לדוגמה')).toBeInTheDocument()
+    expect(screen.queryByText('דנה בדיקה')).toBeNull()
+    auth.isAdmin = true
   })
 
   it('filters by name or apartment number', async () => {

@@ -1,10 +1,10 @@
 import { ActionIcon, Button, Card, Divider, Group, Menu, Stack, Text, TextInput } from '@mantine/core'
-import { IconDots, IconMail, IconMailPlus, IconPencil, IconPhone, IconPlus, IconSearch, IconTrash } from '@tabler/icons-react'
+import { IconDots, IconMail, IconMailPlus, IconPencil, IconPhone, IconPlus, IconSearch, IconTrash, IconUsersGroup } from '@tabler/icons-react'
 import { Fragment, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { useAuth } from '../../auth/AuthProvider'
 import { he } from '../../lib/he'
-import { AptPlate, EmptyState, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
+import { ApartmentTags, AptPlate, EmptyState, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
 import { ApartmentForm } from './ApartmentForm'
 import { useApartments, type Apartment, useDeleteResident, useDirectory, type DirectoryEntry, useProfiles } from './api'
 import { ConfirmDialog, FormModal } from './dialogs'
@@ -18,6 +18,8 @@ interface Group {
   number: number
   apartmentId: string
   entries: DirectoryEntry[]
+  /** The apartment is marked "נציג ועד": residents look for these to reach the committee. */
+  committee?: boolean
 }
 
 function matches(e: DirectoryEntry, q: string): boolean {
@@ -32,6 +34,13 @@ function groupByApartment(entries: DirectoryEntry[]): Group[] {
     else groups.push({ number: e.apartmentNumber, apartmentId: e.apartment_id, entries: [e] })
   }
   return groups
+}
+
+/** Marks committee apartments; `only` keeps just those (the "נציגי ועד" filter). */
+function withCommittee(groups: Group[], all: Apartment[], only: boolean): Group[] {
+  const committee = new Set(all.filter((a) => a.is_committee).map((a) => a.id))
+  const marked = groups.map((g) => ({ ...g, committee: committee.has(g.apartmentId) }))
+  return only ? marked.filter((g) => g.committee) : marked
 }
 
 /** Admins also see apartments nobody lives in (found by number), so residents can be added to them. */
@@ -153,7 +162,10 @@ function ApartmentGroup({ group, actions }: { group: Group; actions: Actions }) 
     return (
       <Group align="flex-start" wrap="nowrap" gap="md" py="sm">
         <AptPlate number={group.number} size="sm" />
-        <ResidentList group={group} actions={actions} />
+        <Stack gap={6} style={{ flex: 1, minWidth: 0 }}>
+          {group.committee && <ApartmentTags committee />}
+          <ResidentList group={group} actions={actions} />
+        </Stack>
       </Group>
     )
   }
@@ -163,6 +175,7 @@ function ApartmentGroup({ group, actions }: { group: Group; actions: Actions }) 
         <Group gap="md" wrap="nowrap">
           <AptPlate number={group.number} size="sm" />
           <Text fw={600}>{he.apartment(group.number)}</Text>
+          {group.committee && <ApartmentTags committee />}
         </Group>
         <ActionIcon variant="subtle" color="stone.7" size={44} aria-label={he.tenants.editApartmentN(group.number)}
           onClick={() => actions.open({ kind: 'apartment', apartmentId: group.apartmentId })}>
@@ -207,6 +220,23 @@ function useInvitable(isAdmin: boolean): (r: DirectoryEntry) => boolean {
   return (r) => Boolean(r.email && profiles.data && !hasAccount(r, profiles.data))
 }
 
+/** The "נציגי ועד" toggle, kept in the URL (?committee=1) so "contact the committee" can link straight to it. */
+function CommitteeFilter({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <Button variant={on ? 'light' : 'default'} aria-pressed={on} leftSection={<IconUsersGroup size={18} stroke={1.75} />}
+      onClick={() => onChange(!on)} style={{ alignSelf: 'flex-start' }}>
+      {he.tenants.committeeOnly}
+    </Button>
+  )
+}
+
+function useCommitteeParam(): [boolean, (on: boolean) => void] {
+  const [params, setParams] = useSearchParams()
+  const on = params.get('committee') === '1'
+  const set = (next: boolean) => setParams((p) => { const n = new URLSearchParams(p); if (next) n.set('committee', '1'); else n.delete('committee'); return n }, { replace: true })
+  return [on, set]
+}
+
 /** Everyone's phone book: residents grouped by apartment, searchable by name or apartment number. */
 export default function DirectoryPage() {
   const directory = useDirectory()
@@ -222,10 +252,13 @@ export default function DirectoryPage() {
   if (linked !== seenLink) { setSeenLink(linked); setQuery(linked ?? '') }
   const q = query.trim()
   const apartments = useApartments()
+  const [committeeOnly, setCommitteeOnly] = useCommitteeParam()
+  const hasCommittee = Boolean(apartments.data?.some((a) => a.is_committee))
   const groups = useMemo(() => {
     const found = groupByApartment((directory.data ?? []).filter((e) => matches(e, q)))
-    return isAdmin ? withEmptyApartments(found, apartments.data ?? [], q) : found
-  }, [directory.data, apartments.data, isAdmin, q])
+    const all = apartments.data ?? []
+    return withCommittee(isAdmin ? withEmptyApartments(found, all, q) : found, all, committeeOnly)
+  }, [directory.data, apartments.data, isAdmin, q, committeeOnly])
   const { action: exportAction, lines } = useDirectoryExport(groups, apartments.data ?? [], q !== '', Boolean(directory.data && apartments.data))
   const empty = directory.data?.length === 0 && !(isAdmin && apartments.data?.length)
   return (
@@ -233,6 +266,7 @@ export default function DirectoryPage() {
       <PageHeader title={he.nav.directory} subtitle={he.nav.hints.directory} secondaryAction={exportAction} />
       <TextInput aria-label={he.tenants.search} placeholder={he.tenants.searchPlaceholder} value={query}
         onChange={(e) => setQuery(e.currentTarget.value)} leftSection={<IconSearch size={18} stroke={1.75} />} type="search" />
+      {(hasCommittee || committeeOnly) && <CommitteeFilter on={committeeOnly} onChange={setCommitteeOnly} />}
       <Card padding="md">
         {directory.isError && <Text c="debt.7">{he.tenants.loadError}</Text>}
         {directory.isLoading && <ListSkeleton rows={5} />}

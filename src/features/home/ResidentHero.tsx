@@ -1,6 +1,6 @@
 import { Anchor, Button, Card, Group, Stack, Text, Title, UnstyledButton } from '@mantine/core'
-import { IconCopy, IconPhone } from '@tabler/icons-react'
-import { useNavigate } from 'react-router'
+import { IconCopy, IconPhone, IconUsersGroup } from '@tabler/icons-react'
+import { Link, useNavigate } from 'react-router'
 import { useAuth } from '../../auth/AuthProvider'
 import { formatDate, formatILS, formatKwh, monthLabel } from '../../lib/format'
 import { he } from '../../lib/he'
@@ -50,6 +50,16 @@ function EvPart() {
   return <Text size="sm" c="dimmed" className="bm-num">{H.evLast(he.ev.kwhValue(formatKwh(last.kwh)), monthLabel(last.month))}</Text>
 }
 
+/** No committee phone set: point to the committee members in the phone book (when the user may open it). */
+function NoContact() {
+  if (!useAuth().can('directory')) return <Text size="sm" c="dimmed">{H.noContact}</Text>
+  return (
+    <Anchor component={Link} to="/directory?committee=1" fw={600} mih={44} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      <IconUsersGroup size={20} stroke={1.75} aria-hidden="true" /><span>{H.committeeLink}</span>
+    </Anchor>
+  )
+}
+
 /** "איך משלמים" (while something is owed) and the committee's phone. Without finance_own: the phone only. */
 function HowToPayPart({ money }: { money: boolean }) {
   const building = useBuilding()
@@ -66,7 +76,7 @@ function HowToPayPart({ money }: { money: boolean }) {
           {text && <Button color="signal" fullWidth leftSection={<IconCopy size={20} stroke={1.75} aria-hidden="true" />} onClick={() => void copyText(text)}>{he.pay.copy}</Button>}
         </>
       )}
-      {!phone && !owes && <Text size="sm" c="dimmed">{H.noContact}</Text>}
+      {!phone && !owes && <NoContact />}
       {phone && (
         <Anchor href={telHref(phone)} fw={600} mih={44} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           <IconPhone size={20} stroke={1.75} aria-hidden="true" /><span>{he.pay.call(phone)}</span>
