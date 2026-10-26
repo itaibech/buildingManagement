@@ -5,7 +5,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(36);
+select plan(43);
 
 insert into auth.users (id, email, aud, role) values
   ('a2800000-0000-0000-0000-000000000001', 'reopen-admin@test.local', 'authenticated', 'authenticated'),
@@ -113,25 +113,57 @@ select lives_ok($$update public.meeting_attendance set arrived_at = null where m
   and apartment_id = 'b2800000-0000-0000-0000-000000000004'$$, 'the arrival time can be cleared (from the opening)');
 update public.meeting_attendance set status = 'absent' where meeting_id = 'e2800000-0000-0000-0000-000000000001'
   and apartment_id = 'b2800000-0000-0000-0000-000000000002';
-select is((select row(status, arrived_at, left_at)::text from public.meeting_attendance where meeting_id = 'e2800000-0000-0000-0000-000000000001'
-  and apartment_id = 'b2800000-0000-0000-0000-000000000002'), '(absent,,)', 'corrected to absent: no departure stamp, absent all along');
+select is((select row(status, arrived_at is not null, left_at)::text from public.meeting_attendance where meeting_id = 'e2800000-0000-0000-0000-000000000001'
+  and apartment_id = 'b2800000-0000-0000-0000-000000000002'), '(absent,t,)', 'corrected to absent: no departure stamp, the stored arrival kept');
+update public.meeting_attendance set status = 'present' where meeting_id = 'e2800000-0000-0000-0000-000000000001'
+  and apartment_id = 'b2800000-0000-0000-0000-000000000002';
+select is((select row(status, arrived_at is not null)::text from public.meeting_attendance where meeting_id = 'e2800000-0000-0000-0000-000000000001'
+  and apartment_id = 'b2800000-0000-0000-0000-000000000002'), '(present,t)', 'absent and back to present: the stored arrival time is not dropped');
+update public.meeting_attendance set status = 'absent' where meeting_id = 'e2800000-0000-0000-0000-000000000001'
+  and apartment_id = 'b2800000-0000-0000-0000-000000000002';
 
--- ---------------------------------------------------------------- correction: agenda and votes
+-- ---------------------------------------------------------------- correction: agenda and votes (attending: 1, 3, 4, 5)
 select lives_ok($$update public.meeting_agenda_items set votes_for = 4, votes_against = 0, votes_abstain = 0
   where meeting_id = 'e2800000-0000-0000-0000-000000000001'$$, 'votes are editable after reopening');
 select is((select attendees_at_vote from public.meeting_agenda_items where meeting_id = 'e2800000-0000-0000-0000-000000000001'), 4,
   'the vote is checked against the corrected attendance');
 select lives_ok($$insert into public.meeting_agenda_items (meeting_id, position, title, decision)
   values ('e2800000-0000-0000-0000-000000000001', 0, 'נושא שנשכח', 'הוחלט')$$, 'items can be added after reopening');
+select is((select added_during_meeting from public.meeting_agenda_items where meeting_id = 'e2800000-0000-0000-0000-000000000001'
+  and title = 'נושא שנשכח'), false, 'an item added during a correction is not marked added during the meeting');
+update public.meeting_attendance set status = 'absent' where meeting_id = 'e2800000-0000-0000-0000-000000000001'
+  and apartment_id = 'b2800000-0000-0000-0000-000000000003';
+select throws_ok($$update public.meeting_agenda_items set decision = 'אושר סופית' where meeting_id = 'e2800000-0000-0000-0000-000000000001'
+  and title = 'אישור תקציב'$$, '23514', null, 'a correction checks a kept vote against the corrected attendance (4 > 3)');
+select throws_like($$select public.close_meeting('e2800000-0000-0000-0000-000000000001')$$, 'meeting:votes%',
+  're-close refuses votes over the corrected attendance');
+update public.meeting_attendance set status = 'present' where meeting_id = 'e2800000-0000-0000-0000-000000000001'
+  and apartment_id = 'b2800000-0000-0000-0000-000000000003';
+update public.meeting_agenda_items set votes_for = 3 where meeting_id = 'e2800000-0000-0000-0000-000000000001' and title = 'אישור תקציב';
+update public.meeting_attendance set status = 'absent' where meeting_id = 'e2800000-0000-0000-0000-000000000001'
+  and apartment_id = 'b2800000-0000-0000-0000-000000000005';
+
+-- ---------------------------------------------------------------- correction: documents and files stay
+reset role;
+insert into public.meeting_documents (id, meeting_id, file_path, file_name, size_bytes) values ('d2800000-0000-0000-0000-000000000001',
+  'e2800000-0000-0000-0000-000000000001', 'e2800000-0000-0000-0000-000000000001/1b9a54c4-3e1f-4b8e-9f0a-2c6d1e7f8a90.pdf', 'סדר יום.pdf', 100);
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"a2800000-0000-0000-0000-000000000001","role":"authenticated"}';
+select throws_ok($$delete from public.meeting_documents where id = 'd2800000-0000-0000-0000-000000000001'$$, '42501', null,
+  'documents cannot be removed during a correction');
+select is(public.meeting_file_status('e2800000-0000-0000-0000-000000000001/1b9a54c4-3e1f-4b8e-9f0a-2c6d1e7f8a90.pdf'), 'closed',
+  'the files of a meeting under correction read as closed (no overwrite or delete)');
 
 -- ---------------------------------------------------------------- closing again
-select lives_ok($$select public.close_meeting('e2800000-0000-0000-0000-000000000001', null)$$, 'closes again');
+select lives_ok($$select public.close_meeting('e2800000-0000-0000-0000-000000000001', now())$$, 'closes again');
 select is((select row(m.status, m.closed_at = o.closed_at, m.reopened_from is null)::text from public.meetings m, orig o
-  where m.id = 'e2800000-0000-0000-0000-000000000001'), '(closed,t,t)', 'closed again at the original closing time');
+  where m.id = 'e2800000-0000-0000-0000-000000000001'), '(closed,t,t)', 'closed again at exactly the original closing time (the time sent is ignored)');
+select is((select attendees_at_vote from public.meeting_agenda_items where meeting_id = 'e2800000-0000-0000-0000-000000000001'
+  and title = 'אישור תקציב'), 3, 're-close refreshes a kept vote''s attendance to the corrected attendance');
 select is((select string_agg(title || '=' || decision_number, ',' order by decision_number) from public.meeting_agenda_items
   where meeting_id = 'e2800000-0000-0000-0000-000000000001'), 'נושא שנשכח=1,אישור תקציב=2', 'decisions renumbered on re-close');
-select is((select count(*)::int from public.meeting_events where meeting_id = 'e2800000-0000-0000-0000-000000000001' and kind = 'closed'), 2,
-  'both closes are logged');
+select is((select string_agg(kind, ',' order by created_at) from public.meeting_events where meeting_id = 'e2800000-0000-0000-0000-000000000001'
+  and kind in ('closed', 'reopened', 'reclosed')), 'closed,reopened,reclosed', 'the close, the reopen and the re-close are logged');
 select throws_ok($$update public.meeting_attendance set status = 'absent' where meeting_id = 'e2800000-0000-0000-0000-000000000001'
   and apartment_id = 'b2800000-0000-0000-0000-000000000003'$$, '42501', null, 're-closed: attendance is locked again');
 select throws_ok($$update public.meeting_agenda_items set decision = 'שונה' where meeting_id = 'e2800000-0000-0000-0000-000000000001'$$,

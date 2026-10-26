@@ -13,6 +13,10 @@ export const HEBREW_MONTHS: readonly string[] = [
   'דצמבר',
 ]
 
+// Shared by a meeting's history and the toast of the same action.
+const PROTOCOL_REOPENED = 'הפרוטוקול נפתח לעריכה'
+const PROTOCOL_RECLOSED = 'הפרוטוקול נסגר מחדש'
+
 export const he = {
   appName: 'ניהול בניין',
   loading: 'טוען…',
@@ -1354,7 +1358,7 @@ export const he = {
       invited: 'נשלח זימון', edited: 'פרטי הישיבה עודכנו', agenda_edited: 'סדר היום עודכן', invitation_updated: 'נשלח עדכון זימון',
       postponed: 'האסיפה נדחתה בשעה', opened: 'הישיבה נפתחה', closed: 'הישיבה הסתיימה', signed: 'נוספה חתימה',
       published: 'הפרוטוקול פורסם', addendum: 'נוסף תיקון לפרוטוקול', postponement_cancelled: 'הדחייה בוטלה',
-      reopened: 'הפרוטוקול נפתח לעריכה',
+      reopened: PROTOCOL_REOPENED, reclosed: PROTOCOL_RECLOSED,
     } as Record<string, string>,
     actions: {
       edit: 'עריכה',
@@ -1491,7 +1495,8 @@ export const he = {
         close: 'שמירה וסגירה מחדש',
         closeTitle: 'לסגור את הפרוטוקול מחדש?',
         closeBody: 'הנוכחות, ההצבעות וההחלטות יינעלו שוב, ומספרי ההחלטות ייקבעו מחדש לפי סדר היום.',
-        closed: 'הפרוטוקול נסגר מחדש',
+        closed: PROTOCOL_RECLOSED,
+        closingTimeKept: (time: string) => `שעת הסיום המקורית נשמרת: ${time}`,
       },
     },
     vote: {
@@ -1539,9 +1544,7 @@ export const he = {
       body: 'הישיבה תיפתח לעריכה: אפשר לעדכן נוכחות, הצבעות והחלטות, ואז לסגור אותה שוב.',
       confirm: 'פתיחה לעריכה',
       cancel: 'ביטול',
-      reopened: 'הפרוטוקול נפתח לעריכה',
-      signed: "הפרוטוקול כבר נחתם — לתיקון השתמשו ב'תיקון לפרוטוקול'",
-      hasAddenda: "לפרוטוקול כבר נוסף תיקון — לתיקונים נוספים השתמשו ב'תיקון לפרוטוקול'",
+      reopened: PROTOCOL_REOPENED,
     },
     addendum: {
       title: 'תיקון לפרוטוקול',

@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { he } from '../../lib/he'
 import { AptPlate, notifyError } from '../../ui'
 import { fileProblem, uploadMeetingFile, useMeetingFileUrls, type AttendanceValue } from './api'
-import { fromInputs, meetingISODate, meetingTime } from './fmt'
+import { arrivalAt, meetingTime } from './fmt'
 import { ATTENDANCE_STATUSES, type Attendance } from './types'
 
 const L = he.meetings.live
@@ -48,7 +48,7 @@ function ArrivalTime({ apartmentId, stored, entry }: { apartmentId: string; stor
   const [time, setTime] = useState(shown)
   const save = () => {
     if (time === shown) return
-    entry.onSet(apartmentId, time ? fromInputs(meetingISODate(entry.openedAt), time) : null)
+    entry.onSet(apartmentId, time ? arrivalAt(entry.openedAt, time) : null)
   }
   return (
     <TextInput label={L.correction.arrival} description={L.correction.arrivalHint} type="time" dir="ltr" maw={220}

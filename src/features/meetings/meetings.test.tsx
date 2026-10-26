@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { MantineProvider } from '@mantine/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, cleanup, configure, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, configure, fireEvent, render, screen, within } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -9,6 +9,7 @@ import { he } from '../../lib/he'
 import { theme } from '../../ui'
 import { ClosedMeeting } from './ClosedMeeting'
 import { meetingFixture } from './fixture'
+import { arrivalAt } from './fmt'
 import { InviteDialog } from './InviteDialog'
 import { LiveItem } from './LiveItem'
 import { LiveAttendance } from './LiveAttendance'
@@ -314,13 +315,14 @@ describe('quick start', () => {
 
 describe('"עריכת הפרוטוקול" (reopen before publication)', () => {
   const RO = he.meetings.reopen
+  const E = he.meetings.errors
   const unsigned = (o: Partial<MeetingDetail> = {}) => withStatus('closed', { signatures: [], addenda: [], ...o })
 
   it('closed, unsigned, no addenda: enabled; the dialog explains and confirms the reopen', async () => {
     wrap(<ClosedMeeting meeting={unsigned()} isAdmin />)
     const edit = screen.getByRole('button', { name: A.editProtocol })
     expect(edit).toBeEnabled()
-    expect(screen.queryByText(RO.signed)).not.toBeInTheDocument()
+    expect(screen.queryByText(E.signed)).not.toBeInTheDocument()
     fireEvent.click(edit)
     expect(await screen.findByText(RO.body)).toBeInTheDocument()
     expect(mutate).not.toHaveBeenCalled()
@@ -338,14 +340,14 @@ describe('"עריכת הפרוטוקול" (reopen before publication)', () => {
   it('signed: disabled, pointing to "תיקון לפרוטוקול"', () => {
     wrap(<ClosedMeeting meeting={unsigned({ signatures: meetingFixture().signatures })} isAdmin />)
     expect(button(A.editProtocol)).toBeDisabled()
-    expect(screen.getByText(RO.signed)).toBeInTheDocument()
+    expect(screen.getByText(E.signed)).toBeInTheDocument()
     expect(button(A.addendum)).toBeEnabled()
   })
 
   it('with an addendum: disabled, with its own explanation', () => {
     wrap(<ClosedMeeting meeting={unsigned({ addenda: meetingFixture().addenda })} isAdmin />)
     expect(button(A.editProtocol)).toBeDisabled()
-    expect(screen.getByText(RO.hasAddenda)).toBeInTheDocument()
+    expect(screen.getByText(E.has_addenda)).toBeInTheDocument()
   })
 
   it('not offered once published, nor to residents', () => {
@@ -359,7 +361,7 @@ describe('"עריכת הפרוטוקול" (reopen before publication)', () => {
   it('reopenBlock and isCorrection', () => {
     expect(reopenBlock(unsigned())).toBeNull()
     expect(reopenBlock(meetingFixture())).toBe('signed')
-    expect(reopenBlock(unsigned({ addenda: meetingFixture().addenda }))).toBe('hasAddenda')
+    expect(reopenBlock(unsigned({ addenda: meetingFixture().addenda }))).toBe('has_addenda')
     expect(isCorrection({ status: 'in_progress', reopened_from: '2026-11-03T19:30:00Z' })).toBe(true)
     expect(isCorrection({ status: 'in_progress', reopened_from: null })).toBe(false)
     expect(isCorrection({ status: 'closed', reopened_from: '2026-11-03T19:30:00Z' })).toBe(false)
@@ -372,7 +374,7 @@ describe('the live screen during a correction', () => {
   const reopened = (o: Partial<MeetingDetail> = {}) =>
     withStatus('in_progress', { signatures: [], addenda: [], closed_at: '2026-11-03T19:30:00Z', reopened_from: '2026-11-03T19:30:00Z', ...o })
 
-  it('says it is a correction; closing reads "שמירה וסגירה מחדש" and defaults to the original closing time', async () => {
+  it('says it is a correction; "שמירה וסגירה מחדש" keeps the original closing time (shown, not editable)', async () => {
     wrap(<LiveMeeting meeting={reopened()} />)
     expect(screen.getByText(C.banner)).toBeInTheDocument()
     expect(button(L.close)).not.toBeInTheDocument()
@@ -380,7 +382,18 @@ describe('the live screen during a correction', () => {
     expect(button(L.postpone)).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: C.close }))
     expect(await screen.findByText(C.closeBody)).toBeInTheDocument()
-    expect(screen.getByLabelText(L.closingTime)).toHaveValue('21:30')
+    expect(screen.getByText(C.closingTimeKept('21:30'))).toBeInTheDocument()
+    expect(screen.queryByLabelText(L.closingTime)).not.toBeInTheDocument()
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: C.close }))
+    expect(mutate).toHaveBeenCalledTimes(1)
+  })
+
+  it('a vote is checked against the corrected attendance, not the attendance stored with it', () => {
+    const item = { ...meetingFixture().items[0]!, votes_for: 3, votes_against: 0, votes_abstain: 0, attendees_at_vote: 5 }
+    // Fixture attendance: 2 present + 1 proxy = 3 attending; correct apartment 1 to absent → 2.
+    const attendance = meetingFixture().attendance.map((a) => (a.apartment_number === 1 ? { ...a, status: 'absent' as const } : a))
+    wrap(<LiveMeeting meeting={reopened({ items: [item], attendance })} />)
+    expect(screen.getByText(he.meetings.vote.tooMany(3, 2))).toBeInTheDocument()
   })
 
   it('a live meeting has no banner and the usual close', () => {
@@ -403,6 +416,14 @@ describe('the live screen during a correction', () => {
     expect(onSet).toHaveBeenCalledWith('a1', '2026-11-03T18:30:00.000Z')
     view.unmount()
     wrap(<LiveAttendance meetingId="m1" apartments={apts} values={{ a1: present }} absent={present} onChange={vi.fn()} />)
+    expect(screen.queryByLabelText(C.arrival)).not.toBeInTheDocument()
+  })
+
+  it('an arrival typed earlier than the opening is on the next day (a meeting past midnight)', () => {
+    // Opened 23:30 Israel time on 03/11.
+    expect(arrivalAt('2026-11-03T21:30:00Z', '23:45')).toBe('2026-11-03T21:45:00.000Z')
+    expect(arrivalAt('2026-11-03T21:30:00Z', '00:15')).toBe('2026-11-03T22:15:00.000Z')
+    expect(arrivalAt('2026-11-03T21:30:20Z', '23:30')).toBe('2026-11-03T21:30:00.000Z')
     expect(screen.queryByLabelText(C.arrival)).not.toBeInTheDocument()
   })
 })

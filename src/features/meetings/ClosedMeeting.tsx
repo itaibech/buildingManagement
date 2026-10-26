@@ -42,7 +42,7 @@ export function ClosedMeeting({ meeting, isAdmin }: { meeting: MeetingDetail; is
         {closed && isAdmin && <ReopenButton block={block} onOpen={() => setDialog('reopen')} />}
         {isAdmin && <Button variant="default" leftSection={<IconFilePlus {...ICON} />} onClick={() => setDialog('addendum')}>{A.addendum}</Button>}
       </Group>
-      {closed && isAdmin && block && <Text id="bm-reopen-block" size="sm" c="dimmed">{he.meetings.reopen[block]}</Text>}
+      {closed && isAdmin && block && <Text id="bm-reopen-block" size="sm" c="dimmed">{he.meetings.errors[block]}</Text>}
       {closed && isAdmin && !isSigned(meeting) && <Text size="sm" c="dimmed">{he.meetings.publish.needsSignatures}</Text>}
       {meeting.published_at && <Text size="sm" c="dimmed" className="bm-num">{he.meetings.publish.publishedAt(meetingDate(meeting.published_at))}</Text>}
       {closed && isAdmin && <SignPanel meeting={meeting} />}
