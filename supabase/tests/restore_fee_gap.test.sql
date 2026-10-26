@@ -1,4 +1,4 @@
--- Restoring an archived apartment (0025): every month between the archive month and the restore month stays
+-- Restoring an archived apartment (0026): every month between the archive month and the restore month stays
 -- unbilled, even when the fee timeline has a row inside that gap (a change scheduled before the archive).
 -- Independent of seed.sql: wipes finance rows and apartments inside a rolled-back transaction.
 begin;

@@ -1,4 +1,4 @@
--- 0025: restoring an archived apartment never bills the months it was archived.
+-- 0026: restoring an archived apartment never bills the months it was archived.
 -- Same as 0022, except that fee timeline rows inside the gap (a change scheduled before the archive, or written
 -- while archived) no longer bill those months: the restore month's row is written first (from what applies then,
 -- as before), then the rows strictly between the gap's first month and the restore month are removed and the gap's
