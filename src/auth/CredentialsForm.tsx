@@ -68,7 +68,7 @@ export default function CredentialsForm() {
       <Stack gap="md">
         <Title order={2} size="h3">{TITLE[mode]}</Title>
         {mode === 'forgot' && <Text size="sm" c="dimmed">{he.reset.forgotBody}</Text>}
-        {mode === 'signUp' && <TextInput label={he.fullName} autoComplete="name" value={fullName} onChange={field(setFullName)} required />}
+        {mode === 'signUp' && <TextInput label={he.fullName} autoComplete="name" maxLength={200} value={fullName} onChange={field(setFullName)} required />}
         <TextInput label={he.email} type="email" dir="ltr" autoComplete="email" inputMode="email" value={email} onChange={field(setEmail)} required />
         {mode !== 'forgot' && (
           <PasswordInput label={he.password} dir="ltr" autoComplete={mode === 'signIn' ? 'current-password' : 'new-password'} value={password} onChange={field(setPassword)} required />
