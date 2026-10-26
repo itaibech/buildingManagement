@@ -1,5 +1,5 @@
 import { Button, Card, Group, Progress, Stack, Text, Title, UnstyledButton } from '@mantine/core'
-import { useLocalStorage } from '@mantine/hooks'
+import { useDisclosure, useLocalStorage } from '@mantine/hooks'
 import { IconCircle, IconCircleCheck, IconChevronLeft } from '@tabler/icons-react'
 import { Link } from 'react-router'
 import { he } from '../../lib/he'
@@ -7,7 +7,7 @@ import { useEmailStatus } from '../email/api'
 import { useFeeSchedule } from '../finance/api'
 import { useBuilding } from '../settings/api'
 import { useApartments, useResidents } from '../tenants/api'
-import { CHECKLIST_DISMISSED_KEY, checklistProgress, PERMISSIONS_SEEN_KEY, setupSteps, type SetupStep } from './checklist'
+import { CHECKLIST_DISMISSED_KEY, checklistProgress, PERMISSIONS_SEEN_KEY, setupSteps, shownSteps, type SetupStep } from './checklist'
 
 const S = he.home.setup
 
@@ -36,10 +36,11 @@ function useSetupSteps(): SetupStep[] | null {
   return setupSteps({ building: building.data, feeCount: fees.data.length, apartmentsWithResidents: withResidents, emailStatus, permissionsSeen: seen })
 }
 
-/** Admin "הקמת הבניין": a dismissible checklist on home until every step is done. */
+/** Admin "הקמת הבניין": a dismissible checklist on home until every step is done; the next steps only until expanded. */
 export function SetupChecklist() {
   const steps = useSetupSteps()
   const [dismissed, setDismissed] = useLocalStorage({ key: CHECKLIST_DISMISSED_KEY, defaultValue: false })
+  const [expanded, { toggle }] = useDisclosure(false)
   if (!steps || dismissed) return null
   const p = checklistProgress(steps)
   if (p.complete) return null
@@ -50,7 +51,10 @@ export function SetupChecklist() {
         <Button variant="subtle" color="stone.7" onClick={() => setDismissed(true)} aria-label={S.dismissLabel}>{S.dismiss}</Button>
       </Group>
       <Progress value={(p.done / p.total) * 100} color="paid.7" size="sm" radius="xl" mb="xs" aria-label={S.progressLabel(p.done, p.total)} />
-      <Stack gap={0}>{[...steps].sort((a, b) => Number(a.done) - Number(b.done)).map((s) => <StepRow key={s.key} step={s} />)}</Stack>
+      <Stack gap={0} id="bm-setup-steps">{shownSteps(steps, expanded).map((s) => <StepRow key={s.key} step={s} />)}</Stack>
+      <Button variant="subtle" size="compact-md" mih={44} px="xs" mt={4} style={{ alignSelf: 'flex-start' }} onClick={toggle} aria-expanded={expanded} aria-controls="bm-setup-steps">
+        {expanded ? S.showLess : S.showAll(p.total)}
+      </Button>
     </Card>
   )
 }

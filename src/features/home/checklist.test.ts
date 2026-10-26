@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checklistProgress, setupSteps, type SetupInput } from './checklist'
+import { CHECKLIST_PREVIEW, checklistProgress, setupSteps, shownSteps, type SetupInput } from './checklist'
 
 const done: SetupInput = {
   building: { name: 'הבצלת 6', address: 'הבצלת 6, תל אביב', payment_instructions: 'העברה לחשבון', committee_contact: '050-0000000' },
@@ -30,5 +30,14 @@ describe('setupSteps', () => {
   it('4 of 8 shows progress', () => {
     const steps = setupSteps({ ...done, feeCount: 0, apartmentsWithResidents: 0, emailStatus: 'unavailable', permissionsSeen: false })
     expect(checklistProgress(steps)).toEqual({ done: 4, total: 8, complete: false })
+  })
+  it('collapsed shows only the next open steps, in order; expanded shows all, open first', () => {
+    const building = { name: 'הבצלת 6', address: null, payment_instructions: 'העברה', committee_contact: '050-0000000' }
+    const fresh = setupSteps({ building, feeCount: 0, apartmentsWithResidents: 0, emailStatus: 'dryRun', permissionsSeen: false })
+    expect(CHECKLIST_PREVIEW).toBe(3)
+    expect(shownSteps(fresh, false).map((s) => s.key)).toEqual(['address', 'fees', 'residents'])
+    const all = shownSteps(fresh, true)
+    expect(all).toHaveLength(8)
+    expect(all.slice(0, 5).every((s) => !s.done)).toBe(true)
   })
 })

@@ -37,3 +37,12 @@ export function checklistProgress(steps: readonly SetupStep[]): { done: number; 
   const done = steps.filter((s) => s.done).length
   return { done, total: steps.length, complete: done === steps.length }
 }
+
+/** Collapsed, the card lists only the next few open steps, so the collection hero stays above the fold. */
+export const CHECKLIST_PREVIEW = 3
+
+/** Open steps first; collapsed = the first CHECKLIST_PREVIEW open steps only. */
+export function shownSteps(steps: readonly SetupStep[], expanded: boolean): SetupStep[] {
+  const ordered = [...steps].sort((a, b) => Number(a.done) - Number(b.done))
+  return expanded ? ordered : ordered.filter((s) => !s.done).slice(0, CHECKLIST_PREVIEW)
+}

@@ -280,6 +280,12 @@ describe('HomePage', () => {
     // name, payment, contact, fees, residents done; address, email (dry run), permissions not yet.
     expect(within(card).getByText('5/8')).toBeInTheDocument()
     expect(within(card).getByRole('link', { name: `${he.home.setup.steps.address}: ${he.home.setup.todo}` })).toHaveAttribute('href', '/settings')
+    // Collapsed: only the open steps; the done ones appear once expanded.
+    const doneName = `${he.home.setup.steps.name}: ${he.home.setup.done}`
+    expect(within(card).queryByRole('link', { name: doneName })).toBeNull()
+    fireEvent.click(within(card).getByRole('button', { name: he.home.setup.showAll(8) }))
+    expect(within(card).getByRole('link', { name: doneName })).toBeInTheDocument()
+    expect(within(card).getByRole('button', { name: he.home.setup.showLess })).toHaveAttribute('aria-expanded', 'true')
     fireEvent.click(within(card).getByRole('button', { name: he.home.setup.dismissLabel }))
     expect(screen.queryByRole('heading', { name: new RegExp(he.home.setup.title) })).toBeNull()
   })
