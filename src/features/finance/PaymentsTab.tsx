@@ -1,7 +1,7 @@
 import { Card, Divider, Group, Stack, Text } from '@mantine/core'
 import { Fragment, useState } from 'react'
 import { todayISO } from '../../lib/dates'
-import { formatDate, formatILS } from '../../lib/format'
+import { formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
 import { EmptyState, ListSkeleton, Money, notifySuccess } from '../../ui'
 import { paymentsRows } from '../export/buildWorkbook'
@@ -11,12 +11,8 @@ import { LoadFailed } from './cards'
 import { useRegisterExport } from './exportSlot'
 import { DeleteButton, MonthStepper, Row } from './fields'
 import { useApartmentInfo } from './hooks'
-import { monthOf } from './ledger'
+import { monthOf, paymentMeta } from './ledger'
 import { PaymentForm } from './PaymentForm'
-
-function meta(p: Payment): string {
-  return [formatDate(p.paid_on), he.finance.methods[p.method], p.is_special ? he.finance.special.chip(p.note) : p.note].filter(Boolean).join(' · ')
-}
 
 /** Admin "תשלומים": the month's payments with a total; add via the page FAB, remove a mistaken one. */
 export function PaymentsTab({ adding, onAdd, onAddingClose }: { adding: boolean; onAdd: () => void; onAddingClose: () => void }) {
@@ -44,7 +40,7 @@ export function PaymentsTab({ adding, onAdd, onAddingClose }: { adding: boolean;
         {q.data?.map((p) => (
           <Fragment key={p.id}>
             <Divider color="stone.1" />
-            <Row plate={info.get(p.apartment_id)?.number} title={info.get(p.apartment_id)?.names || he.finance.noResidents} meta={meta(p)}
+            <Row plate={info.get(p.apartment_id)?.number} title={info.get(p.apartment_id)?.names || he.finance.noResidents} meta={paymentMeta(p)}
               end={<Money amount={p.amount} tone="neutral" />} trailing={<DeleteButton label={he.finance.deletePayment} onClick={() => setRemoving(p)} />} />
           </Fragment>
         ))}

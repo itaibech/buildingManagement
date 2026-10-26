@@ -13,6 +13,7 @@ import { LevyForm } from './ChargeForms'
 import { ApplyTemplates } from './ExpenseForms'
 import FinancePage from './FinancePage'
 import { PaymentForm } from './PaymentForm'
+import { paymentMeta } from './ledger'
 import { receiptsOf, useDeleteExpense, useSaveExpense, useUndoSpecialCharge, type Template } from './api'
 
 interface Call { table: string; op: string; args: unknown[] }
@@ -318,5 +319,15 @@ describe('finance UX', () => {
     fireEvent.click(screen.getAllByRole('button', { name: he.finance.newChargeChooser })[0] as HTMLElement)
     fireEvent.click(await screen.findByRole('button', { name: new RegExp(he.finance.chooseLevy) }))
     expect(await screen.findByRole('dialog', { name: he.finance.newLevy })).toBeInTheDocument()
+  })
+})
+
+describe('paymentMeta', () => {
+  it('shows an auto standing-order payment\'s method once, not again as its note', () => {
+    const meta = paymentMeta({ paid_on: '2026-10-01', method: 'standing_order', note: he.finance.methods.standing_order })
+    expect(meta.split(' · ')).toEqual(['01/10/2026', he.finance.methods.standing_order])
+  })
+  it('keeps a note that adds something', () => {
+    expect(paymentMeta({ paid_on: '2026-10-01', method: 'cash', note: 'שולם לגזבר' })).toBe(`01/10/2026 · ${he.finance.methods.cash} · שולם לגזבר`)
   })
 })

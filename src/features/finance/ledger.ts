@@ -1,7 +1,7 @@
 /** Pure finance helpers: ledger grid, budget vs actual, month arithmetic. No I/O here. */
-import { formatILS, HEBREW_MONTHS } from '../../lib/format'
+import { formatDate, formatILS, HEBREW_MONTHS } from '../../lib/format'
 import { he } from '../../lib/he'
-import type { ApartmentBalance } from './api'
+import type { ApartmentBalance, Payment } from './api'
 import type { BudgetSource } from './budget'
 
 export interface LedgerRow {
@@ -205,3 +205,10 @@ export function receiptError(file: File): string | null {
 /** Whether a balance row carries any badge (exempt, committee, standing order). */
 export const hasBadges = (row: Pick<ApartmentBalance, 'feeMode' | 'isCommittee' | 'standingOrder'>): boolean =>
   row.feeMode === 'exempt' || row.isCommittee || row.standingOrder
+
+/** Date · method · note. An auto standing-order payment's note repeats its method ("הוראת קבע"), so it is shown once. */
+export function paymentMeta(p: Pick<Payment, 'paid_on' | 'method' | 'note' | 'is_special'>): string {
+  const method = he.finance.methods[p.method]
+  const note = p.is_special ? he.finance.special.chip(p.note) : p.note.trim() === method ? null : p.note
+  return [formatDate(p.paid_on), method, note].filter(Boolean).join(' · ')
+}
