@@ -1,4 +1,4 @@
-import { ActionIcon, AppShell, Box, Divider, Group, NavLink, ScrollArea, Stack, Text, Tooltip } from '@mantine/core'
+import { ActionIcon, AppShell, Box, Divider, Group, Kbd, NavLink, ScrollArea, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core'
 import { useHotkeys, useLocalStorage } from '@mantine/hooks'
 import { IconLogout, IconSearch, IconShieldCog } from '@tabler/icons-react'
 import { Suspense, useEffect, useState, type ReactNode } from 'react'
@@ -41,11 +41,15 @@ function badgeFor(to: string, counts: NavCounts) {
 }
 
 
-/** Building name on the start side; the user's plate (and any trailing controls) on the end side. */
-function BuildingIdentity({ name, apartment, children }: { name: string; apartment: number | null; children?: ReactNode }) {
+/**
+ * Building name on the start side; the user's plate (and any trailing controls) on the end side.
+ * `wrap`: up to two lines instead of an ellipsis (the 240px side nav, where a real name like "הבצלת 6" plus plate,
+ * search and bell left room for one letter).
+ */
+function BuildingIdentity({ name, apartment, wrap = false, children }: { name: string; apartment: number | null; wrap?: boolean; children?: ReactNode }) {
   return (
     <Group justify="space-between" wrap="nowrap" gap="sm" style={{ minWidth: 0 }}>
-      <Text className="bm-display" fz="lg" truncate>
+      <Text className="bm-display" fz="lg" truncate={!wrap} lineClamp={wrap ? 2 : undefined} lh={1.25} style={{ flex: 1, minWidth: 0 }}>
         {name}
       </Text>
       <Group gap="xs" wrap="nowrap">
@@ -64,6 +68,17 @@ function SearchButton({ onOpen }: { onOpen: () => void }) {
         <IconSearch {...ICON} aria-hidden="true" />
       </ActionIcon>
     </Tooltip>
+  )
+}
+
+/** Desktop: search as a field-like bar under the building name, with its "/" shortcut on show. */
+function SideSearch({ onOpen }: { onOpen: () => void }) {
+  return (
+    <UnstyledButton className="bm-side-search" onClick={onOpen} aria-keyshortcuts="/ Control+K Meta+K" mt="xs">
+      <IconSearch size={18} stroke={1.75} aria-hidden="true" />
+      <Text component="span" c="dimmed" style={{ flex: 1 }}>{he.search.open}</Text>
+      <Kbd size="xs" aria-hidden="true">/</Kbd>
+    </UnstyledButton>
   )
 }
 
@@ -128,10 +143,10 @@ function SideNav({ pathname, name, apartment, unread, onExit, onSearch }: { path
   return (
     <Stack h="100%" gap={4} justify="space-between">
       <Box px="xs" pt={4} pb={4}>
-        <BuildingIdentity name={name} apartment={apartment}>
-          <SearchButton onOpen={onSearch} />
+        <BuildingIdentity name={name} apartment={apartment} wrap>
           <NotificationBell />
         </BuildingIdentity>
+        <SideSearch onOpen={onSearch} />
       </Box>
       <ScrollArea style={{ flex: 1 }} type="auto">
         <nav aria-label={he.mainNav}>

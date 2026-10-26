@@ -169,6 +169,15 @@ describe('Shell nav by permission', () => {
     expect(screen.getAllByRole('button', { name: he.search.open })).toHaveLength(2)
   })
 
+  it('desktop side nav: search is a field-like bar showing its "/" shortcut, and opens the quick search', async () => {
+    renderShell()
+    const bar = screen.getAllByRole('button', { name: he.search.open }).find((b) => b.classList.contains('bm-side-search')) as HTMLElement
+    expect(bar).toHaveAttribute('aria-keyshortcuts', '/ Control+K Meta+K')
+    expect(bar).toHaveTextContent('/')
+    fireEvent.click(bar)
+    expect(await screen.findByRole('dialog', { name: he.search.title })).toBeInTheDocument()
+  })
+
   it('"/" opens the quick search', async () => {
     renderShell()
     fireEvent.keyDown(document.documentElement, { key: '/' })

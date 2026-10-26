@@ -118,6 +118,8 @@ Mobile (<768)                        Desktop (≥768)
   `FormModal compact` (centred, not full screen).
 - Pages with a FAB reserve room for it at scroll end on mobile (`.bm-main:has(.bm-fab)`).
 - Header secondary actions (export) show icon + short text on mobile ("ייצוא"), never an icon alone.
+- Desktop side-nav header: the building name wraps to two lines (never "ה…"), beside the plate and bell; quick search
+  is a field-like bar under it showing its "/" shortcut. The mobile header keeps the search icon.
 
 ## Motion and quality floor
 
