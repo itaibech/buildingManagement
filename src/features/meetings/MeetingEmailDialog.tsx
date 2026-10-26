@@ -4,10 +4,18 @@ import { sendableCount, useEmailPreview, useSplitSend, type EmailRequest, type M
 import { PreviewInfo, SendActions } from '../email/parts'
 import { FormModal } from '../tenants/dialogs'
 
-interface Props { opened: boolean; onClose: () => void; meetingId: string; variant: MeetingEmailVariant; title: string }
+interface Props {
+  opened: boolean
+  onClose: () => void
+  meetingId: string
+  variant: MeetingEmailVariant
+  title: string
+  /** Invitation / update: each topic's details under its title. */
+  details?: boolean
+}
 
-function Body({ meetingId, variant, title, onClose }: Omit<Props, 'opened'>) {
-  const req: EmailRequest = { kind: 'meeting', id: meetingId, variant, apartmentIds: 'all' }
+function Body({ meetingId, variant, title, details = false, onClose }: Omit<Props, 'opened'>) {
+  const req: EmailRequest = { kind: 'meeting', id: meetingId, variant, apartmentIds: 'all', ...(details ? { details: true } : {}) }
   const preview = useEmailPreview(req)
   const send = useSplitSend()
   return (

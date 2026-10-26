@@ -50,6 +50,19 @@ export function toInput(v: Values): MeetingInput {
   }
 }
 
+export type DraftMode = 'replace' | 'append'
+
+const isBlank = (r: AgendaRow): boolean => !r.title.trim() && !r.discussion.trim()
+
+/** The agenda rows after importing a draft: instead of every row, or after the filled-in ones (empty rows dropped). */
+export function withDraft(rows: readonly AgendaRow[], topics: readonly { title: string; discussion: string }[], mode: DraftMode): AgendaRow[] {
+  const added = topics.map((t) => ({ key: crypto.randomUUID(), title: t.title, discussion: t.discussion }))
+  return mode === 'replace' ? added : [...rows.filter((r) => !isBlank(r)), ...added]
+}
+
+/** Whether the agenda has any filled-in row (the import then defaults to appending). */
+export const hasAgenda = (rows: readonly AgendaRow[]): boolean => rows.some((r) => !isBlank(r))
+
 export const useMeetingForm = (meeting: MeetingDetail | undefined) =>
   useForm<Values>({ mode: 'controlled', initialValues: initial(meeting), validate })
 export type MeetingFormApi = ReturnType<typeof useMeetingForm>

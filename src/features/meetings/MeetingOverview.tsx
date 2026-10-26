@@ -11,6 +11,7 @@ import { EventLog } from './EventLog'
 import { InviteDialog } from './InviteDialog'
 import { actionsFor, type MeetingAction } from './lifecycle'
 import { MeetingDetails } from './MeetingDetails'
+import { MeetingDocuments } from './MeetingDocuments'
 import { MeetingEmailDialog } from './MeetingEmailDialog'
 import { MeetingForm } from './MeetingForm'
 import { QuickStartDialog } from './QuickStart'
@@ -38,6 +39,8 @@ function Actions({ meeting, onAction }: { meeting: MeetingDetail; onAction: (a: 
 function Dialogs({ meeting, dialog, setDialog }: { meeting: MeetingDetail; dialog: Dialog; setDialog: (d: Dialog) => void }) {
   const call = useMeetingCall()
   const navigate = useNavigate()
+  // The email repeats the announcement's choice to include each topic's details.
+  const [details, setDetails] = useState(false)
   const close = () => setDialog(null)
   const remove = () => call.mutate(() => meetingRpc.remove(meeting.id), { onSuccess: () => { notifySuccess(he.meetings.deleted); navigate('/meetings') } })
   const invite = dialog === 'invite' || dialog === 'updateInvite'
@@ -47,9 +50,9 @@ function Dialogs({ meeting, dialog, setDialog }: { meeting: MeetingDetail; dialo
         {dialog === 'edit' && <MeetingForm meeting={meeting} onDone={close} />}
       </FormModal>
       <InviteDialog opened={invite} meeting={meeting} mode={dialog === 'updateInvite' ? 'update' : 'invite'} onClose={close}
-        onSent={(email) => setDialog(email ? (dialog === 'invite' ? 'emailInvite' : 'emailUpdate') : null)} />
+        onSent={(email, withDetails) => { setDetails(withDetails); setDialog(email ? (dialog === 'invite' ? 'emailInvite' : 'emailUpdate') : null) }} />
       <MeetingEmailDialog opened={dialog === 'emailInvite' || dialog === 'emailUpdate'} onClose={close} meetingId={meeting.id}
-        title={meeting.title} variant={dialog === 'emailUpdate' ? 'update' : 'invite'} />
+        title={meeting.title} variant={dialog === 'emailUpdate' ? 'update' : 'invite'} details={details} />
       <QuickStartDialog opened={dialog === 'quickStart'} meeting={meeting} onClose={close} />
       <ConfirmDialog opened={dialog === 'delete'} title={he.meetings.deleteTitle} body={he.meetings.deleteBody} confirmLabel={A.delete}
         loading={call.isPending} failed={call.isError} onConfirm={remove} onClose={close} />
@@ -66,6 +69,7 @@ export function MeetingOverview({ meeting, isAdmin, onRun }: { meeting: MeetingD
     <Stack gap="md">
       {isAdmin && <Actions meeting={meeting} onAction={onAction} />}
       <MeetingDetails meeting={meeting} total={apartments.data?.length ?? null} />
+      <MeetingDocuments meetingId={meeting.id} status={meeting.status} isAdmin={isAdmin} />
       {isAdmin && <EventLog meetingId={meeting.id} />}
       {isAdmin && <Dialogs meeting={meeting} dialog={dialog} setDialog={setDialog} />}
     </Stack>

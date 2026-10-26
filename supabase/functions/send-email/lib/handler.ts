@@ -75,7 +75,7 @@ async function planMeeting(req: EmailRequest, ctx: Context, data: DataSource, br
   const sel = req.apartmentIds ?? 'all'
   const ids = resolveIds(sel, apartments)
   const recipients = buildRecipients(residents, ids)
-  const messages = toMessages(brand, recipients, (r) => meetingContent(m, variant, r.name, brand.appUrl))
+  const messages = toMessages(brand, recipients, (r) => meetingContent(m, variant, r.name, brand.appUrl, req.details === true))
   return { messages, apartmentIds: sel === 'all' ? null : ids, skipped: [], perApartment: countBy(recipients) }
 }
 

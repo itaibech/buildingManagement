@@ -13,6 +13,8 @@ export interface EmailRequest {
   apartmentIds?: string[] | 'all'
   note?: string
   variant?: MeetingVariant
+  /** kind 'meeting', invite / update only: each topic's details under its title. */
+  details?: boolean
   preview: boolean
   /** kind 'test' with preview only: just say whether sending is live (dryRun), no data read. */
   status?: boolean
@@ -45,8 +47,8 @@ export interface MeetingInfo {
   opened_at: string | null
   location: string
   status: string
-  /** Open agenda item titles, in order. */
-  agenda: string[]
+  /** Open agenda items, in order: the title and its details (the discussion draft). */
+  agenda: { title: string; discussion: string }[]
 }
 
 export interface Balance { apartmentId: string; balance: number }

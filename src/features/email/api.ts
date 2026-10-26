@@ -18,6 +18,8 @@ export interface EmailRequest {
   note?: string
   /** kind 'meeting' only: which email (invitation, its update, or the published protocol). */
   variant?: MeetingEmailVariant
+  /** kind 'meeting', invitation / update only: each topic's details under its title. */
+  details?: boolean
 }
 
 export interface EmailPreview {

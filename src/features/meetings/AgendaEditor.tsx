@@ -1,7 +1,10 @@
 import { ActionIcon, Button, Group, Input, Stack, Text, Textarea, TextInput } from '@mantine/core'
-import { IconArrowDown, IconArrowUp, IconPlus, IconTrash } from '@tabler/icons-react'
+import { IconArrowDown, IconArrowUp, IconFileImport, IconPlus, IconTrash } from '@tabler/icons-react'
+import { useState } from 'react'
 import { he } from '../../lib/he'
-import type { MeetingFormApi } from './formModel'
+import { notifySuccess } from '../../ui'
+import { hasAgenda, withDraft, type MeetingFormApi } from './formModel'
+import { ImportDraftDialog } from './ImportDraftDialog'
 
 const ICON = { size: 18, stroke: 1.75 } as const
 const F = he.meetings.form
@@ -29,9 +32,29 @@ export function AgendaEditor({ form }: { form: MeetingFormApi }) {
               onClick={() => form.removeListItem('agenda', i)}><IconTrash {...ICON} /></ActionIcon>
           </Group>
         ))}
-        <Button variant="light" leftSection={<IconPlus {...ICON} />} style={{ alignSelf: 'flex-start' }}
-          onClick={() => form.insertListItem('agenda', { key: crypto.randomUUID(), title: '', discussion: '' })}>{F.addItem}</Button>
+        <Group gap="sm" wrap="wrap">
+          <Button variant="light" leftSection={<IconPlus {...ICON} />}
+            onClick={() => form.insertListItem('agenda', { key: crypto.randomUUID(), title: '', discussion: '' })}>{F.addItem}</Button>
+          <ImportDraft form={form} />
+        </Group>
       </Stack>
     </Input.Wrapper>
+  )
+}
+
+/** "ייבוא טיוטה מטקסט": fills the form's agenda rows; nothing is saved until the form is. */
+function ImportDraft({ form }: { form: MeetingFormApi }) {
+  const [opened, setOpened] = useState(false)
+  const rows = form.getValues().agenda
+  return (
+    <>
+      <Button variant="default" leftSection={<IconFileImport {...ICON} />} onClick={() => setOpened(true)}>{he.meetings.importDraft.open}</Button>
+      <ImportDraftDialog opened={opened} hasRows={hasAgenda(rows)} onClose={() => setOpened(false)} onImport={(topics, mode) => {
+        form.setFieldValue('agenda', withDraft(form.getValues().agenda, topics, mode))
+        form.clearFieldError('agenda')
+        setOpened(false)
+        notifySuccess(he.meetings.importDraft.done)
+      }} />
+    </>
   )
 }
