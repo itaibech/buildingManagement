@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { mailerAutoconfirm } from './db.ts'
 import { AuthFailure, ERR, handleInvite, MAX_INVITES, type AuditRow, type ExistingUser, type InviteDeps, type NewResident } from './handler.ts'
 
 const ADMIN = '11111111-1111-4111-8111-111111111111'
@@ -23,6 +24,7 @@ function deps(over: Partial<InviteDeps> = {}, opts: { isAdmin?: boolean; signedI
   return {
     invited, approved, inserted, links, audits,
     caller: async () => (opts.signedIn === false ? null : { userId: ADMIN, isAdmin: opts.isAdmin ?? true }),
+    autoconfirm: async () => false,
     buildingOf: async () => 'b1',
     groupInBuilding: async (id, b) => id === GROUP && b === 'b1',
     apartmentOk: async (id) => id === APT,
@@ -63,6 +65,31 @@ describe('admin-invite-user: caller and request', () => {
   })
   it('400 when the group is not in the caller\'s building', async () => {
     expect((await handleInvite({ ...one('a@example.test'), groupId: OTHER }, deps())).body).toEqual({ error: 'הקבוצה לא נמצאה' })
+  })
+  it('409 when email sign-ups are auto-confirmed: nothing is sent, approved or linked', async () => {
+    const d = deps({ autoconfirm: async () => true })
+    const r = await handleInvite({ invites: [{ email: 'a@example.test', apartmentId: APT }], groupId: GROUP }, d)
+    expect(r).toEqual({ status: 409, body: { error: ERR.autoconfirm } })
+    expect([d.invited, d.approved, d.links, d.inserted]).toEqual([[], [], [], []])
+  })
+})
+
+describe('admin-invite-user: mailerAutoconfirm (GoTrue /auth/v1/settings)', () => {
+  const settings = (status: number, body: unknown): typeof fetch => async () => new Response(JSON.stringify(body), { status })
+  it('false only when the server says mailer_autoconfirm is false', async () => {
+    expect(await mailerAutoconfirm('http://x', 'anon', settings(200, { mailer_autoconfirm: false }))).toBe(false)
+    expect(await mailerAutoconfirm('http://x', 'anon', settings(200, { mailer_autoconfirm: true }))).toBe(true)
+    expect(await mailerAutoconfirm('http://x', 'anon', settings(200, {}))).toBe(true)
+  })
+  it('asks the auth settings endpoint with the anon key, and throws when it is unreachable', async () => {
+    const calls: [string, string | null][] = []
+    const spy: typeof fetch = async (input, init) => {
+      calls.push([String(input), new Headers(init?.headers).get('apikey')])
+      return new Response('{}', { status: 200 })
+    }
+    await mailerAutoconfirm('http://x', 'anon', spy)
+    expect(calls).toEqual([['http://x/auth/v1/settings', 'anon']])
+    await expect(mailerAutoconfirm('http://x', 'anon', settings(503, {}))).rejects.toThrow()
   })
 })
 

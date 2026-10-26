@@ -37,6 +37,8 @@ export class AuthFailure extends Error {
 
 export interface InviteDeps {
   caller(): Promise<Caller | null>
+  /** Whether the auth server auto-confirms email sign-ups ("Confirm email" off). */
+  autoconfirm(): Promise<boolean>
   buildingOf(userId: string): Promise<string>
   groupInBuilding(groupId: string, buildingId: string): Promise<boolean>
   /** The apartment if it is in the building and not archived. */
@@ -65,6 +67,7 @@ export const ERR = {
   smtp: 'שליחת האימייל נכשלה',
   failed: 'ההזמנה נכשלה',
   skipped: 'לא נשלחה – מגבלת שליחה',
+  autoconfirm: 'לא ניתן לשלוח הזמנות כש"אימות אימייל" כבוי. יש להפעיל את Confirm email ב-Supabase (Authentication → Providers → Email).',
 } as const
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -196,6 +199,9 @@ export async function handleInvite(body: unknown, d: InviteDeps): Promise<Reply>
   if (!caller.isAdmin) return fail(403, 'רק מנהל יכול להזמין משתמשים')
   const req = parse(body)
   if (!req) return fail(400, 'בקשה לא תקינה')
+  // An invite approves a login nobody has claimed yet. With auto-confirm on, signUp() with the invited address
+  // returns a session for that approved login to whoever calls it first, so refuse to invite at all.
+  if (await d.autoconfirm()) return fail(409, ERR.autoconfirm)
   const buildingId = await d.buildingOf(caller.userId)
   if (req.groupId && !(await d.groupInBuilding(req.groupId, buildingId))) return fail(400, 'הקבוצה לא נמצאה')
   const c: Ctx = { d, actor: caller.userId, buildingId, groupId: req.groupId }

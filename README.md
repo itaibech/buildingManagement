@@ -180,7 +180,9 @@ Supabase → Authentication:
   sign up with the owner's address (auto-confirmed) before the owner does; the owner's later Google
   sign-in would then be linked into that attacker-created account (pre-account takeover). With it on,
   GoTrue drops unverified email identities when a verified Google identity signs in with the same
-  address. A minimum password length of 8 or more is recommended.
+  address. It also protects invites: with it off, `signUp()` with an invited address returns a session for
+  the already-approved login, so `admin-invite-user` refuses to send invites until it is on. A minimum
+  password length of 8 or more is recommended.
 - **Mail delivery:** Supabase's built-in mailer is for testing only: heavily rate-limited, and it only
   delivers to the project's team-member addresses. Until custom SMTP is set up, residents should sign in
   with **Google** (the login page recommends it). Email/password sign-up, confirmation and password
@@ -328,7 +330,8 @@ git-ignored, as are `supabase/.env` and `supabase/seed.local.sql`.
 
 Local test accounts (seeded, local only, password `password123`):
 `admin@example.test` (approved admin) and `resident@example.test`
-(approved resident of apartment 1). Email confirmation is off locally.
+(approved resident of apartment 1). Email confirmation is on locally, as on the hosted project: confirmation
+and invite emails land in Inbucket at http://127.0.0.1:54324 (restart the stack after pulling this setting).
 
 `supabase/seed.sql` has invented sample data only (the repo is public). For your own data, use the
 optional, git-ignored `supabase/seed.local.sql`; `db:reset` loads it after `seed.sql` when it exists.

@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { corsHeaders } from '../send-email/lib/cors.ts'
 import { callerFrom } from '../send-email/lib/db.ts'
 import { readBody } from '../send-email/lib/http.ts'
-import { inviteSource } from './lib/db.ts'
+import { inviteSource, mailerAutoconfirm } from './lib/db.ts'
 import { handleInvite } from './lib/handler.ts'
 
 const env = Deno.env.toObject()
@@ -27,7 +27,11 @@ Deno.serve(async (req) => {
   try {
     const read = await readBody(req)
     if (!read.ok) return json(read.status, { error: read.error }, cors)
-    const r = await handleInvite(read.body, { caller: () => callerFrom(user), ...inviteSource(service, appUrl) })
+    const r = await handleInvite(read.body, {
+      caller: () => callerFrom(user),
+      autoconfirm: () => mailerAutoconfirm(url, env.SUPABASE_ANON_KEY ?? ''),
+      ...inviteSource(service, appUrl),
+    })
     return json(r.status, r.body, cors)
   } catch (e) {
     console.error('[admin-invite-user] failed', e instanceof Error ? e.message : String(e))

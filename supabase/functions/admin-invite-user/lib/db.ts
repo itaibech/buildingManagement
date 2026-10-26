@@ -48,8 +48,16 @@ function inviter(db: SupabaseClient, appUrl: string): InviteDeps['invite'] {
   }
 }
 
+/** GoTrue's public settings: whether email sign-ups are auto-confirmed. True unless the server says false (fails closed). */
+export async function mailerAutoconfirm(url: string, anonKey: string, fetchFn: typeof fetch = fetch): Promise<boolean> {
+  const res = await fetchFn(`${url}/auth/v1/settings`, { headers: { apikey: anonKey } })
+  if (!res.ok) throw new Error(`auth settings: HTTP ${res.status}`)
+  const body: unknown = await res.json()
+  return !(typeof body === 'object' && body !== null && (body as { mailer_autoconfirm?: unknown }).mailer_autoconfirm === false)
+}
+
 /** Reads and writes with the service-role client (server only; never exposed to the browser). */
-export function inviteSource(db: SupabaseClient, appUrl: string): Omit<InviteDeps, 'caller'> {
+export function inviteSource(db: SupabaseClient, appUrl: string): Omit<InviteDeps, 'caller' | 'autoconfirm'> {
   return {
     buildingOf: async (userId) => must<{ building_id: string }>(await db.from('profiles').select('building_id').eq('user_id', userId).single()).building_id,
     groupInBuilding: async (id, b) => maybe(await db.from('user_groups').select('id').eq('id', id).eq('building_id', b).maybeSingle()) !== null,
