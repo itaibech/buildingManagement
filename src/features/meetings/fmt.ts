@@ -30,6 +30,12 @@ export function fromInputs(date: string, time: string): string {
   return new Date(guess.getTime() - (shown - guess.getTime())).toISOString()
 }
 
+/** The arrival for a typed time: on the opening's date (Israel time), or the next day when earlier than the opening. */
+export function arrivalAt(openedAt: string, time: string): string {
+  const next = time < meetingTime(openedAt) ? new Date(new Date(openedAt).getTime() + 86_400_000) : openedAt
+  return fromInputs(meetingISODate(next), time)
+}
+
 /** Whole days from now until the timestamp (for the short-notice warning). */
 export const daysUntil = (iso: string, now: Date = new Date()): number => Math.floor((new Date(iso).getTime() - now.getTime()) / 86_400_000)
 

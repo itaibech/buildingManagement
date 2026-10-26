@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { he } from '../../lib/he'
 import { AptPlate, notifyError } from '../../ui'
 import { fileProblem, uploadMeetingFile, useMeetingFileUrls, type AttendanceValue } from './api'
-import { meetingTime } from './fmt'
+import { arrivalAt, meetingTime } from './fmt'
 import { ATTENDANCE_STATUSES, type Attendance } from './types'
 
 const L = he.meetings.live
@@ -38,10 +38,31 @@ const attendeeOptions = (residents: readonly string[]): string[] =>
 
 /** times: the stored arrival / departure during the meeting (server-set). */
 export type AttendanceTimes = Pick<Attendance, 'arrived_at' | 'left_at'>
-interface RowProps { meetingId: string; apt: ApartmentLine; value: AttendanceValue; times?: AttendanceTimes; onChange: (v: AttendanceValue) => void }
+
+/** During a correction: arrival times are entered by hand (none = present from the opening). */
+export interface ArrivalEntry { openedAt: string; onSet: (apartmentId: string, arrivedAt: string | null) => void }
+
+/** "שעת הגעה" during a correction: saved when the field is left; cleared = from the opening (Israel time, the opening's date). */
+function ArrivalTime({ apartmentId, stored, entry }: { apartmentId: string; stored: string | null; entry: ArrivalEntry }) {
+  const shown = stored ? meetingTime(stored) : ''
+  const [time, setTime] = useState(shown)
+  const save = () => {
+    if (time === shown) return
+    entry.onSet(apartmentId, time ? arrivalAt(entry.openedAt, time) : null)
+  }
+  return (
+    <TextInput label={L.correction.arrival} description={L.correction.arrivalHint} type="time" dir="ltr" maw={220}
+      value={time} onChange={(e) => setTime(e.currentTarget.value)} onBlur={save} />
+  )
+}
+
+interface RowProps {
+  meetingId: string; apt: ApartmentLine; value: AttendanceValue; times?: AttendanceTimes; arrival?: ArrivalEntry
+  onChange: (v: AttendanceValue) => void
+}
 
 /** One apartment: נוכח / ייפוי כוח / נעדר, then who attends or who holds the proxy (and its form). */
-function AttendanceRow({ meetingId, apt, value, times, onChange }: RowProps) {
+function AttendanceRow({ meetingId, apt, value, times, arrival, onChange }: RowProps) {
   const set = (patch: Partial<AttendanceValue>) => onChange({ ...value, ...patch })
   return (
     <Card padding="sm" data-testid={`attendance-${apt.number}`}>
@@ -55,6 +76,9 @@ function AttendanceRow({ meetingId, apt, value, times, onChange }: RowProps) {
         <SegmentedControl fullWidth size="md" value={value.status} aria-label={he.apartment(apt.number)}
           data={ATTENDANCE_STATUSES.map((s) => ({ value: s, label: L.statuses[s] }))}
           onChange={(v) => set({ status: ATTENDANCE_STATUSES.find((s) => s === v) ?? 'absent' })} />
+        {arrival && value.status !== 'absent' && (
+          <ArrivalTime key={times?.arrived_at ?? ''} apartmentId={apt.id} stored={times?.arrived_at ?? null} entry={arrival} />
+        )}
         {value.status === 'present' && (
           <Autocomplete label={L.attendeeName} placeholder={L.attendeeHint} data={attendeeOptions(apt.residents)} value={value.attendee_name}
             onChange={(v) => set({ attendee_name: v })} />
@@ -80,15 +104,17 @@ export interface LiveAttendanceProps {
   values: Record<string, AttendanceValue>
   times?: Record<string, AttendanceTimes>
   absent: AttendanceValue
+  /** Set during a correction (after reopening): no clock stamps, an optional arrival time per apartment. */
+  arrival?: ArrivalEntry
   onChange: (apartmentId: string, v: AttendanceValue) => void
 }
 
 /** Every apartment with its attendance (absent until marked). */
-export function LiveAttendance({ meetingId, apartments, values, times, absent, onChange }: LiveAttendanceProps) {
+export function LiveAttendance({ meetingId, apartments, values, times, absent, arrival, onChange }: LiveAttendanceProps) {
   return (
     <Stack gap="xs">
       {apartments.map((a) => (
-        <AttendanceRow key={a.id} meetingId={meetingId} apt={a} value={values[a.id] ?? absent} times={times?.[a.id]} onChange={(v) => onChange(a.id, v)} />
+        <AttendanceRow key={a.id} meetingId={meetingId} apt={a} value={values[a.id] ?? absent} times={times?.[a.id]} arrival={arrival} onChange={(v) => onChange(a.id, v)} />
       ))}
     </Stack>
   )

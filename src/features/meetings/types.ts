@@ -38,6 +38,8 @@ export interface Meeting {
   quick_started: boolean
   /** Opened with "פתיחה ללא מניין". */
   opened_without_quorum: boolean
+  /** While reopened for correction ("עריכת הפרוטוקול"): the closing time being corrected; null otherwise. */
+  reopened_from: string | null
 }
 
 export interface AgendaItem {

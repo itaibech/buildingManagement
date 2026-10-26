@@ -9,6 +9,7 @@ import type { MeetingDetail } from './types'
 
 const P = he.meetings.publish
 const AD = he.meetings.addendum
+const RO = he.meetings.reopen
 
 /** "פרסום הפרוטוקול": needs both signatures; optionally emails everyone afterwards. */
 export function PublishDialog({ meeting, opened, onClose, onPublished }: { meeting: MeetingDetail; opened: boolean; onClose: () => void; onPublished: (email: boolean) => void }) {
@@ -25,6 +26,23 @@ export function PublishDialog({ meeting, opened, onClose, onPublished }: { meeti
         <Group justify="flex-end" gap="sm">
           <Button variant="default" onClick={onClose}>{he.meetings.invite.cancel}</Button>
           <Button onClick={publish} loading={call.isPending} disabled={!signed}>{P.confirm}</Button>
+        </Group>
+      </Stack>
+    </FormModal>
+  )
+}
+
+/** "עריכת הפרוטוקול": confirms reopening the closed, unsigned meeting; the page then shows the live screen. */
+export function ReopenDialog({ meetingId, opened, onClose }: { meetingId: string; opened: boolean; onClose: () => void }) {
+  const call = useMeetingCall()
+  const reopen = () => call.mutate(() => meetingRpc.reopen(meetingId), { onSuccess: () => { notifySuccess(RO.reopened); onClose() } })
+  return (
+    <FormModal opened={opened} title={RO.title} onClose={onClose} compact>
+      <Stack>
+        <Text>{RO.body}</Text>
+        <Group justify="flex-end" gap="sm">
+          <Button variant="default" onClick={onClose}>{RO.cancel}</Button>
+          <Button onClick={reopen} loading={call.isPending}>{RO.confirm}</Button>
         </Group>
       </Stack>
     </FormModal>

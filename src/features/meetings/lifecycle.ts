@@ -44,6 +44,15 @@ export const meetingYear = yearOf
 export const isSigned = (m: { signatures: readonly Pick<Signature, 'role'>[] }): boolean =>
   (['chair', 'secretary'] as const).every((r) => m.signatures.some((s) => s.role === r))
 
+/** Why "עריכת הפרוטוקול" (reopen_meeting) is refused, or null: any signature or addendum locks the protocol. */
+/** The reason is reopen_meeting's own refusal token (its Hebrew message is in he.meetings.errors). */
+export const reopenBlock = (m: { signatures: readonly unknown[]; addenda: readonly unknown[] }): 'signed' | 'has_addenda' | null =>
+  m.signatures.length > 0 ? 'signed' : m.addenda.length > 0 ? 'has_addenda' : null
+
+/** Open for correction after closing (reopen_meeting), not a live meeting. */
+export const isCorrection = (m: { status: string; reopened_from: string | null }): boolean =>
+  m.status === 'in_progress' && m.reopened_from !== null
+
 /** After a postponement the meeting may not open before the postponed time (open_meeting refuses 'too_early'). */
 export const isTooEarly = (postponedTo: string | null, openedAt: string): boolean =>
   postponedTo !== null && new Date(openedAt).getTime() < new Date(postponedTo).getTime()

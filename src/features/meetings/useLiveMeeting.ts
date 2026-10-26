@@ -4,6 +4,7 @@ import { useAutosave } from './autosave'
 import { voteError, voteLimit } from './votes'
 import { ABSENT, attKey, attendanceFrom, heldIds, itemKey, itemPatchFrom, itemPatchOf, mergeAttendance, mergeItems, releasable } from './liveDraft'
 import { attendingCount } from './quorum'
+import { isCorrection } from './lifecycle'
 import { votesOf, type AgendaItem, type MeetingDetail } from './types'
 
 const VOTE_KEYS = ['votes_for', 'votes_against', 'votes_abstain'] as const
@@ -25,7 +26,10 @@ export function useLiveMeeting(meeting: MeetingDetail) {
     Object.fromEntries(mergeItems(meeting.items, restored).filter((i) => restored[itemKey(i.id)]).map((i) => [i.id, i])))
   // Items whose votes are held on the device (over the attendee count), so a later attendance change can send them.
   const held = useRef<Set<string>>(heldIds(restored))
-  const items = useMemo(() => meeting.items.map((i) => edited[i.id] ?? i), [meeting.items, edited])
+  // During a correction every vote is checked against the attendance now (the stored attendees_at_vote is ignored).
+  const correction = isCorrection(meeting)
+  const items = useMemo(() => meeting.items.map((i) => edited[i.id] ?? i)
+    .map((i) => (correction ? { ...i, attendees_at_vote: null } : i)), [meeting.items, edited, correction])
   const attending = useMemo(() => attendingCount(Object.values(attendance)), [attendance])
 
   const setApartment = (apartmentId: string, v: AttendanceValue) => {

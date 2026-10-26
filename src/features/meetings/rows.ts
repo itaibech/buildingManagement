@@ -20,6 +20,7 @@ export const toMeeting = (r: MeetingRow): Meeting => ({
   status: pick(MEETING_STATUSES, r.status, 'draft'), invited_at: r.invited_at, postponed_at: r.postponed_at,
   postponed_to: r.postponed_to, opened_at: r.opened_at, chair_name: r.chair_name, secretary_name: r.secretary_name,
   closed_at: r.closed_at, published_at: r.published_at, quick_started: r.quick_started, opened_without_quorum: r.opened_without_quorum,
+  reopened_from: r.reopened_from,
 })
 
 export const toItem = (r: ItemRow): AgendaItem => ({ ...r, item_status: pick(ITEM_STATUSES, r.item_status, 'open') })

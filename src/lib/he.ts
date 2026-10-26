@@ -13,6 +13,10 @@ export const HEBREW_MONTHS: readonly string[] = [
   'דצמבר',
 ]
 
+// Shared by a meeting's history and the toast of the same action.
+const PROTOCOL_REOPENED = 'הפרוטוקול נפתח לעריכה'
+const PROTOCOL_RECLOSED = 'הפרוטוקול נסגר מחדש'
+
 export const he = {
   appName: 'ניהול בניין',
   loading: 'טוען…',
@@ -1354,6 +1358,7 @@ export const he = {
       invited: 'נשלח זימון', edited: 'פרטי הישיבה עודכנו', agenda_edited: 'סדר היום עודכן', invitation_updated: 'נשלח עדכון זימון',
       postponed: 'האסיפה נדחתה בשעה', opened: 'הישיבה נפתחה', closed: 'הישיבה הסתיימה', signed: 'נוספה חתימה',
       published: 'הפרוטוקול פורסם', addendum: 'נוסף תיקון לפרוטוקול', postponement_cancelled: 'הדחייה בוטלה',
+      reopened: PROTOCOL_REOPENED, reclosed: PROTOCOL_RECLOSED,
     } as Record<string, string>,
     actions: {
       edit: 'עריכה',
@@ -1365,6 +1370,7 @@ export const he = {
       sign: 'חתימות',
       publish: 'פרסום הפרוטוקול',
       addendum: 'תיקון לפרוטוקול',
+      editProtocol: 'עריכת הפרוטוקול',
       print: 'הדפסה / PDF',
     },
     deleteTitle: 'למחוק את הטיוטה?',
@@ -1481,6 +1487,17 @@ export const he = {
       offline: 'אין חיבור. השינויים נשמרו במכשיר ויסונכרנו כשהחיבור יחזור.',
       saveFailed: 'השמירה נכשלה. השינויים נשמרו במכשיר וננסה שוב.',
       cancel: 'ביטול',
+      correction: {
+        banner: 'עריכת פרוטוקול לאחר סגירה',
+        bannerBody: 'זו לא ישיבה פעילה. מי שמסומן עכשיו כנוכח נחשב נוכח מפתיחת הישיבה, אלא אם מזינים שעת הגעה.',
+        arrival: 'שעת הגעה',
+        arrivalHint: 'רק אם הגיע/ה באיחור. ריק: מפתיחת הישיבה',
+        close: 'שמירה וסגירה מחדש',
+        closeTitle: 'לסגור את הפרוטוקול מחדש?',
+        closeBody: 'הנוכחות, ההצבעות וההחלטות יינעלו שוב, ומספרי ההחלטות ייקבעו מחדש לפי סדר היום.',
+        closed: PROTOCOL_RECLOSED,
+        closingTimeKept: (time: string) => `שעת הסיום המקורית נשמרת: ${time}`,
+      },
     },
     vote: {
       invalid: 'יש להזין מספרים שלמים, 0 ומעלה',
@@ -1521,6 +1538,13 @@ export const he = {
       confirm: 'פרסום',
       published: 'הפרוטוקול פורסם',
       publishedAt: (date: string) => `פורסם ב-${date}`,
+    },
+    reopen: {
+      title: 'עריכת הפרוטוקול',
+      body: 'הישיבה תיפתח לעריכה: אפשר לעדכן נוכחות, הצבעות והחלטות, ואז לסגור אותה שוב.',
+      confirm: 'פתיחה לעריכה',
+      cancel: 'ביטול',
+      reopened: PROTOCOL_REOPENED,
     },
     addendum: {
       title: 'תיקון לפרוטוקול',
@@ -1602,6 +1626,9 @@ export const he = {
       name: 'יש להזין שם',
       body: 'יש להזין את נוסח התיקון',
       locked: 'הישיבה הסתיימה ולא ניתן לשנות אותה. אפשר להוסיף תיקון לפרוטוקול.',
+      signed: "הפרוטוקול כבר נחתם — לתיקון השתמשו ב'תיקון לפרוטוקול'",
+      has_addenda: "לפרוטוקול כבר נוסף תיקון — לתיקונים נוספים השתמשו ב'תיקון לפרוטוקול'",
+      times: 'שעת ההגעה צריכה להיות בין פתיחת הישיבה לסגירתה',
       files_kept: 'חלק מהקבצים לא נמחקו מהאחסון, ולכן הפעולה הופסקה. רעננו את הדף ונסו שוב.',
       generic: 'הפעולה נכשלה. נסו שוב.',
     } as Record<string, string>,
