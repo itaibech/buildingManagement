@@ -1015,6 +1015,8 @@ export const he = {
     tab: 'טעינת רכב',
     chargeLabel: 'טעינת רכב חשמלי',
     chargers: 'עמדות טעינה',
+    roundProgress: (done: number, total: number, month: string) => `נרשמו ${done} מתוך ${total} קריאות ל${month}`,
+    roundDone: (month: string) => `כל הקריאות ל${month} נרשמו`,
     addCharger: 'הוספת עמדת טעינה',
     chargerAdded: 'עמדת הטעינה נוספה',
     noChargers: 'אין עדיין עמדות טעינה',

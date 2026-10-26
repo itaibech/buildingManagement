@@ -14,7 +14,7 @@ import { ConfirmDialog, FormModal } from '../tenants/dialogs'
 import { useChargers, useDeleteRate, useEvRates, useEvReadings, type Charger, type EvRate, type Reading } from './api'
 import { ChargerForm, RateForm } from './ChargerForms'
 import { EvExportButton } from './EvExport'
-import { rateText } from './evMath'
+import { rateText, readingRound } from './evMath'
 import { ReadingForm } from './ReadingForm'
 
 function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
@@ -47,7 +47,8 @@ function ChargerCard({ charger, last, onRecord }: { charger: Charger; last: Read
         </Stack>
       </Group>
       <Group grow mt="sm" gap="sm">
-        <Button variant="light" onClick={onRecord}>{he.ev.recordReading}</Button>
+        {/* Still to do this month: the filled primary; already recorded: a quiet one (a correction is rare). */}
+        <Button variant={recorded ? 'default' : 'filled'} onClick={onRecord}>{he.ev.recordReading}</Button>
         <Button variant="default" component={Link} to={`/ev/${charger.id}`}>{he.ev.history}</Button>
       </Group>
     </Card>
@@ -62,6 +63,8 @@ function ChargerList({ onRecord, onAdd }: { onRecord: (c: Charger) => void; onAd
     for (const r of readings.data ?? []) if (!m.has(r.charger_id)) m.set(r.charger_id, r)
     return m
   }, [readings.data])
+  const month = monthOf(todayISO())
+  const round = readingRound(chargers.data ?? [], (id) => latest.get(id)?.month, month)
   const actions = (
     <Group gap="xs">
       <Button variant="light" component={Link} to="/ev/import" leftSection={<IconFileImport size={20} stroke={1.75} aria-hidden="true" />}>{he.ev.importAction}</Button>
@@ -73,9 +76,14 @@ function ChargerList({ onRecord, onAdd }: { onRecord: (c: Charger) => void; onAd
       {(chargers.isLoading || readings.isLoading) && <ListSkeleton rows={2} />}
       {(chargers.isError || readings.isError) && <LoadFailed onRetry={() => { void chargers.refetch(); void readings.refetch() }} />}
       {chargers.data?.length === 0 && <Card><EmptyState title={he.ev.noChargers} body={he.ev.noChargersBody} action={{ label: he.ev.addCharger, onClick: onAdd }} /></Card>}
+      {chargers.data && readings.data && round.total > 0 && (
+        <Text size="sm" c={round.done === round.total ? 'paid.8' : 'dimmed'} className="bm-num" aria-live="polite">
+          {round.done === round.total ? he.ev.roundDone(monthLabel(month)) : he.ev.roundProgress(round.done, round.total, monthLabel(month))}
+        </Text>
+      )}
       {chargers.data && readings.data && (
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
-          {chargers.data.map((c) => <ChargerCard key={c.id} charger={c} last={latest.get(c.id)} onRecord={() => onRecord(c)} />)}
+          {round.ordered.map((c) => <ChargerCard key={c.id} charger={c} last={latest.get(c.id)} onRecord={() => onRecord(c)} />)}
         </SimpleGrid>
       )}
     </Section>
