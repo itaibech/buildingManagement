@@ -1440,7 +1440,7 @@ isOneToOne: false
 { Args: { "p_name": string }; Returns: string
                            },
 "meeting_invitation_body":
-{ Args: { "p_meeting": string }; Returns: string
+{ Args: { "p_details"?: boolean,"p_meeting": string }; Returns: string
                            },
 "meeting_kind_label":
 { Args: { "p_kind": string }; Returns: string
