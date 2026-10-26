@@ -57,14 +57,15 @@ interface Actions {
 
 function InviteAction({ r, open }: { r: DirectoryEntry; open: Actions['open'] }) {
   return (
-    <Button variant="subtle" size="compact-md" mih={44} px="xs" leftSection={<IconMailPlus size={18} stroke={1.75} />}
+    <Button variant="subtle" size="compact-md" mih={44} px="xs" leftSection={<IconMailPlus size={18} stroke={1.75} />} visibleFrom="sm"
       aria-label={he.invite.directoryActionLabel(r.full_name)} onClick={() => open({ kind: 'invite', resident: r })}>
       {he.invite.directoryAction}
     </Button>
   )
 }
 
-function ResidentMenu({ r, open }: { r: DirectoryEntry; open: Actions['open'] }) {
+/** On mobile "הזמנה" moves in here, so the row keeps room for the full phone number. */
+function ResidentMenu({ r, open, invitable }: { r: DirectoryEntry; open: Actions['open']; invitable: boolean }) {
   return (
     <Menu position="bottom-start" withinPortal>
       <Menu.Target>
@@ -73,6 +74,10 @@ function ResidentMenu({ r, open }: { r: DirectoryEntry; open: Actions['open'] })
         </ActionIcon>
       </Menu.Target>
       <Menu.Dropdown>
+        {invitable && (
+          <Menu.Item hiddenFrom="sm" leftSection={<IconMailPlus size={18} stroke={1.75} />}
+            onClick={() => open({ kind: 'invite', resident: r })}>{he.invite.directoryMenuItem}</Menu.Item>
+        )}
         <Menu.Item leftSection={<IconPencil size={18} stroke={1.75} />}
           onClick={() => open({ kind: 'resident', apartmentId: r.apartment_id, resident: r })}>{he.tenants.editResident}</Menu.Item>
         <Menu.Item color="debt" leftSection={<IconTrash size={18} stroke={1.75} />}
@@ -129,7 +134,7 @@ function ResidentLine({ r, actions }: { r: DirectoryEntry; actions: Actions }) {
       <Group wrap="nowrap" gap={0} style={{ flexShrink: 0, maxWidth: '100%' }}>
         <ContactActions r={r} />
         {actions.admin && actions.invitable(r) && <InviteAction r={r} open={actions.open} />}
-        {actions.admin && <ResidentMenu r={r} open={actions.open} />}
+        {actions.admin && <ResidentMenu r={r} open={actions.open} invitable={actions.invitable(r)} />}
       </Group>
     </Group>
   )

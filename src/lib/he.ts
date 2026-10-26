@@ -392,6 +392,7 @@ export const he = {
     resent: (email: string) => `ההזמנה נשלחה שוב ל-${email}`,
     directoryAction: 'הזמנה',
     directoryActionLabel: (name: string) => `הזמנת ${name} לאפליקציה`,
+    directoryMenuItem: 'הזמנה לאפליקציה',
     done: 'סגירה',
   },
   announcements: {
