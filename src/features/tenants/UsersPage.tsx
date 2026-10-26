@@ -1,4 +1,4 @@
-import { ActionIcon, Badge, Button, Card, Group, Menu, SegmentedControl, Select, Stack, Text, Title } from '@mantine/core'
+import { ActionIcon, Badge, Button, Card, Group, Menu, SegmentedControl, Select, Stack, Text, TextInput, Title } from '@mantine/core'
 import { IconDots, IconTrash, IconUserPlus } from '@tabler/icons-react'
 import { useMemo, useState, type ReactNode } from 'react'
 import { useAuth } from '../../auth/AuthProvider'
@@ -130,11 +130,25 @@ function PendingRow({ p, residents, options, groups, invited }: RowProps & { p: 
   )
 }
 
+/** The user's display name (any language): saved on blur or Enter when it changed. */
+function NameField({ p, onSave }: { p: Profile; onSave: (name: string) => void }) {
+  const [value, setValue] = useState(p.full_name)
+  const name = value.trim()
+  const save = () => { if (name && name !== p.full_name) onSave(name) }
+  return (
+    <TextInput label={he.users.nameLabel} value={value} maxLength={200} maw={360}
+      error={name ? undefined : he.users.nameRequired}
+      onChange={(e) => setValue(e.currentTarget.value)} onBlur={save}
+      onKeyDown={(e) => { if (e.key === 'Enter') save() }} />
+  )
+}
+
 function UserControls({ p, options, groups, locked }: { p: Profile; options: Option[]; groups: UserGroup[]; locked: boolean }) {
   const update = useUpdateProfile()
   const patch = (values: Parameters<typeof update.mutate>[0]['patch']) => update.mutate({ userId: p.user_id, patch: values }, { onSuccess: () => notifySuccess(he.toast.userUpdated) })
   return (
     <>
+      <NameField p={p} onSave={(full_name) => patch({ full_name })} />
       <Group align="flex-end" wrap="wrap" gap="sm">
         <ResidentSelect value={p.resident_id} onChange={(id) => patch({ resident_id: id })} options={options} />
         <RoleControl value={p.role} onChange={(role) => patch({ role })} disabled={locked} />

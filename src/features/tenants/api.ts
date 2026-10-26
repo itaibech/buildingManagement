@@ -47,7 +47,7 @@ export interface ResidentInput {
   is_owner: boolean
 }
 
-export type ProfilePatch = Partial<Pick<Profile, 'role' | 'status' | 'resident_id' | 'group_id'>>
+export type ProfilePatch = Partial<Pick<Profile, 'full_name' | 'role' | 'status' | 'resident_id' | 'group_id'>>
 
 interface DbError {
   message: string
