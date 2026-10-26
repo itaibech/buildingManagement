@@ -7,6 +7,8 @@ interface Zip { FullPaths: string[]; FileIndex: ZipEntry[] }
 interface ZipReader { read: (data: Uint8Array, options: { type: 'array' }) => Zip }
 
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+/** Larger files aren't read (the bucket's limit too). */
+export const MAX_DOCX_BYTES = 10 * 1024 * 1024
 
 export const isDocx = (file: File): boolean => file.type === DOCX_MIME || file.name.toLowerCase().endsWith('.docx')
 
@@ -34,26 +36,45 @@ export function bulletLevels(numberingXml: string | null): Set<string> {
   return out
 }
 
-/** One paragraph's text: runs, tabs as spaces, line breaks as new lines. */
-function runsText(p: Element): string {
+/**
+ * One paragraph's own text: runs, tabs as spaces, line breaks as new lines. Paragraphs nested in it (a text box) are
+ * left to their own line, and `mc:Fallback` (the legacy copy of a text box) is skipped, so nothing is read twice.
+ */
+function runsText(node: Element): string {
   let text = ''
-  for (const el of p.getElementsByTagName('*')) {
+  for (const el of node.children) {
+    if (el.tagName === 'w:p' || el.tagName === 'mc:Fallback') continue
     if (el.tagName === 'w:t') text += el.textContent ?? ''
     else if (el.tagName === 'w:tab') text += ' '
     else if (el.tagName === 'w:br' || el.tagName === 'w:cr') text += '\n'
+    else text += runsText(el)
   }
   return text
+}
+
+/** Inside a text box's legacy copy (read once, from its modern copy). */
+function inFallback(el: Element): boolean {
+  for (let n = el.parentElement; n; n = n.parentElement) if (n.tagName === 'mc:Fallback') return true
+  return false
+}
+
+/** The list a paragraph belongs to, or null (no numPr, or numId 0 = numbering removed). */
+function listOf(p: Element): { numId: string; level: string } | null {
+  const pPr = [...p.children].find((c) => c.tagName === 'w:pPr')
+  const numPr = pPr && first(pPr, 'w:numPr')
+  const numId = attr(numPr && first(numPr, 'w:numId'), 'w:val')
+  if (!numPr || !numId || numId === '0') return null
+  return { numId, level: attr(first(numPr, 'w:ilvl'), 'w:val') || '0' }
 }
 
 /** word/document.xml → lines, with list markers restored. */
 export function documentXmlToText(documentXml: string, bullets: ReadonlySet<string> = new Set()): string {
   const doc = new DOMParser().parseFromString(documentXml, 'application/xml')
   const counters = new Map<string, number>()
-  return [...doc.getElementsByTagName('w:p')].map((p) => {
-    const numPr = first(p, 'w:numPr')
-    if (!numPr) return runsText(p)
-    const numId = attr(first(numPr, 'w:numId'), 'w:val')
-    const level = attr(first(numPr, 'w:ilvl'), 'w:val') || '0'
+  return [...doc.getElementsByTagName('w:p')].filter((p) => !inFallback(p)).map((p) => {
+    const list = listOf(p)
+    if (!list) return runsText(p)
+    const { numId, level } = list
     if (level !== '0' || bullets.has(`${numId}:${level}`)) return `• ${runsText(p)}`
     const n = (counters.get(numId) ?? 0) + 1
     counters.set(numId, n)
@@ -61,8 +82,9 @@ export function documentXmlToText(documentXml: string, bullets: ReadonlySet<stri
   }).join('\n')
 }
 
-/** The text of a .docx file; throws when it isn't a readable Word document. */
+/** The text of a .docx file; throws when it is over 10 MB or isn't a readable Word document. */
 export async function docxToText(file: Blob): Promise<string> {
+  if (file.size > MAX_DOCX_BYTES) throw new Error('too big')
   const { CFB } = await import('xlsx')
   const reader: ZipReader = CFB
   const zip = reader.read(new Uint8Array(await file.arrayBuffer()), { type: 'array' })

@@ -11,6 +11,8 @@ const T = he.meetings.documents
 const ICON = { size: 18, stroke: 1.75 } as const
 const ACCEPT = 'application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg,image/webp,image/heic,image/heif'
 
+const PROBLEMS = { type: T.fileType, empty: T.fileEmpty, size: T.fileTooBig } as const
+
 /** Same rules as the bucket: add until published, remove until closed. */
 const canAdd = (s: MeetingStatus): boolean => s !== 'published'
 const canRemove = (s: MeetingStatus): boolean => s === 'draft' || s === 'invited' || s === 'in_progress'
@@ -36,11 +38,11 @@ function DocumentRow({ doc, onRemove }: { doc: MeetingDocument; onRemove: (() =>
 }
 
 function Upload({ meetingId }: { meetingId: string }) {
-  const call = useDocumentCall(meetingId)
+  const call = useDocumentCall(meetingId, T.failed)
   const pick = (file: File | null) => {
     if (!file) return
     const problem = documentProblem(file)
-    if (problem) return notifyError(problem === 'size' ? T.fileTooBig : T.fileType)
+    if (problem) return notifyError(PROBLEMS[problem])
     call.mutate(() => addMeetingDocument(meetingId, file), { onSuccess: () => notifySuccess(T.uploaded) })
   }
   return (
@@ -57,7 +59,7 @@ function Upload({ meetingId }: { meetingId: string }) {
 /** "מסמכים": the meeting's attached documents with download links; admins add and remove them while the state allows. */
 export function MeetingDocuments({ meetingId, status, isAdmin }: { meetingId: string; status: MeetingStatus; isAdmin: boolean }) {
   const docs = useMeetingDocuments(meetingId)
-  const remove = useDocumentCall(meetingId)
+  const remove = useDocumentCall(meetingId, T.removeFailed)
   const [removing, setRemoving] = useState<MeetingDocument | null>(null)
   const list = docs.data ?? []
   if (!isAdmin && list.length === 0) return null

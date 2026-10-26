@@ -8,10 +8,16 @@ const MAX_DISCUSSION = 10000
 const MAX_HEADING = 60
 export const MAX_TOPICS = 30
 
-// `1.` `12)` `א.` `יא)` and the title; a number may stand alone (the title is on the next line). Hebrew letters
-// only as numerals (א–ט, י / כ with an optional unit), so a word such as "לא." never starts a topic.
-const NUMBERED = /^(?:(\d{1,2})|([א-ט]|[יכ][א-ט]?))[.)](?!\d)\s*(.*)$/
+// `1.` `12)` `א.` `יא)` `טו.` and the title; a number may stand alone (the title is on the next line). Hebrew letters
+// only as numerals (א–ט, טו, טז, י / כ with a unit), so a word such as "לא." never starts a topic.
+const NUMBERED = /^(?:(\d{1,2})|(ט[וז]|[א-ט]|[יכ][א-דז-ט]?))[.)](?!\d)\s*(.*)$/
 const BULLET = /^[-•–]/
+// Bullet-style topics: `•` / `-` lines are topics when `–` lines are their sub-points.
+const TOPIC_BULLET = /^[-•]\s*/
+// "סדר היום:", "נושאים שיעלו באסיפה": the agenda starts after this line.
+const AGENDA_MARK = /^(?:סדר ה?יום|ה?נושאים (?:שיעלו|לדיון|על סדר))/
+// A letter's sign-off: the agenda ends here.
+const SIGN_OFF = /^(?:בברכה|בכבוד רב|בתודה)/
 // Direction marks, embeddings and isolates that PDF / Word copies carry, and the BOM.
 const INVISIBLE = /[\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g
 
@@ -52,44 +58,68 @@ function joinDetails(lines: readonly string[]): string {
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim()
 }
 
+type Mode = 'numbered' | 'bullets' | 'headings'
+
+/** Numbered lines win; else bullet topics with `–` sub-points; else the heading heuristic. */
+function modeOf(lines: readonly string[]): Mode {
+  if (lines.some((l) => numberedTitle(l) !== null)) return 'numbered'
+  const markers = new Set(lines.map((l) => BULLET.exec(l)?.[0]))
+  return markers.has('–') && (markers.has('•') || markers.has('-')) ? 'bullets' : 'headings'
+}
+
+/** The lines of the agenda: after an agenda line ("סדר היום:") or from the first numbered line, up to a sign-off. */
+function agendaLines(lines: readonly string[]): string[] {
+  const isMark = (l: string): boolean => l.length <= MAX_HEADING && AGENDA_MARK.test(l)
+  const mark = lines.findIndex(isMark)
+  const numbered = lines.findIndex((l) => numberedTitle(l) !== null)
+  const starts = [mark >= 0 ? mark + 1 : -1, numbered].filter((i) => i >= 0)
+  const from = starts.length ? Math.min(...starts) : 0
+  const rest = lines.slice(from)
+  const end = rest.findIndex((l) => SIGN_OFF.test(l))
+  return end >= 0 ? rest.slice(0, end) : rest
+}
+
+/** The title when line i starts a topic in this mode ('' for a number alone), or null. */
+function topicTitle(lines: readonly string[], i: number, mode: Mode): string | null {
+  const line = lines[i]
+  if (!line) return null
+  if (mode === 'numbered') return numberedTitle(line)
+  if (mode === 'bullets') return TOPIC_BULLET.test(line) ? stripColon(line.replace(TOPIC_BULLET, '')) : null
+  return isHeading(lines, i) ? stripColon(line) : null
+}
+
 interface Draft { title: string; body: string[] }
 
-/** Topics with their raw detail lines, plus the lines before the first topic. */
-function collect(lines: readonly string[]): { preamble: string[]; drafts: Draft[] } {
-  const preamble: string[] = []
+/** Topics with their raw detail lines; text before the first topic is dropped. */
+function collect(lines: readonly string[], mode: Mode): Draft[] {
   const drafts: Draft[] = []
   let awaitingTitle = false
   lines.forEach((line, i) => {
     const current = drafts.at(-1)
-    const numbered = BULLET.test(line) ? null : numberedTitle(line)
+    const title = topicTitle(lines, i, mode)
     if (awaitingTitle && current && line) {
       current.title = stripColon(line)
       awaitingTitle = false
-    } else if (numbered !== null) {
-      drafts.push({ title: numbered, body: [] })
-      awaitingTitle = numbered === ''
-    } else if (line && isHeading(lines, i)) {
-      drafts.push({ title: stripColon(line), body: [] })
-    } else if (current) {
-      current.body.push(line)
+    } else if (title !== null) {
+      drafts.push({ title, body: [] })
+      awaitingTitle = title === ''
     } else {
-      preamble.push(line)
+      current?.body.push(line)
     }
   })
-  return { preamble, drafts }
+  return drafts
 }
 
 /**
- * Splits a document into topics. A topic starts at a numbered line (`1.`, `1)`, `א.`) or at a short standalone heading
- * (≤ 60 characters, no closing period, followed by body text). Lines starting with `-`, `•` or `–` are details of the
- * current topic; text before the first topic goes into the first topic's details.
+ * Splits a document into topics. Once the text has numbered lines (`1.`, `1)`, `א.`), only they start topics; without
+ * numbers, `•` / `-` lines start topics when `–` lines are their sub-points, else a short standalone heading does
+ * (≤ 60 characters, no closing period, followed by body text). Other lines are details of the current topic. Text
+ * before the agenda (a letterhead, "לכבוד", "הנדון", "סדר היום:") is dropped, and a sign-off ("בכבוד רב") ends it.
  */
 export function parseAgendaDraft(text: string): DraftTopic[] {
-  const lines = text.replace(/\r\n?/g, '\n').split('\n').map(clean)
-  const { preamble, drafts } = collect(lines)
-  const topics = drafts.filter((d) => d.title)
-  if (topics.length && preamble.some(Boolean)) topics[0].body = [...preamble, '', ...topics[0].body]
-  return topics.map((d) => ({ title: d.title.slice(0, MAX_TITLE), discussion: joinDetails(d.body).slice(0, MAX_DISCUSSION) }))
+  const lines = agendaLines(text.replace(/\r\n?/g, '\n').split('\n').map(clean))
+  return collect(lines, modeOf(lines)).filter((d) => d.title)
+    .map((d) => ({ title: d.title.slice(0, MAX_TITLE), discussion: joinDetails(d.body).slice(0, MAX_DISCUSSION) }))
 }
 
 /** Why the parsed topics can't be imported (none, or more than 30), or null. */

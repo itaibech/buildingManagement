@@ -63,6 +63,6 @@ export function withDraft(rows: readonly AgendaRow[], topics: readonly { title: 
 /** Whether the agenda has any filled-in row (the import then defaults to appending). */
 export const hasAgenda = (rows: readonly AgendaRow[]): boolean => rows.some((r) => !isBlank(r))
 
-export const useMeetingForm =(meeting: MeetingDetail | undefined) =>
+export const useMeetingForm = (meeting: MeetingDetail | undefined) =>
   useForm<Values>({ mode: 'controlled', initialValues: initial(meeting), validate })
 export type MeetingFormApi = ReturnType<typeof useMeetingForm>

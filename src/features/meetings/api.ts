@@ -1,5 +1,6 @@
 // Meetings data access (the only place the feature touches supabase). RLS and the 0021 RPCs enforce every rule.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { he } from '../../lib/he'
 import { supabase } from '../../lib/supabase'
 import { notifyError } from '../../ui/notify'
 import { meetingError } from './errors'
@@ -132,6 +133,14 @@ export function useMeetingCall() {
   })
 }
 
+/** Removes files from the bucket; throws 'meeting:files_kept' when any of them is still there. */
+async function removeFiles(paths: readonly string[]): Promise<void> {
+  if (!paths.length) return
+  const { data, error } = await supabase.storage.from(MEETING_BUCKET).remove([...paths])
+  fail(error)
+  if ((data ?? []).length < paths.length) throw new Error('meeting:files_kept')
+}
+
 const rpcDone = ({ error }: { error: { message: string } | null }): void => fail(error)
 
 export const meetingRpc = {
@@ -155,12 +164,15 @@ export const meetingRpc = {
     rpcDone(await supabase.rpc('sign_meeting', { p_meeting: id, p_role: role, p_signer_name: name, p_image_path: path, p_method: method })),
   publish: async (id: string) => rpcDone(await supabase.rpc('publish_meeting', { p_meeting: id })),
   addendum: async (id: string, body: string) => rpcDone(await supabase.rpc('add_addendum', { p_meeting: id, p_body: body })),
-  /** Deletes a draft; its documents' files first (the rows go with the meeting). */
+  /**
+   * Deletes a draft; its documents' files first (the rows go with the meeting). Re-reads the state, since only a draft
+   * may lose its files, and checks every file was really removed (storage skips what RLS forbids without an error).
+   */
   remove: async (id: string) => {
-    const docs = await supabase.from('meeting_documents').select('file_path').eq('meeting_id', id)
-    fail(docs.error)
-    const paths = (docs.data ?? []).map((d) => d.file_path)
-    if (paths.length) fail((await supabase.storage.from(MEETING_BUCKET).remove(paths)).error)
+    const m = await supabase.from('meetings').select('status, meeting_documents(file_path)').eq('id', id).maybeSingle()
+    fail(m.error)
+    if (m.data?.status !== 'draft') throw new Error('meeting:state')
+    await removeFiles(m.data.meeting_documents.map((d) => d.file_path))
     rpcDone(await supabase.from('meetings').delete().eq('id', id))
   },
 }
@@ -228,13 +240,17 @@ export function documentType(file: File): string | null {
   return !file.type && file.name.toLowerCase().endsWith('.docx') ? DOCX_MIME : null
 }
 
-/** Why a file can't be attached as a meeting document (PDF / Word / image, at most 10 MB), or null. */
-export function documentProblem(file: File): 'type' | 'size' | null {
+/** Why a file can't be attached as a meeting document (PDF / Word / image, 1 byte to 10 MB), or null. */
+export function documentProblem(file: File): 'type' | 'empty' | 'size' | null {
   if (!documentType(file)) return 'type'
+  if (file.size === 0) return 'empty'
   return file.size > MAX_FILE_BYTES ? 'size' : null
 }
 
-/** The meeting's documents (RLS: residents only once published), each with a short-lived download link. */
+/** A signed URL that downloads under the document's own name (the storage `download` query parameter). */
+const withDownloadName = (url: string, name: string): string => `${url}&download=${encodeURIComponent(name)}`
+
+/** The meeting's documents (RLS: residents only once published), with short-lived download links signed in one call. */
 export function useMeetingDocuments(meetingId: string) {
   return useQuery({
     queryKey: [...KEY, 'documents', meetingId],
@@ -243,10 +259,15 @@ export function useMeetingDocuments(meetingId: string) {
       const { data, error } = await supabase.from('meeting_documents').select('id, file_path, file_name, size_bytes, created_at')
         .eq('meeting_id', meetingId).order('created_at')
       fail(error)
-      return Promise.all((data ?? []).map(async (d) => {
-        const signed = await supabase.storage.from(MEETING_BUCKET).createSignedUrl(d.file_path, SIGNED_URL_SECONDS, { download: d.file_name })
-        return { ...d, url: signed.data?.signedUrl ?? null }
-      }))
+      const docs = data ?? []
+      if (!docs.length) return []
+      const signed = await supabase.storage.from(MEETING_BUCKET).createSignedUrls(docs.map((d) => d.file_path), SIGNED_URL_SECONDS)
+      fail(signed.error)
+      const urls = new Map((signed.data ?? []).flatMap((u) => (u.path && u.signedUrl ? [[u.path, u.signedUrl]] : [])))
+      return docs.map((d) => {
+        const url = urls.get(d.file_path)
+        return { ...d, url: url ? withDownloadName(url, d.file_name) : null }
+      })
     },
   })
 }
@@ -263,18 +284,21 @@ export async function addMeetingDocument(meetingId: string, file: File): Promise
   fail(error)
 }
 
-/** Removes a document: the row, then its file. */
+/** Removes a document: its file first (checked, so a refused removal changes nothing), then the row. */
 export async function removeMeetingDocument(doc: Pick<MeetingDocument, 'id' | 'file_path'>): Promise<void> {
+  await removeFiles([doc.file_path])
   fail((await supabase.from('meeting_documents').delete().eq('id', doc.id)).error)
-  fail((await supabase.storage.from(MEETING_BUCKET).remove([doc.file_path])).error)
 }
 
-/** Runs a document change, then refreshes the meeting's documents; failures toast the Hebrew reason. */
-export function useDocumentCall(meetingId: string) {
+/** Runs a document change, then refreshes the meeting's documents; failures toast the reason, or `failMessage`. */
+export function useDocumentCall(meetingId: string, failMessage: string) {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (call: () => Promise<void>) => call(),
-    onError: (e) => notifyError(meetingError(e)),
+    onError: (e) => {
+      const reason = meetingError(e)
+      notifyError(reason === he.meetings.errors.generic ? failMessage : reason)
+    },
     onSettled: () => client.invalidateQueries({ queryKey: [...KEY, 'documents', meetingId] }),
   })
 }

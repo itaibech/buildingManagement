@@ -51,9 +51,17 @@ describe('ImportDraftDialog', () => {
     fireEvent.click(screen.getByText(T.replace))
     fireEvent.click(screen.getByRole('button', { name: T.confirm(2) }))
     expect(onImport).toHaveBeenCalledWith([
-      { title: 'אישור תקציב', discussion: 'סדר היום\n\nהצעת התקציב מצורפת.\n- רזרבה 10%' },
+      { title: 'אישור תקציב', discussion: 'הצעת התקציב מצורפת.\n- רזרבה 10%' },
       { title: 'בחירת ועד', discussion: '' },
     ], 'replace')
+  })
+
+  it('refuses a .docx over 10 MB before reading it', () => {
+    wrap(<ImportDraftDialog opened hasRows={false} onClose={vi.fn()} onImport={vi.fn()} />)
+    const file = new File(['x'], 'big.docx')
+    Object.defineProperty(file, 'size', { value: 10 * 1024 * 1024 + 1 })
+    fireEvent.change(document.querySelector('input[type=file]') as HTMLInputElement, { target: { files: [file] } })
+    expect(screen.getByText(T.docxTooBig)).toBeInTheDocument()
   })
 
   it('refuses text with no topics or with more than 30', () => {
@@ -77,7 +85,7 @@ describe('import in the meeting form', () => {
     expect(save).not.toHaveBeenCalled()
     const titles = screen.getAllByRole('textbox', { name: /^נושא \d+$/ }).map((el) => (el as HTMLInputElement).value)
     expect(titles).toEqual(['אישור תקציב 2027', 'צביעת חדר המדרגות', 'שונות: חניה', 'אישור תקציב', 'בחירת ועד'])
-    expect(screen.getByRole('textbox', { name: he.meetings.form.agendaDetails(4) })).toHaveValue('סדר היום\n\nהצעת התקציב מצורפת.\n- רזרבה 10%')
+    expect(screen.getByRole('textbox', { name: he.meetings.form.agendaDetails(4) })).toHaveValue('הצעת התקציב מצורפת.\n- רזרבה 10%')
   })
 })
 
@@ -121,6 +129,8 @@ describe('MeetingDocuments', () => {
     wrap(<MeetingDocuments meetingId="m1" status="draft" isAdmin />)
     const input = document.querySelector('input[type=file]') as HTMLInputElement
     fireEvent.change(input, { target: { files: [new File(['x'], 'a.exe', { type: 'application/x-msdownload' })] } })
+    expect(docMutate).not.toHaveBeenCalled()
+    fireEvent.change(input, { target: { files: [new File([], 'empty.pdf', { type: 'application/pdf' })] } })
     expect(docMutate).not.toHaveBeenCalled()
     fireEvent.change(input, { target: { files: [new File(['x'], 'a.docx', { type: '' })] } })
     expect(docMutate).toHaveBeenCalled()

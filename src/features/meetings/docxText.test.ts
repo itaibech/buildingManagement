@@ -34,7 +34,26 @@ describe('documentXmlToText', () => {
   })
 })
 
+describe('documentXmlToText: edge cases', () => {
+  it('w:numId 0 means no numbering', () => {
+    expect(documentXmlToText(doc(p('רגיל', list(0)) + p('תקציב', list(1))), bulletLevels(numbering))).toBe('רגיל\n1. תקציב')
+  })
+
+  it('a text box is read once: its paragraphs on their own lines, the legacy fallback copy skipped', () => {
+    const box = '<w:txbxContent>' + p('בתוך התיבה') + '</w:txbxContent>'
+    const anchor = '<w:p><w:r><w:t>לפני </w:t></w:r><w:r><mc:AlternateContent xmlns:mc="m"><mc:Choice><w:drawing><wps:txbx xmlns:wps="w">'
+      + box + '</wps:txbx></w:drawing></mc:Choice><mc:Fallback><w:pict><v:textbox xmlns:v="v">' + box
+      + '</v:textbox></w:pict></mc:Fallback></mc:AlternateContent></w:r><w:r><w:t>אחרי</w:t></w:r></w:p>'
+    expect(documentXmlToText(doc(anchor))).toBe('לפני אחרי\nבתוך התיבה')
+  })
+})
+
 describe('docxToText', () => {
+  it('refuses a file over 10 MB without reading it', async () => {
+    const big = { size: 10 * 1024 * 1024 + 1, arrayBuffer: () => { throw new Error('read') } } as unknown as Blob
+    await expect(docxToText(big)).rejects.toThrow('too big')
+  })
+
   it('reads word/document.xml out of the zip and feeds the same parser', async () => {
     const file = docxFile({
       '[Content_Types].xml': '<Types/>',

@@ -12,8 +12,12 @@ describe('parseAgendaDraft', () => {
     ])
   })
 
-  it('a short line right after a finished sentence counts as standalone', () => {
-    expect(parseAgendaDraft('1. נושא\nסוף משפט.\nכותרת חדשה\nגוף הנושא.').map((t) => t.title)).toEqual(['נושא', 'כותרת חדשה'])
+  it('without numbers, a short line right after a finished sentence counts as standalone', () => {
+    expect(parseAgendaDraft('מבוא\nסוף משפט.\nכותרת חדשה\nגוף הנושא.').map((t) => t.title)).toEqual(['מבוא', 'כותרת חדשה'])
+  })
+
+  it('once there are numbered lines, headings do not start topics', () => {
+    expect(parseAgendaDraft('1. נושא\nסוף משפט.\nכותרת קצרה\nגוף.').map((t) => t.title)).toEqual(['נושא'])
   })
 
   it('a short standalone heading followed by body text starts a topic', () => {
@@ -37,12 +41,55 @@ describe('parseAgendaDraft', () => {
     expect(parseAgendaDraft(text)).toEqual([{ title: 'ניקיון', discussion: '- החלפת חברה\n• הגדלת שעות\n– פעמיים בשבוע' }])
   })
 
-  it('text before the first topic goes into the first topic', () => {
-    const text = 'סדר היום לאסיפה השנתית.\n\n1. תקציב\nפרטים.\n2. שונות'
+  it('text before the first numbered line is dropped, not merged into topic 1', () => {
+    const text = 'הקדמה לאסיפה השנתית.\nעוד שורת פתיחה\n\n1. תקציב\nפרטים.\n2. שונות'
     expect(parseAgendaDraft(text)).toEqual([
-      { title: 'תקציב', discussion: 'סדר היום לאסיפה השנתית.\n\nפרטים.' },
+      { title: 'תקציב', discussion: 'פרטים.' },
       { title: 'שונות', discussion: '' },
     ])
+  })
+
+  it('a typical Hebrew invitation letter gives exactly its numbered items', () => {
+    const letter = [
+      'ועד הבית - רחוב הדקל 5, תל אביב', 'טלפון 03-5551234', '', 'תאריך: 1.11.2026', '', 'לכבוד', 'דיירי הבניין', '',
+      'הנדון: זימון לאסיפת דיירים כללית', '', 'שלום רב,', 'הנכם מוזמנים לאסיפת דיירים שתתקיים ביום שלישי 17.11.2026 בשעה 19:30 בלובי.',
+      '', 'סדר היום:', '1. אישור פרוטוקול האסיפה הקודמת', '2. אישור תקציב 2027', '3. שיפוץ הלובי', '4. שונות', '',
+      'דייר שאינו יכול להגיע מתבקש להביא איתו:', 'ייפוי כוח חתום', 'העתק תעודת זהות', '', 'בכבוד רב,', 'ועד הבית', 'רות כהן, יו"ר',
+    ].join('\n')
+    const topics = parseAgendaDraft(letter)
+    expect(topics.map((t) => t.title)).toEqual(['אישור פרוטוקול האסיפה הקודמת', 'אישור תקציב 2027', 'שיפוץ הלובי', 'שונות'])
+    expect(topics[3].discussion).toBe('דייר שאינו יכול להגיע מתבקש להביא איתו:\nייפוי כוח חתום\nהעתק תעודת זהות')
+    expect(topics.map((t) => t.discussion).join(' ')).not.toMatch(/לכבוד|הנדון|בכבוד רב|ועד הבית/)
+  })
+
+  it('"נושאים שיעלו באסיפה" with bullet topics and "–" sub-points', () => {
+    const agenda = [
+      'נושאים שיעלו באסיפה', '', '• שיפוץ הלובי', '– הוצגו שלוש הצעות מחיר', '– לוח זמנים: חודשיים', '',
+      '• החלפת קבלן הגינון', '– הקבלן הנוכחי מסיים בדצמבר', '• שונות',
+    ].join('\n')
+    expect(parseAgendaDraft(agenda)).toEqual([
+      { title: 'שיפוץ הלובי', discussion: '– הוצגו שלוש הצעות מחיר\n– לוח זמנים: חודשיים' },
+      { title: 'החלפת קבלן הגינון', discussion: '– הקבלן הנוכחי מסיים בדצמבר' },
+      { title: 'שונות', discussion: '' },
+    ])
+  })
+
+  it('"נושאים שיעלו באסיפה" with plain topic lines and "–" sub-points', () => {
+    const agenda = 'נושאים שיעלו באסיפה:\n\nשיפוץ הלובי\n– שלוש הצעות מחיר\n\nגינון\n– החלפת קבלן'
+    expect(parseAgendaDraft(agenda)).toEqual([
+      { title: 'שיפוץ הלובי', discussion: '– שלוש הצעות מחיר' },
+      { title: 'גינון', discussion: '– החלפת קבלן' },
+    ])
+  })
+
+  it('stops at a sign-off (בברכה, בכבוד רב, בתודה)', () => {
+    for (const end of ['בברכה,', 'בכבוד רב', 'בתודה מראש']) {
+      expect(parseAgendaDraft(`1. תקציב\nפרטים.\n${end}\nועד הבית`)).toEqual([{ title: 'תקציב', discussion: 'פרטים.' }])
+    }
+  })
+
+  it('Hebrew numerals טו / טז count; יה / יו do not', () => {
+    expect(parseAgendaDraft('יד. נושא א\nטו. נושא ב\nטז) נושא ג\nיה. לא נושא').map((t) => t.title)).toEqual(['נושא א', 'נושא ב', 'נושא ג'])
   })
 
   it('collapses blank-line runs, trims, and drops PDF direction marks and stray spaces', () => {

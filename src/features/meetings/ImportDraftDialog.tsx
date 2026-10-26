@@ -3,7 +3,7 @@ import { IconFileTypeDocx } from '@tabler/icons-react'
 import { useMemo, useState } from 'react'
 import { he } from '../../lib/he'
 import { FormModal } from '../tenants/dialogs'
-import { docxToText, isDocx } from './docxText'
+import { docxToText, isDocx, MAX_DOCX_BYTES } from './docxText'
 import { draftProblem, MAX_TOPICS, parseAgendaDraft, type DraftTopic } from './draftImport'
 import type { DraftMode } from './formModel'
 
@@ -19,15 +19,15 @@ export interface ImportDraftDialogProps {
 
 function DocxPicker({ onText }: { onText: (text: string) => void }) {
   const [busy, setBusy] = useState(false)
-  const [failed, setFailed] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const pick = async (file: File | null) => {
     if (!file) return
-    setFailed(false)
+    // Checked before reading: a large file is never loaded into memory.
+    if (file.size > MAX_DOCX_BYTES) return setError(T.docxTooBig)
+    if (!isDocx(file) || file.size === 0) return setError(T.docxFailed)
+    setError(null)
     setBusy(true)
-    try {
-      if (!isDocx(file)) throw new Error('type')
-      onText(await docxToText(file))
-    } catch { setFailed(true) } finally { setBusy(false) }
+    try { onText(await docxToText(file)) } catch { setError(T.docxFailed) } finally { setBusy(false) }
   }
   return (
     <Stack gap={4}>
@@ -35,7 +35,7 @@ function DocxPicker({ onText }: { onText: (text: string) => void }) {
         {(props) => <Button {...props} variant="default" loading={busy} leftSection={<IconFileTypeDocx size={18} stroke={1.75} />}
           style={{ alignSelf: 'flex-start' }}>{T.docx}</Button>}
       </FileButton>
-      {failed && <Text size="sm" c="debt.7" role="alert">{T.docxFailed}</Text>}
+      {error && <Text size="sm" c="debt.7" role="alert">{error}</Text>}
     </Stack>
   )
 }
