@@ -164,6 +164,8 @@ export const meetingRpc = {
     rpcDone(await supabase.rpc('sign_meeting', { p_meeting: id, p_role: role, p_signer_name: name, p_image_path: path, p_method: method })),
   publish: async (id: string) => rpcDone(await supabase.rpc('publish_meeting', { p_meeting: id })),
   addendum: async (id: string, body: string) => rpcDone(await supabase.rpc('add_addendum', { p_meeting: id, p_body: body })),
+  /** Closed, unsigned, no addenda → in progress for correction ("עריכת הפרוטוקול"). */
+  reopen: async (id: string) => rpcDone(await supabase.rpc('reopen_meeting', { p_meeting: id })),
   /**
    * Deletes a draft; its documents' files first (the rows go with the meeting). Re-reads the state, since only a draft
    * may lose its files, and checks every file was really removed (storage skips what RLS forbids without an error).
@@ -195,6 +197,14 @@ export type AttendanceValue = Pick<Attendance, 'status' | 'attendee_name' | 'pro
 export async function saveAttendance(meetingId: string, apartmentId: string, v: AttendanceValue): Promise<void> {
   const row = { meeting_id: meetingId, apartment_id: apartmentId, ...v }
   fail((await supabase.from('meeting_attendance').upsert(row, { onConflict: 'meeting_id,apartment_id' })).error)
+}
+
+/**
+ * During a correction: the arrival time the admin enters (null = present from the opening). The DB keeps a time set
+ * explicitly and never stamps one itself while correcting.
+ */
+export async function saveArrival(meetingId: string, apartmentId: string, arrivedAt: string | null): Promise<void> {
+  fail((await supabase.from('meeting_attendance').update({ arrived_at: arrivedAt }).eq('meeting_id', meetingId).eq('apartment_id', apartmentId)).error)
 }
 
 const MIME_EXT: Readonly<Record<string, string>> = {

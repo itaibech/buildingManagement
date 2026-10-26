@@ -843,14 +843,14 @@ isOneToOne: false
                   ]
                 },"meetings": {
                   Row: {
-                    "building_id": string,"chair_name": string,"closed_at": string | null,"created_at": string,"created_by": string | null,"id": string,"invite_announcement_id": string | null,"invited_at": string | null,"kind": string,"location": string,"opened_at": string | null,"opened_without_quorum": boolean,"postponed_at": string | null,"postponed_to": string | null,"publish_announcement_id": string | null,"published_at": string | null,"quick_started": boolean,"quorum_mode": string,"quorum_note": string,"quorum_value": number | null,"scheduled_at": string,"secretary_name": string,"status": string,"title": string,"updated_at": string
+                    "building_id": string,"chair_name": string,"closed_at": string | null,"created_at": string,"created_by": string | null,"id": string,"invite_announcement_id": string | null,"invited_at": string | null,"kind": string,"location": string,"opened_at": string | null,"opened_without_quorum": boolean,"postponed_at": string | null,"postponed_to": string | null,"publish_announcement_id": string | null,"published_at": string | null,"quick_started": boolean,"quorum_mode": string,"quorum_note": string,"quorum_value": number | null,"reopened_from": string | null,"scheduled_at": string,"secretary_name": string,"status": string,"title": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "building_id"?: string,"chair_name"?: string,"closed_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"invite_announcement_id"?: string | null,"invited_at"?: string | null,"kind"?: string,"location"?: string,"opened_at"?: string | null,"opened_without_quorum"?: boolean,"postponed_at"?: string | null,"postponed_to"?: string | null,"publish_announcement_id"?: string | null,"published_at"?: string | null,"quick_started"?: boolean,"quorum_mode"?: string,"quorum_note"?: string,"quorum_value"?: number | null,"scheduled_at": string,"secretary_name"?: string,"status"?: string,"title": string,"updated_at"?: string
+                    "building_id"?: string,"chair_name"?: string,"closed_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"invite_announcement_id"?: string | null,"invited_at"?: string | null,"kind"?: string,"location"?: string,"opened_at"?: string | null,"opened_without_quorum"?: boolean,"postponed_at"?: string | null,"postponed_to"?: string | null,"publish_announcement_id"?: string | null,"published_at"?: string | null,"quick_started"?: boolean,"quorum_mode"?: string,"quorum_note"?: string,"quorum_value"?: number | null,"reopened_from"?: string | null,"scheduled_at": string,"secretary_name"?: string,"status"?: string,"title": string,"updated_at"?: string
                   }
                   Update: {
-                    "building_id"?: string,"chair_name"?: string,"closed_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"invite_announcement_id"?: string | null,"invited_at"?: string | null,"kind"?: string,"location"?: string,"opened_at"?: string | null,"opened_without_quorum"?: boolean,"postponed_at"?: string | null,"postponed_to"?: string | null,"publish_announcement_id"?: string | null,"published_at"?: string | null,"quick_started"?: boolean,"quorum_mode"?: string,"quorum_note"?: string,"quorum_value"?: number | null,"scheduled_at"?: string,"secretary_name"?: string,"status"?: string,"title"?: string,"updated_at"?: string
+                    "building_id"?: string,"chair_name"?: string,"closed_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"invite_announcement_id"?: string | null,"invited_at"?: string | null,"kind"?: string,"location"?: string,"opened_at"?: string | null,"opened_without_quorum"?: boolean,"postponed_at"?: string | null,"postponed_to"?: string | null,"publish_announcement_id"?: string | null,"published_at"?: string | null,"quick_started"?: boolean,"quorum_mode"?: string,"quorum_note"?: string,"quorum_value"?: number | null,"reopened_from"?: string | null,"scheduled_at"?: string,"secretary_name"?: string,"status"?: string,"title"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -1470,6 +1470,7 @@ isOneToOne: false
 "quorum_mode": string,
 "quorum_note": string,
 "quorum_value": number | null,
+"reopened_from": string | null,
 "scheduled_at": string,
 "secretary_name": string,
 "status": string,
@@ -1515,6 +1516,9 @@ isOneToOne: false
                            },
 "record_ev_reading":
 { Args: { "p_charger_id": string,"p_month": string,"p_note"?: string,"p_read_on"?: string,"p_reading": number }; Returns: Json
+                           },
+"reopen_meeting":
+{ Args: { "p_meeting": string }; Returns: undefined
                            },
 "reserve_email_quota":
 { Args: { "p_apartment_ids"?: (string)[],"p_building": string,"p_cap": number,"p_count": number,"p_kind": string,"p_ref_id"?: string,"p_sent_by": string }; Returns: string

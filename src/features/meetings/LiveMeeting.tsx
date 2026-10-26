@@ -1,15 +1,16 @@
-import { Button, Group, SegmentedControl, Stack, Text, TextInput, Title } from '@mantine/core'
+import { Alert, Button, Group, SegmentedControl, Stack, Text, TextInput, Title } from '@mantine/core'
 import { IconPlus } from '@tabler/icons-react'
 import { useState } from 'react'
 import { he } from '../../lib/he'
 import { notifySuccess } from '../../ui'
 import { useApartments, useResidents } from '../tenants/api'
-import { addItem, meetingRpc, useMeetingCall } from './api'
+import { addItem, meetingRpc, saveArrival, useMeetingCall } from './api'
 import type { SaveStatus } from './autosave'
 import { CloseMeeting } from './CloseMeeting'
 import { decisionNumbers, sortAgenda } from './decisions'
 import { meetingTime } from './fmt'
-import { LiveAttendance, type ApartmentLine } from './LiveAttendance'
+import { isCorrection } from './lifecycle'
+import { LiveAttendance, type ApartmentLine, type ArrivalEntry } from './LiveAttendance'
 import { LiveItem } from './LiveItem'
 import { Opening, Postponement, type OpeningValues } from './LiveOpening'
 import { QuorumMeter } from './QuorumMeter'
@@ -18,6 +19,7 @@ import { ruleOf, type MeetingDetail } from './types'
 import { useLiveMeeting } from './useLiveMeeting'
 
 const L = he.meetings.live
+const C = L.correction
 const STATUS_TEXT: Partial<Record<SaveStatus, string>> = { saving: L.saving, saved: L.saved, offline: L.offline, error: L.saveFailed }
 
 function useApartmentLines(): ApartmentLine[] {
@@ -51,7 +53,14 @@ function Agenda({ live, meetingId }: { live: ReturnType<typeof useLiveMeeting>; 
   )
 }
 
-/** Mobile-first live screen: attendance with the quorum meter, postponement and opening; then the agenda and closing. */
+/** A correction (reopened after closing) is not a live session: the banner says so. */
+const CorrectionBanner = () => <Alert color="signal" title={C.banner}>{C.bannerBody}</Alert>
+
+/**
+ * Mobile-first live screen: attendance with the quorum meter, postponement and opening; then the agenda and closing.
+ * After "עריכת הפרוטוקול" (a correction) the same screen, without the opening steps, with arrival times by hand and
+ * "שמירה וסגירה מחדש" at the original closing time.
+ */
 export function LiveMeeting({ meeting }: { meeting: MeetingDetail }) {
   const lines = useApartmentLines()
   const live = useLiveMeeting(meeting)
@@ -59,12 +68,16 @@ export function LiveMeeting({ meeting }: { meeting: MeetingDetail }) {
   const [view, setView] = useState<'attendance' | 'agenda'>(meeting.status === 'in_progress' ? 'agenda' : 'attendance')
   const q = quorumState(ruleOf(meeting), lines.length, Object.values(live.attendance), meeting.postponed_at !== null)
   const names = lines.flatMap((l) => [live.attendance[l.id]?.attendee_name, live.attendance[l.id]?.proxy_name]).filter((n): n is string => !!n?.trim() && n !== L.committeeHolder)
-  const run = (fn: () => Promise<void>, done: string) => call.mutate(async () => { await live.flush(); await fn() }, { onSuccess: () => notifySuccess(done) })
+  const run = (fn: () => Promise<void>, done?: string) => call.mutate(async () => { await live.flush(); await fn() }, { onSuccess: () => done && notifySuccess(done) })
   const open = (v: OpeningValues) => run(() => meetingRpc.open(meeting.id, v.openedAt, v.chair, v.secretary, v.override), L.opened)
   const inProgress = meeting.status === 'in_progress'
+  const correction = isCorrection(meeting)
+  const arrival: ArrivalEntry | undefined = correction && meeting.opened_at
+    ? { openedAt: meeting.opened_at, onSet: (apt, at) => run(() => saveArrival(meeting.id, apt, at)) } : undefined
   return (
     <Stack gap="md">
       <Title order={2} size="h3">{L.title}</Title>
+      {correction && <CorrectionBanner />}
       <Text size="sm" mih={22} c={live.status === 'offline' || live.status === 'error' ? 'signal.9' : 'dimmed'} aria-live="polite">{STATUS_TEXT[live.status] ?? ''}</Text>
       <QuorumMeter q={q} />
       {inProgress && meeting.opened_at && <Text size="sm" c="dimmed" className="bm-num">{L.openedAt(meetingTime(meeting.opened_at))}</Text>}
@@ -75,12 +88,13 @@ export function LiveMeeting({ meeting }: { meeting: MeetingDetail }) {
       {!inProgress && <Postponement meeting={meeting} q={q} busy={call.isPending} onPostpone={() => run(() => meetingRpc.postpone(meeting.id), L.postponedToast)}
         onCancel={() => run(() => meetingRpc.cancelPostpone(meeting.id), L.postponeCancelled)} />}
       {(view === 'attendance' || !inProgress) && (
-        <LiveAttendance meetingId={meeting.id} apartments={lines} values={live.attendance} absent={live.absent} onChange={live.setApartment}
+        <LiveAttendance meetingId={meeting.id} apartments={lines} values={live.attendance} absent={live.absent} arrival={arrival} onChange={live.setApartment}
           times={Object.fromEntries(meeting.attendance.flatMap((a) => (a.apartment_id ? [[a.apartment_id, a]] : [])))} />
       )}
       {!inProgress && <Opening key={meeting.postponed_to ?? 'now'} meeting={meeting} q={q} names={names} busy={call.isPending} onOpen={open} />}
       {inProgress && view === 'agenda' && <Agenda live={live} meetingId={meeting.id} />}
-      {inProgress && <CloseMeeting busy={call.isPending} onClose={(at) => run(() => meetingRpc.close(meeting.id, at), L.closed)} />}
+      {inProgress && <CloseMeeting busy={call.isPending} reclose={correction ? meeting.reopened_from : null}
+        onClose={(at) => run(() => meetingRpc.close(meeting.id, at), correction ? C.closed : L.closed)} />}
     </Stack>
   )
 }
