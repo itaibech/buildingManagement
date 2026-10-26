@@ -89,6 +89,8 @@ export const he = {
       progressLabel: (done: number, total: number) => `הושלמו ${done} מתוך ${total} שלבים`,
       dismiss: 'הסתרה',
       dismissLabel: 'הסתרת רשימת ההקמה',
+      showAll: (total: number) => `כל ${total} השלבים`,
+      showLess: 'רק השלבים הבאים',
       steps: {
         name: 'שם הבניין', address: 'כתובת', payment: 'הנחיות תשלום לדיירים', contact: 'טלפון של הוועד',
         fees: 'דמי ועד', residents: 'דירה אחת לפחות עם דיירים', email: 'שליחת מיילים מוגדרת', permissions: 'סקירת הרשאות הדיירים',
