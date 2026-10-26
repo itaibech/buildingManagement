@@ -781,6 +781,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"meeting_documents": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"file_name": string,"file_path": string,"id": string,"meeting_id": string,"size_bytes": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"file_name": string,"file_path": string,"id"?: string,"meeting_id": string,"size_bytes": number
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"file_name"?: string,"file_path"?: string,"id"?: string,"meeting_id"?: string,"size_bytes"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "meeting_documents_meeting_id_fkey"
+      columns: ["meeting_id"]
+isOneToOne: false
+      referencedRelation: "meetings"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"meeting_events": {
                   Row: {
                     "actor": string | null,"created_at": string,"details": NonNullable<Json>,"id": string,"kind": string,"meeting_id": string
@@ -1382,7 +1402,7 @@ isOneToOne: false
 { Args: { "payload": Json }; Returns: Json
                            },
 "invite_meeting":
-{ Args: { "p_confirm_short_notice"?: boolean,"p_meeting": string }; Returns: string
+{ Args: { "p_confirm_short_notice"?: boolean,"p_include_details"?: boolean,"p_meeting": string }; Returns: string
                            },
 "is_admin":
 { Args: Record<PropertyKey, never>; Returns: boolean
@@ -1549,7 +1569,7 @@ isOneToOne: false
 { Args: { "p_special_id": string }; Returns: Json
                            },
 "update_meeting_invitation":
-{ Args: { "p_meeting": string }; Returns: string
+{ Args: { "p_include_details"?: boolean,"p_meeting": string }; Returns: string
                            },
 "user_names":
 { Args: { "ids": (string)[] }; Returns: {

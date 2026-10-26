@@ -23,6 +23,8 @@ vi.mock('./api', async (orig) => ({
   useMeetingCall: () => ({ mutate, isPending: false, isError: false }),
   useMeetingEvents: () => ({ data: [] }),
   useMeetingFileUrls: () => ({ data: {} }),
+  useMeetingDocuments: () => ({ data: [] }),
+  useDocumentCall: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
   useSaveMeeting: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
 }))
 vi.mock('../tenants/api', () => ({ useApartments: () => ({ data: [] }), useResidents: () => ({ data: [] }) }))

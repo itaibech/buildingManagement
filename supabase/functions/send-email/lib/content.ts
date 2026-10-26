@@ -74,14 +74,25 @@ function meetingSubject(m: MeetingInfo, variant: MeetingVariant): string {
   return `${variant === 'update' ? 'עדכון זימון' : 'זימון'} ל${kind}: ${m.title}`
 }
 
-/** kind 'meeting': the invitation (or its update) with the time, place and agenda; or the published protocol. */
-export function meetingContent(m: MeetingInfo, variant: MeetingVariant, name: string, appUrl: string): EmailContent {
+/** The numbered agenda; with details, each topic's details indented under its title (escaped by the template). */
+export function agendaText(agenda: MeetingInfo['agenda'], details: boolean): string {
+  return agenda.map((t, i) => {
+    const body = details ? t.discussion.trim() : ''
+    return body ? `${i + 1}. ${t.title}\n${body.split('\n').map((l) => `   ${l}`).join('\n')}` : `${i + 1}. ${t.title}`
+  }).join('\n')
+}
+
+/**
+ * kind 'meeting': the invitation (or its update) with the time, place and agenda (optionally with each topic's
+ * details); or the published protocol.
+ */
+export function meetingContent(m: MeetingInfo, variant: MeetingVariant, name: string, appUrl: string, details = false): EmailContent {
   const link = { href: `${appUrl}#/meetings/${m.id}`, label: variant === 'published' ? 'לפרוטוקול באפליקציה' : 'לפרטי הישיבה באפליקציה' }
   if (variant === 'published') {
     return { subject: meetingSubject(m, variant), greeting: greeting(name), heading: m.title, link,
       paragraphs: ['פרוטוקול הישיבה פורסם וזמין לכל הדיירים באפליקציה, כולל מי שלא נכח.'] }
   }
-  const agenda = m.agenda.map((t, i) => `${i + 1}. ${t}`).join('\n')
+  const agenda = agendaText(m.agenda, details)
   return {
     subject: meetingSubject(m, variant), greeting: greeting(name), heading: `${KIND[m.kind] ?? KIND.committee}: ${m.title}`, link,
     lines: [{ label: 'מועד', value: `${ilDate(m.scheduled_at)} בשעה ${ilTime(m.scheduled_at)}` }, { label: 'מקום', value: m.location || '—' }],

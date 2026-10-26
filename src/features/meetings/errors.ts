@@ -6,5 +6,6 @@ export function meetingError(e: unknown): string {
   const token = /meeting:([a-z_]+)/.exec(message)?.[1]
   if (token && he.meetings.errors[token]) return he.meetings.errors[token]
   if (/closed: add a correction/.test(message)) return he.meetings.errors.locked
+  if (/documents (are final|stay as recorded)/.test(message)) return he.meetings.documents.locked
   return he.meetings.errors.generic
 }

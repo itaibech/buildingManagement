@@ -6,6 +6,7 @@ import { AddendumDialog, PublishDialog } from './CloseoutDialogs'
 import { EventLog } from './EventLog'
 import { meetingDate } from './fmt'
 import { isSigned, needsPublishReminder } from './lifecycle'
+import { MeetingDocuments } from './MeetingDocuments'
 import { MeetingEmailDialog } from './MeetingEmailDialog'
 import { printProtocol } from './print'
 import { ProtocolView } from './ProtocolView'
@@ -35,6 +36,7 @@ export function ClosedMeeting({ meeting, isAdmin }: { meeting: MeetingDetail; is
       {meeting.published_at && <Text size="sm" c="dimmed" className="bm-num">{he.meetings.publish.publishedAt(meetingDate(meeting.published_at))}</Text>}
       {closed && isAdmin && <SignPanel meeting={meeting} />}
       <ProtocolView meeting={meeting} />
+      <MeetingDocuments meetingId={meeting.id} status={meeting.status} isAdmin={isAdmin} />
       {isAdmin && <EventLog meetingId={meeting.id} />}
       {isAdmin && (
         <>

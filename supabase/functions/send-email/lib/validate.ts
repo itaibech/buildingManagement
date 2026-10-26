@@ -17,7 +17,10 @@ function parseApartments(v: unknown): string[] | 'all' | undefined | null {
   return [...new Set(v.map((id) => id.toLowerCase()))]
 }
 
-/** Validates the JSON body: { kind, id?, apartmentIds?: uuid[] | 'all', note?, variant? (meeting only), preview?, status? (test preview only) }. */
+/**
+ * Validates the JSON body: { kind, id?, apartmentIds?: uuid[] | 'all', note?, variant? (meeting only),
+ * details? (meeting invite / update only), preview?, status? (test preview only) }.
+ */
 export function parseRequest(body: unknown): Parsed {
   if (!isRecord(body) || !isKind(body.kind)) return { ok: false, error: 'kind' }
   const { kind } = body
@@ -27,12 +30,16 @@ export function parseRequest(body: unknown): Parsed {
   const apartmentIds = parseApartments(body.apartmentIds)
   if (apartmentIds === null || (kind === 'test' && apartmentIds !== undefined)) return { ok: false, error: 'apartmentIds' }
   if (body.note !== undefined && (typeof body.note !== 'string' || body.note.length > MAX_NOTE)) return { ok: false, error: 'note' }
+  if (body.details !== undefined && (typeof body.details !== 'boolean' || kind !== 'meeting' || body.variant === 'published')) {
+    return { ok: false, error: 'details' }
+  }
   if (body.preview !== undefined && typeof body.preview !== 'boolean') return { ok: false, error: 'preview' }
   if (body.status !== undefined && (body.status !== true || kind !== 'test' || body.preview !== true)) return { ok: false, error: 'status' }
   const value: EmailRequest = { kind, preview: body.preview === true }
   if (body.status === true) value.status = true
   if (needsId) value.id = String(body.id).toLowerCase()
   if (isVariant(body.variant)) value.variant = body.variant
+  if (body.details === true) value.details = true
   if (apartmentIds !== undefined) value.apartmentIds = apartmentIds
   const note = typeof body.note === 'string' ? body.note.trim() : ''
   if (note) value.note = note

@@ -57,9 +57,9 @@ async function meeting(db: SupabaseClient, id: string, buildingId: string): Prom
   const m = maybe<Omit<MeetingInfo, 'agenda'>>(await db.from('meetings')
     .select('id, kind, title, scheduled_at, opened_at, location, status').eq('id', id).eq('building_id', buildingId).maybeSingle())
   if (!m) return null
-  const items = must<{ title: string }[]>(await db.from('meeting_agenda_items').select('title').eq('meeting_id', id)
-    .eq('item_status', 'open').order('position').order('created_at'))
-  return { ...m, agenda: items.map((i) => i.title) }
+  const items = must<{ title: string; discussion: string }[]>(await db.from('meeting_agenda_items').select('title, discussion')
+    .eq('meeting_id', id).eq('item_status', 'open').order('position').order('created_at'))
+  return { ...m, agenda: items.map((i) => ({ title: i.title, discussion: i.discussion })) }
 }
 
 async function balances(db: SupabaseClient, ids: string[]): Promise<Balance[]> {
