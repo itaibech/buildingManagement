@@ -28,7 +28,7 @@ export function ChargerForm({ onDone }: { onDone: () => void }) {
   }, [chargers.data, options])
   const form = useForm<{ apartmentId: string | null; initial: number | string }>({
     initialValues: { apartmentId: null, initial: 0 },
-    validate: { apartmentId: (v) => (v ? null : he.ev.errors.required), initial: nonNegative },
+    validate: { apartmentId: (v) => (v ? null : he.ev.errors.chargerApartment), initial: nonNegative },
   })
   const submit = form.onSubmit((v) => {
     if (!v.apartmentId || typeof v.initial !== 'number') return

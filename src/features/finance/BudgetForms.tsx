@@ -44,7 +44,7 @@ function BudgetFormFields({ year, categoryId, planned, onDone, categories }: Bud
   const save = useSetBudgets(useMemo(() => namesOf(categories), [categories]))
   const form = useForm<Values>({
     initialValues: { categoryId: categoryId ?? null, amount: planned ?? '', scope: 'recurring' },
-    validate: { categoryId: (v) => (v ? null : he.finance.errors.required), amount: (v) => (typeof v === 'number' && v >= 0 ? null : he.finance.errors.nonNegative) },
+    validate: { categoryId: (v) => (v ? null : he.finance.errors.category), amount: (v) => (typeof v === 'number' && v >= 0 ? null : he.finance.errors.nonNegative) },
   })
   const { amount, scope } = form.values
   const submit = form.onSubmit((v) => {

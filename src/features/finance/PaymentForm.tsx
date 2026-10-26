@@ -28,8 +28,8 @@ export function PaymentForm({ apartmentId, note, onDone }: { apartmentId?: strin
   const form = useForm<PaymentValues>({
     initialValues: { apartmentId: apartmentId ?? null, paidOn: todayISO(), amount: '', method: 'transfer', note: note ?? '' },
     validate: {
-      apartmentId: (v) => (v ? null : he.finance.errors.required),
-      paidOn: (v) => (v ? null : he.finance.errors.required),
+      apartmentId: (v) => (v ? null : he.finance.errors.apartment),
+      paidOn: (v) => (v ? null : he.finance.errors.paidOn),
       amount: (v) => (typeof v === 'number' && v > 0 ? null : he.finance.errors.positive),
     },
   })

@@ -34,7 +34,7 @@ export function TicketForm({ ticket, onDone }: { ticket?: Ticket; onDone: () => 
   const { submit, pending, failed } = useSubmit(ticket, onDone)
   const form = useForm<TicketInput>({
     initialValues: { title: ticket?.title ?? '', description: ticket?.description ?? '', location: ticket?.location ?? '' },
-    validate: { title: (v) => (v.trim() ? null : he.tickets.errors.required) },
+    validate: { title: (v) => (v.trim() ? null : he.tickets.errors.title) },
   })
   return (
     <form onSubmit={form.onSubmit((v) => submit(trimmed(v), photos.map((p) => p.file)), focusFirstError)} noValidate>

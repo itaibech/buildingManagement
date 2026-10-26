@@ -36,7 +36,7 @@ export function DoneForm({ task, onDone }: { task: Task; onDone: () => void }) {
   const form = useForm<DoneValues>({
     initialValues: { doneOn: todayISO(), note: '', cost: '', categoryId: null },
     validate: {
-      doneOn: (v) => (v ? null : he.maintenance.errors.required),
+      doneOn: (v) => (v ? null : he.maintenance.errors.doneOn),
       cost: (v) => (typeof v === 'number' && v < 0 ? he.maintenance.errors.cost : null),
       categoryId: (v, values) => (costOf(values) !== null && !v ? he.maintenance.errors.category : null),
     },

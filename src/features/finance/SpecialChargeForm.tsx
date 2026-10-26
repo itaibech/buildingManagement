@@ -61,10 +61,10 @@ function useSpecialForm(apartmentId: string, onDone: () => void) {
   const form = useForm<SpecialValues>({
     initialValues: { label: '', amount: '', month: monthOf(todayISO()), note: '', paid: false, method: 'transfer', today: false, expense: false, categoryId: null },
     validate: {
-      label: (v) => (v.trim() ? null : he.finance.errors.required),
+      label: (v) => (v.trim() ? null : he.finance.errors.chargeLabel),
       amount: (v) => (typeof v === 'number' && v > 0 ? null : he.finance.errors.positive),
       month: (v) => (v <= monthOf(todayISO()) ? null : S.futureMonth),
-      categoryId: (v, all) => (!all.expense || v ? null : he.finance.errors.required),
+      categoryId: (v, all) => (!all.expense || v ? null : he.finance.errors.category),
     },
   })
   const submit = form.onSubmit((v) => {

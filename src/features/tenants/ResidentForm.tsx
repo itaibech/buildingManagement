@@ -32,7 +32,7 @@ export function ResidentForm({ apartmentId, resident, onDone }: ResidentFormProp
       is_owner: resident?.is_owner ?? false,
     },
     validate: {
-      full_name: (v) => (v.trim() ? null : he.tenants.errors.required),
+      full_name: (v) => (v.trim() ? null : he.tenants.errors.residentName),
       phone: (v) => (!v.trim() || PHONE.test(v.trim()) ? null : he.tenants.errors.phone),
       email: (v) => (!v.trim() || EMAIL.test(v.trim()) ? null : he.tenants.errors.email),
     },
