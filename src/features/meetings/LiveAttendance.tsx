@@ -32,6 +32,10 @@ function ProxyFile({ meetingId, path, onPath }: { meetingId: string; path: strin
   )
 }
 
+/** The attendee picker's options: trimmed, blank names dropped, each once (Autocomplete rejects duplicate options). */
+const attendeeOptions = (residents: readonly string[]): string[] =>
+  [...new Set(residents.map((n) => n.trim()).filter(Boolean))]
+
 /** times: the stored arrival / departure during the meeting (server-set). */
 export type AttendanceTimes = Pick<Attendance, 'arrived_at' | 'left_at'>
 interface RowProps { meetingId: string; apt: ApartmentLine; value: AttendanceValue; times?: AttendanceTimes; onChange: (v: AttendanceValue) => void }
@@ -52,7 +56,7 @@ function AttendanceRow({ meetingId, apt, value, times, onChange }: RowProps) {
           data={ATTENDANCE_STATUSES.map((s) => ({ value: s, label: L.statuses[s] }))}
           onChange={(v) => set({ status: ATTENDANCE_STATUSES.find((s) => s === v) ?? 'absent' })} />
         {value.status === 'present' && (
-          <Autocomplete label={L.attendeeName} placeholder={L.attendeeHint} data={apt.residents} value={value.attendee_name}
+          <Autocomplete label={L.attendeeName} placeholder={L.attendeeHint} data={attendeeOptions(apt.residents)} value={value.attendee_name}
             onChange={(v) => set({ attendee_name: v })} />
         )}
         {value.status === 'proxy' && (
