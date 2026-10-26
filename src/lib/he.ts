@@ -103,6 +103,7 @@ export const he = {
       standingOrder: 'דמי הוועד נגבים בהוראת קבע',
       evLast: (kwh: string, month: string) => `קריאת מונה אחרונה: ${kwh} · ${month}`,
       noContact: 'לשאלות על הדירה פנו לוועד הבית.',
+      committeeLink: 'לפרטי הקשר של נציגי הוועד',
     },
   },
   search: {
@@ -264,6 +265,7 @@ export const he = {
     directoryEmpty: 'אין עדיין דיירים',
     directoryEmptyBody: 'מנהלי הוועד יוסיפו כאן את דיירי הבניין.',
     noMatches: 'לא נמצאו דיירים',
+    committeeOnly: 'נציגי ועד',
     directoryExport: {
       excel: 'ייצוא לאקסל',
       print: 'PDF / הדפסה',

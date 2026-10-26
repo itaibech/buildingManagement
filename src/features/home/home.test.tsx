@@ -247,6 +247,20 @@ describe('HomePage', () => {
     expect(screen.queryByText(he.pay.title)).toBeNull()
   })
 
+  it('no committee phone: the hero links to the committee members in the phone book (directory permission only)', () => {
+    m.granted = ['home', 'announcements', 'directory']
+    const original = m.building
+    m.building = { ...original, committee_contact: null }
+    renderHome()
+    expect(screen.getByRole('link', { name: he.home.hero.committeeLink })).toHaveAttribute('href', '/directory?committee=1')
+    cleanup()
+    m.granted = ['home', 'announcements']
+    renderHome()
+    expect(screen.queryByRole('link', { name: he.home.hero.committeeLink })).toBeNull()
+    expect(screen.getByText(he.home.hero.noContact)).toBeInTheDocument()
+    m.building = original
+  })
+
   it('admin inbox: counts with deep links, and the cheer when nothing is open', () => {
     m.isAdmin = true
     m.tasks = []
