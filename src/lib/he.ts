@@ -1285,6 +1285,8 @@ export const he = {
       quorumRequired: (required: number, total: number) => `נדרש מניין: ${required} מתוך ${total} דירות`,
       agenda: 'סדר היום',
       agendaItem: (n: number) => `נושא ${n}`,
+      agendaDetails: (n: number) => `פרטים לנושא ${n}`,
+      agendaDetailsHint: 'פרטים / טיוטת דיון (אופציונלי)',
       agendaRequired: 'יש להוסיף לפחות נושא אחד לסדר היום',
       addItem: 'הוספת נושא',
       moveUp: (n: number) => `העברת נושא ${n} למעלה`,
@@ -1302,6 +1304,8 @@ export const he = {
     locationLabel: 'מקום',
     quorumLabel: 'מניין חוקי',
     agendaLabel: 'סדר היום',
+    showMore: 'הצג עוד',
+    showLess: 'הצג פחות',
     invitedAt: (date: string) => `הזימון נשלח ב-${date}`,
     history: 'היסטוריית הישיבה',
     events: {

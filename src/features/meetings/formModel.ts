@@ -7,7 +7,7 @@ import type { MeetingDetail, MeetingKind, QuorumMode } from './types'
 
 const F = he.meetings.form
 
-export interface AgendaRow { key: string; id?: string; title: string }
+export interface AgendaRow { key: string; id?: string; title: string; discussion: string }
 
 export interface Values {
   kind: MeetingKind
@@ -30,8 +30,8 @@ export function initial(m: MeetingDetail | undefined): Values {
   return {
     kind: m?.kind ?? 'committee', title: m?.title ?? '', ...when, location: m?.location ?? '',
     quorum_mode: m?.quorum_mode ?? defaultQuorum('committee'), quorum_value: m?.quorum_value ?? '', quorum_note: m?.quorum_note ?? '',
-    agenda: m ? [...m.items].sort((a, b) => a.position - b.position).map((i) => ({ key: i.id, id: i.id, title: i.title }))
-      : [{ key: crypto.randomUUID(), title: '' }],
+    agenda: m ? [...m.items].sort((a, b) => a.position - b.position).map((i) => ({ key: i.id, id: i.id, title: i.title, discussion: i.discussion }))
+      : [{ key: crypto.randomUUID(), title: '', discussion: '' }],
   }
 }
 
@@ -46,7 +46,7 @@ export function toInput(v: Values): MeetingInput {
   return {
     kind: v.kind, title: v.title.trim(), scheduled_at: fromInputs(v.date, v.time), location: v.location.trim(),
     quorum_mode: v.quorum_mode, quorum_value: !takesValue(v.quorum_mode) || typeof v.quorum_value !== 'number' ? null : v.quorum_value,
-    quorum_note: v.quorum_note.trim(), agenda: v.agenda.filter((r) => r.title.trim()).map(({ id, title }) => ({ id, title })),
+    quorum_note: v.quorum_note.trim(), agenda: v.agenda.filter((r) => r.title.trim()).map(({ id, title, discussion }) => ({ id, title, discussion: discussion.trim() })),
   }
 }
 

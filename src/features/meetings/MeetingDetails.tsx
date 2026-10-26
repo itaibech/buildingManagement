@@ -1,4 +1,4 @@
-import { Card, List, SimpleGrid, Stack, Text, Title } from '@mantine/core'
+import { Card, List, SimpleGrid, Spoiler, Stack, Text, Title } from '@mantine/core'
 import { he } from '../../lib/he'
 import { sortAgenda } from './decisions'
 import { meetingDate, meetingTime } from './fmt'
@@ -30,7 +30,16 @@ export function MeetingDetails({ meeting: m, total }: { meeting: MeetingDetail; 
         <Stack gap={4}>
           <Text size="sm" c="dimmed">{he.meetings.agendaLabel}</Text>
           <List type="ordered" spacing={4}>
-            {agenda.map((i) => <List.Item key={i.id}><Text style={{ overflowWrap: 'anywhere' }}>{i.title}</Text></List.Item>)}
+            {agenda.map((i) => (
+              <List.Item key={i.id}>
+                <Text style={{ overflowWrap: 'anywhere' }}>{i.title}</Text>
+                {i.discussion && (
+                  <Spoiler maxHeight={72} showLabel={he.meetings.showMore} hideLabel={he.meetings.showLess}>
+                    <Text size="sm" c="dimmed" className="bm-pre" style={{ overflowWrap: 'anywhere' }}>{i.discussion}</Text>
+                  </Spoiler>
+                )}
+              </List.Item>
+            ))}
           </List>
         </Stack>
         {m.invited_at && <Text size="sm" c="dimmed" className="bm-num">{he.meetings.invitedAt(meetingDate(m.invited_at))}</Text>}

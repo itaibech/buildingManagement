@@ -83,7 +83,7 @@ export interface MeetingInput {
   quorum_value: number | null
   quorum_note: string
   /** In order; `id` for items that already exist. */
-  agenda: { id?: string; title: string }[]
+  agenda: { id?: string; title: string; discussion: string }[]
 }
 
 async function syncAgenda(meetingId: string, agenda: MeetingInput['agenda'], existing: readonly AgendaItem[]): Promise<void> {
@@ -91,9 +91,9 @@ async function syncAgenda(meetingId: string, agenda: MeetingInput['agenda'], exi
   const gone = existing.filter((i) => !keep.has(i.id)).map((i) => i.id)
   if (gone.length) fail((await supabase.from('meeting_agenda_items').delete().in('id', gone)).error)
   for (const [i, a] of agenda.entries()) {
-    const row = { title: a.title.trim(), position: i + 1 }
+    const row = { title: a.title.trim(), discussion: a.discussion, position: i + 1 }
     const old = existing.find((e) => e.id === a.id)
-    if (old && old.title === row.title && old.position === row.position) continue
+    if (old && old.title === row.title && old.discussion === row.discussion && old.position === row.position) continue
     const q = supabase.from('meeting_agenda_items')
     fail((await (a.id ? q.update(row).eq('id', a.id) : q.insert({ ...row, meeting_id: meetingId }))).error)
   }
