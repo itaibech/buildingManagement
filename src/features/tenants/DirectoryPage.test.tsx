@@ -18,9 +18,10 @@ const rows: Record<string, unknown[]> = {
     { id: 'a12', number: 12, floor: 4 },
   ],
   residents: [
-    { id: 'r1', apartment_id: 'a1', full_name: 'דנה בדיקה', phone: '050-0000001', is_owner: true },
+    { id: 'r1', apartment_id: 'a1', full_name: 'דנה בדיקה', phone: '050-0000001', is_owner: true, email: 'dana@example.test' },
     { id: 'r2', apartment_id: 'a12', full_name: 'יוסי לדוגמה', phone: '050-0000002', is_owner: false },
   ],
+  profiles: [],
 }
 
 const auth = vi.hoisted(() => ({ isAdmin: true }))
@@ -28,6 +29,9 @@ const deleted = vi.hoisted(() => vi.fn())
 vi.mock('../../auth/AuthProvider', () => ({ useAuth: () => ({ isAdmin: auth.isAdmin }) }))
 vi.mock('./ApartmentForm', () => ({
   ApartmentForm: ({ apartment }: { apartment?: { number: number } }) => <div data-testid="apt-form">{apartment?.number}</div>,
+}))
+vi.mock('./InviteDialog', () => ({
+  InviteDialog: ({ opened, prefill }: { opened: boolean; prefill?: { email?: string }[] }) => (opened ? <div data-testid="invite">{prefill?.[0]?.email}</div> : null),
 }))
 vi.mock('./ResidentForm', () => ({
   ResidentForm: ({ apartmentId, resident }: { apartmentId: string; resident?: { full_name: string } }) => (
@@ -138,6 +142,14 @@ describe('DirectoryPage', () => {
       fireEvent.click(screen.getByLabelText(he.tenants.residentActions('יוסי לדוגמה')))
       fireEvent.click(await screen.findByText(he.tenants.editResident))
       expect(await screen.findByTestId('res-form')).toHaveTextContent('a12|יוסי לדוגמה')
+    })
+
+    it('offers "הזמנה לאפליקציה" in the resident menu (where it lives on mobile) and opens the invite', async () => {
+      renderPage()
+      await screen.findByText('דנה בדיקה')
+      fireEvent.click(screen.getByLabelText(he.tenants.residentActions('דנה בדיקה')))
+      fireEvent.click(await screen.findByText(he.invite.directoryMenuItem))
+      expect(await screen.findByTestId('invite')).toHaveTextContent('dana@example.test')
     })
 
     it('asks for confirmation before removing a resident', async () => {
