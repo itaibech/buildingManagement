@@ -224,6 +224,16 @@ describe('opening without quorum', () => {
     expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ override: true }))
   })
 
+  it('two residents of one apartment with the same name (or blank names) do not crash the attendee list', () => {
+    const value = { status: 'present' as const, attendee_name: '', proxy_name: '', proxy_file_path: null }
+    const apt = { id: 'a1', number: 1, residents: ['משפחת כהן', 'משפחת כהן', 'משפחת כהן ', 'דנה', '', ' '] }
+    wrap(<LiveAttendance meetingId="m1" apartments={[apt]} values={{ a1: value }} absent={value} onChange={vi.fn()} />)
+    fireEvent.focus(screen.getAllByLabelText(L.attendeeName)[0])
+    const count = (name: string) => screen.getAllByRole('option', { name, hidden: true }).length
+    expect(count('משפחת כהן')).toBe(1)
+    expect(count('דנה')).toBe(1)
+  })
+
   it('a proxy to the committee needs no name: ticking it sets נציגות הוועד and hides the name field', () => {
     const onChange = vi.fn()
     const value = { status: 'proxy' as const, attendee_name: '', proxy_name: '', proxy_file_path: null }
