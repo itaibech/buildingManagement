@@ -87,3 +87,12 @@ export function readingPreview(
 
 /** "₪0.574 לקוט״ש מאוגוסט 2022" */
 export const rateText = (r: Rate): string => he.ev.rateFrom(formatRate(r.rate), monthLabel(r.effective_from))
+
+/** The month's reading round: chargers still waiting first (by number), and how many are done. */
+export function readingRound<C extends { id: string; number: number }>(
+  chargers: readonly C[], lastMonth: (id: string) => string | undefined, month: string,
+): { ordered: C[]; done: number; total: number } {
+  const isDone = (c: C) => lastMonth(c.id) === month
+  const ordered = [...chargers].sort((a, b) => Number(isDone(a)) - Number(isDone(b)) || a.number - b.number)
+  return { ordered, done: chargers.filter(isDone).length, total: chargers.length }
+}

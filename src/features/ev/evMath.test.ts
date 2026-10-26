@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { chargeAmount, evPreview, historyRows, isEvPayment, previousReading, rateFor, readingPreview } from './evMath'
+import { chargeAmount, evPreview, historyRows, isEvPayment, previousReading, rateFor, readingPreview, readingRound } from './evMath'
 
 describe('evPreview', () => {
   it('computes kWh and the amount rounded to agorot (half up, like Postgres round)', () => {
@@ -75,5 +75,15 @@ describe('historyRows', () => {
     expect(rows.map((r) => r.month)).toEqual(['2026-08-01', '2026-07-01'])
     expect(rows[0]).toEqual({ id: 'r2', month: '2026-08-01', reading: 640.15, kwh: 127.35, rate: 0.574, amount: 73.1, paid: 93.1, diff: 20 })
     expect(rows[1]).toMatchObject({ paid: 0, diff: -93.16 })
+  })
+})
+
+describe('readingRound', () => {
+  it('puts chargers still waiting for this month first, by number, and counts the done ones', () => {
+    const chargers = [{ id: 'c4', number: 4 }, { id: 'c5', number: 5 }, { id: 'c2', number: 2 }]
+    const last: Record<string, string> = { c4: '2026-10-01', c5: '2026-09-01' }
+    const round = readingRound(chargers, (id) => last[id], '2026-10-01')
+    expect(round.ordered.map((c) => c.number)).toEqual([2, 5, 4])
+    expect(round).toMatchObject({ done: 1, total: 3 })
   })
 })
