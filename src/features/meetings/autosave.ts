@@ -51,7 +51,7 @@ export function createAutosaver(o: AutosaverOptions): Autosaver {
   let draft: Draft = o.store.load()
   let status: SaveStatus = 'idle'
   let timer: ReturnType<typeof setTimeout> | undefined
-  let running = false
+  let inFlight: Promise<void> | null = null
   const online = o.online ?? (() => navigator.onLine)
   const set = (s: SaveStatus) => { status = s; o.onStatus?.(s) }
   const schedule = (ms: number) => { clearTimeout(timer); timer = setTimeout(() => void flush(), ms) }
@@ -71,13 +71,15 @@ export function createAutosaver(o: AutosaverOptions): Autosaver {
 
   async function flush(): Promise<void> {
     clearTimeout(timer)
-    if (running) return
+    // A save in flight: wait for it, then send what is left, so `await flush()` means the server has everything.
+    if (inFlight) { await inFlight; return flush() }
     if (!sendable().length) return set(status === 'idle' ? 'idle' : 'saved')
     if (!online()) return set('offline')
-    running = true
     set('saving')
-    const results = await Promise.all(sendable().map(([k, v]) => saveOne(k, v)))
-    running = false
+    const run = Promise.all(sendable().map(([k, v]) => saveOne(k, v)))
+    inFlight = run.then(() => undefined)
+    const results = await run
+    inFlight = null
     if (results.includes(false)) { set('error'); schedule(o.retryMs ?? 5000); return }
     if (sendable().length) return flush()
     set('saved')

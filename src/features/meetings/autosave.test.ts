@@ -65,6 +65,22 @@ describe('autosaver', () => {
     expect(save).toHaveBeenLastCalledWith('item:1', { decision: '2' })
   })
 
+  it('flush() during a save in flight resolves only after the server has everything (open/close wait for it)', async () => {
+    let release: () => void = () => undefined
+    const save = vi.fn(() => new Promise<void>((r) => { release = r }))
+    const a = createAutosaver({ delay: 100, save, store: memoryStore(), online: () => true })
+    a.push('att:1', { status: 'present' })
+    await vi.advanceTimersByTimeAsync(100)
+    expect(save).toHaveBeenCalledTimes(1)
+    let done = false
+    const flushed = a.flush().then(() => { done = true })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(done).toBe(false)
+    release()
+    await flushed
+    expect(a.pending()).toEqual({})
+  })
+
   it('hold: kept in the device draft but never sent until a normal push replaces it', async () => {
     const store = memoryStore()
     const save = vi.fn(async () => undefined)
