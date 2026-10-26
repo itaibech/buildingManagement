@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Database } from '../../lib/db.types'
 import { supabase } from '../../lib/supabase'
-import { PHOTO_BUCKET, photoPath } from './photos'
+import { PHOTO_BUCKET, photoMime, photoPath } from './photos'
 
 type Row = Database['public']['Tables']['tickets']['Row']
 export type TicketStatus = 'open' | 'in_progress' | 'closed'
@@ -102,7 +102,7 @@ async function uploadPhotos(ticketId: string, files: readonly File[]): Promise<n
   const results = await Promise.all(
     files.map(async (f) => {
       const path = photoPath(ticketId, f)
-      const { error } = await bucket.upload(path, f, { contentType: f.type })
+      const { error } = await bucket.upload(path, f, { contentType: photoMime(f) ?? f.type })
       return error ? null : path
     }),
   )
