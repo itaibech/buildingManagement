@@ -23,7 +23,7 @@ export function AnnouncementForm({ announcement, onDone }: { announcement?: Anno
       expires_at: announcement?.expires_at ?? '',
     },
     validate: {
-      title: (v) => (v.trim() ? null : he.announcements.errors.required),
+      title: (v) => (v.trim() ? null : he.announcements.errors.title),
       expires_at: (v) => (v && v !== announcement?.expires_at && v < todayISO() ? he.announcements.errors.pastDate : null),
     },
   })

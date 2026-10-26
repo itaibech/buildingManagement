@@ -53,7 +53,7 @@ describe('SpecialChargeForm', () => {
   it('needs a description and a positive amount', async () => {
     wrap(<SpecialChargeForm apartmentId="a2" onDone={() => undefined} />)
     fireEvent.click(save())
-    expect(await screen.findByText(he.finance.errors.required)).toBeInTheDocument()
+    expect(await screen.findByText(he.finance.errors.chargeLabel)).toBeInTheDocument()
     expect(screen.getByText(he.finance.errors.positive)).toBeInTheDocument()
     expect(db.rpcCalls).toHaveLength(0)
   })

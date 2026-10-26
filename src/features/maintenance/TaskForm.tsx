@@ -19,7 +19,7 @@ export function TaskForm({ task, onDone }: { task?: Task; onDone: () => void }) 
   const save = useSaveTask()
   const form = useForm<Values>({
     initialValues: { title: task?.title ?? '', vendor: task?.vendor ?? '', frequency: task?.frequency ?? 'yearly', next_due: task?.next_due ?? '' },
-    validate: { title: (v) => (v.trim() ? null : he.maintenance.errors.required) },
+    validate: { title: (v) => (v.trim() ? null : he.maintenance.errors.title) },
   })
   const submit = form.onSubmit((v) => {
     const values = { title: v.title.trim(), vendor: v.vendor.trim(), frequency: v.frequency, next_due: v.next_due || null }

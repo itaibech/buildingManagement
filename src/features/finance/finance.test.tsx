@@ -200,6 +200,14 @@ describe('admin charges', () => {
 })
 
 describe('forms', () => {
+  it('a payment without an apartment or amount says what to fill in, and saves nothing', async () => {
+    wrap(<PaymentForm onDone={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: he.finance.recordPayment }))
+    expect(await screen.findByText(he.finance.errors.apartment)).toBeInTheDocument()
+    expect(screen.getByText(he.finance.errors.positive)).toBeInTheDocument()
+    expect(inserts('payments')).toEqual([])
+  })
+
   it('records a payment with an explicit date and method, then toasts', async () => {
     const onDone = vi.fn()
     wrap(<PaymentForm apartmentId="a2" onDone={onDone} />)

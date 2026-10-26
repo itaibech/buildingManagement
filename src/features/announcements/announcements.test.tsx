@@ -102,7 +102,7 @@ describe('AnnouncementForm', () => {
   it('requires a title', async () => {
     wrap(<AnnouncementForm onDone={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: he.announcements.publish }))
-    expect(await screen.findByText(he.announcements.errors.required)).toBeInTheDocument()
+    expect(await screen.findByText(he.announcements.errors.title)).toBeInTheDocument()
     expect(db.inserts).toHaveLength(0)
   })
 

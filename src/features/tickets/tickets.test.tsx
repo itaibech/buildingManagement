@@ -124,7 +124,7 @@ describe('TicketForm', () => {
   it('requires a title', () => {
     wrap(<TicketForm onDone={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: he.tickets.send }))
-    expect(screen.getByText(he.tickets.errors.required)).toBeInTheDocument()
+    expect(screen.getByText(he.tickets.errors.title)).toBeInTheDocument()
     expect(m.create).not.toHaveBeenCalled()
   })
 
