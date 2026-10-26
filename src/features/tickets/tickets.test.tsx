@@ -131,7 +131,7 @@ describe('TicketForm', () => {
   it('rejects non-image files in Hebrew', () => {
     const { container } = wrap(<TicketForm onDone={vi.fn()} />)
     const input = container.querySelector('input[type=file]') as HTMLInputElement
-    expect(input).toHaveAttribute('accept', 'image/*')
+    expect(input).toHaveAttribute('accept', 'image/*,.heic,.heif')
     fireEvent.change(input, { target: { files: [file('doc.pdf', 'application/pdf')] } })
     expect(screen.getByText(he.tickets.errors.notImage('doc.pdf'))).toBeInTheDocument()
   })

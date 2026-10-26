@@ -59,7 +59,7 @@ export function PhotoPicker({ value, onChange }: PhotoPickerProps) {
           </Group>
         )}
         {value.length < MAX_PHOTOS && (
-          <FileButton onChange={add} accept="image/*" multiple capture={mobile ? 'environment' : undefined}>
+          <FileButton onChange={add} accept="image/*,.heic,.heif" multiple capture={mobile ? 'environment' : undefined}>
             {(props) => <Button {...props} variant="light" leftSection={<IconCamera size={20} stroke={1.75} />}>{he.tickets.addPhotos}</Button>}
           </FileButton>
         )}
