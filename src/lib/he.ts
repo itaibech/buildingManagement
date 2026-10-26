@@ -342,6 +342,8 @@ export const he = {
   users: {
     edit: 'עריכה',
     done: 'סיום',
+    nameLabel: 'שם',
+    nameRequired: 'כתבו שם',
     pending: 'ממתינים לאישור',
     approved: 'משתמשים מאושרים',
     noPending: 'אין משתמשים שממתינים לאישור',

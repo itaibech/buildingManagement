@@ -121,6 +121,18 @@ describe('UsersPage groups', () => {
     await waitFor(() => expect(lastUpdate()).toEqual({ table: 'profiles', op: 'update', values: { group_id: 'g2' }, filters: [['user_id', 'd1']] }))
   })
 
+  it('an admin can rename a user (e.g. to Hebrew); saved on blur, trimmed, and an unchanged name is not saved', async () => {
+    renderPage()
+    const row = await screen.findByTestId('user-d1')
+    fireEvent.click(within(row).getByRole('button', { name: he.users.edit }))
+    const name = within(row).getByLabelText(he.users.nameLabel)
+    fireEvent.blur(name)
+    expect(lastUpdate()).toBeUndefined()
+    fireEvent.change(name, { target: { value: '  איתי בכור  ' } })
+    fireEvent.blur(name)
+    await waitFor(() => expect(lastUpdate()).toEqual({ table: 'profiles', op: 'update', values: { full_name: 'איתי בכור' }, filters: [['user_id', 'd1']] }))
+  })
+
   it('moving a user to the default group stores null', async () => {
     db.rows.profiles = [...(db.rows.profiles ?? []), profile('d2', 'דיירת בקבוצה', { group_id: 'g2' })]
     renderPage()
