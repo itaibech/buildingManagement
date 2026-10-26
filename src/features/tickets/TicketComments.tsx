@@ -28,7 +28,7 @@ function Composer({ ticketId }: { ticketId: string }) {
   }
   return (
     <Group className="bm-composer" gap="xs" wrap="nowrap" align="flex-end">
-      <Textarea aria-label={he.tickets.comment} placeholder={he.tickets.commentPlaceholder} autosize minRows={1} maxRows={5}
+      <Textarea aria-label={he.tickets.comment} placeholder={he.tickets.commentPlaceholder} autosize minRows={1} maxRows={5} maxLength={5000}
         value={body} onChange={(e) => setBody(e.currentTarget.value)} style={{ flex: 1 }} />
       <ActionIcon size={44} aria-label={he.tickets.sendComment} onClick={send} loading={add.isPending} disabled={!body.trim()}>
         <IconSend size={20} stroke={1.75} className="bm-mirror" />

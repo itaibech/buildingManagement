@@ -39,9 +39,9 @@ export function TicketForm({ ticket, onDone }: { ticket?: Ticket; onDone: () => 
   return (
     <form onSubmit={form.onSubmit((v) => submit(trimmed(v), photos.map((p) => p.file)), focusFirstError)} noValidate>
       <Stack>
-        <TextInput label={he.tickets.title} placeholder={he.tickets.titlePlaceholder} withAsterisk data-autofocus {...form.getInputProps('title')} />
-        <Autocomplete label={he.tickets.location} placeholder={he.tickets.locationPlaceholder} data={[...he.tickets.locations]} {...form.getInputProps('location')} />
-        <Textarea label={he.tickets.description} autosize minRows={3} maxRows={10} {...form.getInputProps('description')} />
+        <TextInput label={he.tickets.title} placeholder={he.tickets.titlePlaceholder} withAsterisk data-autofocus maxLength={200} {...form.getInputProps('title')} />
+        <Autocomplete label={he.tickets.location} placeholder={he.tickets.locationPlaceholder} data={[...he.tickets.locations]} maxLength={200} {...form.getInputProps('location')} />
+        <Textarea label={he.tickets.description} autosize minRows={3} maxRows={10} maxLength={5000} {...form.getInputProps('description')} />
         {!ticket && <PhotoPicker value={photos} onChange={setPhotos} />}
         {failed && <Alert color="debt">{he.tickets.errors.save}</Alert>}
         <Button type="submit" fullWidth loading={pending}>{ticket ? he.tickets.save : he.tickets.send}</Button>
