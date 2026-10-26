@@ -58,6 +58,12 @@ describe('buttons per state', () => {
     expect(onRun).toHaveBeenCalled()
   })
 
+  it('the agenda shows each topic\'s details under its title', () => {
+    wrap(<MeetingOverview meeting={withStatus('invited')} isAdmin onRun={vi.fn()} />)
+    expect(screen.getByText('אישור תקציב 2027')).toBeInTheDocument()
+    expect(screen.getByText('נדונה הצעת התקציב')).toBeInTheDocument()
+  })
+
   it('residents get no actions', () => {
     wrap(<MeetingOverview meeting={withStatus('invited')} isAdmin={false} onRun={vi.fn()} />)
     expect(screen.queryAllByRole('button')).toHaveLength(0)

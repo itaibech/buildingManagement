@@ -134,3 +134,14 @@ describe('postponement times', () => {
   })
 })
 
+
+describe('meeting form agenda details', () => {
+  it('loads each topic\'s discussion and saves it trimmed with the title', async () => {
+    const { initial, toInput } = await import('./formModel')
+    const { meetingFixture } = await import('./fixture')
+    const v = initial(meetingFixture())
+    expect(v.agenda[0]).toMatchObject({ title: 'אישור תקציב 2027', discussion: 'נדונה הצעת התקציב' })
+    v.agenda[0] = { ...v.agenda[0], discussion: '  טיוטה חדשה  ' }
+    expect(toInput(v).agenda[0]).toEqual({ id: 'i1', title: 'אישור תקציב 2027', discussion: 'טיוטה חדשה' })
+  })
+})
