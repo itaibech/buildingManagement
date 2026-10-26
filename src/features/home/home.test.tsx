@@ -293,14 +293,18 @@ describe('HomePage', () => {
     expect(screen.getByRole('button', { name: he.home.cashLink })).toBeInTheDocument()
   })
 
-  it('reminder envelope: test mode when email is in dry run, disabled without a resident email', () => {
+  it('reminder envelope: test mode when email is in dry run, unavailable (and says why on tap) without a resident email', async () => {
     m.isAdmin = true
     m.residents = [{ id: 'r3', apartment_id: 'a3', full_name: 'חייב גדול', email: 'big@example.test' }]
     m.debtLog = [{ created_at: new Date(Date.now() - 5 * 86_400_000).toISOString(), apartment_ids: ['a3'], dry_run: false }]
     renderHome()
     expect(screen.getByRole('button', { name: he.mail.debt.remindTest(3) })).toBeEnabled()
-    expect(screen.getByRole('button', { name: he.mail.debt.remind(5) })).toBeDisabled()
+    const unavailable = screen.getByRole('button', { name: he.mail.debt.remind(5) })
+    expect(unavailable).toHaveAttribute('aria-disabled', 'true')
     expect(screen.getByText(he.mail.debt.noEmail)).toBeInTheDocument()
     expect(screen.getByText(he.mail.debt.sentAgo(5))).toBeInTheDocument()
+    fireEvent.click(unavailable)
+    expect(await screen.findByRole('dialog')).toHaveTextContent(he.mail.debt.noEmail)
+    expect(screen.queryByRole('dialog', { name: he.mail.debt.title })).not.toBeInTheDocument()
   })
 })
