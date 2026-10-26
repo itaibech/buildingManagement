@@ -48,8 +48,13 @@ describe('expiredAnnouncements', () => {
 })
 
 describe('todayISO', () => {
-  it('formats the local calendar date as YYYY-MM-DD', () => {
-    expect(todayISO(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05')
+  it("is Israel's calendar date (the server's billing month), whatever the device's zone", () => {
+    expect(todayISO(new Date('2026-01-05T12:00:00Z'))).toBe('2026-01-05')
+    // 23:30 UTC on Oct 31 is already Nov 1 in Israel (01:30 IST): the new billing month has started.
+    expect(todayISO(new Date('2026-10-31T23:30:00Z'))).toBe('2026-11-01')
+    // Summer time (UTC+3): 21:30 UTC is 00:30 the next day.
+    expect(todayISO(new Date('2026-06-30T21:30:00Z'))).toBe('2026-07-01')
+    expect(todayISO(new Date('2026-06-30T20:59:00Z'))).toBe('2026-06-30')
   })
 })
 
