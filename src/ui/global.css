@@ -243,6 +243,25 @@ body {
   outline-offset: -2px;
 }
 
+/* Side nav search: looks like a field, opens the quick search sheet. */
+.bm-side-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding-inline: 12px;
+  border: 1px solid rgba(107, 116, 128, 0.3);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--mantine-color-stone-7);
+}
+@media (hover: hover) {
+  .bm-side-search:hover {
+    border-color: var(--mantine-color-stone-5);
+  }
+}
+
 /* Ticket comment composer: sticks above the tab bar on mobile. */
 .bm-composer {
   background: var(--bm-plaster);
