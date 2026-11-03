@@ -1,5 +1,6 @@
 // Projects writes (admin only under RLS). Every mutation refreshes the projects queries; failures toast `failMessage`.
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { he } from '../../lib/he'
 import { supabase } from '../../lib/supabase'
 import { notifyError } from '../../ui/notify'
 import { receiptMime, receiptPath } from '../finance/ledger'
@@ -10,9 +11,16 @@ function useProjectMutation<A, R>(fn: (args: A) => Promise<R>, failMessage: stri
   const client = useQueryClient()
   return useMutation({
     mutationFn: fn,
-    onError: () => notifyError(failMessage),
+    onError: (e) => notifyError(e.message === LEVY_TAKEN ? he.projects.form.levyTaken : failMessage),
     onSettled: () => client.invalidateQueries({ queryKey: PROJECTS_KEY }),
   })
+}
+
+/** The levy is already linked to another project (unique index / projects_levy_guard, 23505). */
+export const LEVY_TAKEN = 'project:levy_taken'
+const failSave = (error: { message: string; code?: string } | null): void => {
+  if (error?.code === '23505') throw new Error(LEVY_TAKEN)
+  fail(error)
 }
 
 /** Removes stored files; storage skips what it refuses without an error, so this never throws. */
@@ -24,11 +32,11 @@ async function removeFiles(paths: string[]): Promise<void> {
 export function useSaveProject(failMessage: string) {
   return useProjectMutation(async ({ id, input }: { id?: string; input: ProjectInput }): Promise<string> => {
     if (id) {
-      fail((await supabase.from('projects').update(input).eq('id', id)).error)
+      failSave((await supabase.from('projects').update(input).eq('id', id)).error)
       return id
     }
     const { data, error } = await supabase.from('projects').insert(input).select('id').single()
-    fail(error)
+    failSave(error)
     return data?.id ?? ''
   }, failMessage)
 }

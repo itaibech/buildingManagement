@@ -34,7 +34,8 @@ function AdminActions({ project }: { project: Project }) {
   const remove = useDeleteProject(T.removeFailed)
   const [sheet, setSheet] = useState<'edit' | 'delete' | null>(null)
   const files = (quotes.data ?? []).flatMap((q) => (q.file_path ? [q.file_path] : []))
-  const confirm = () => remove.mutate({ id: project.id, files }, { onSuccess: () => { notifySuccess(T.removed); void navigate('/projects') } })
+  // The quote files are removed with the project: without the list (still loading, or failed) the delete waits.
+  const confirm = () => quotes.data && remove.mutate({ id: project.id, files }, { onSuccess: () => { notifySuccess(T.removed); void navigate('/projects') } })
   return (
     <Group gap="xs">
       <Button variant="default" leftSection={<IconPencil {...ICON} />} onClick={() => setSheet('edit')}>{T.edit}</Button>
@@ -43,7 +44,8 @@ function AdminActions({ project }: { project: Project }) {
         {sheet === 'edit' && <ProjectForm project={project} onDone={() => setSheet(null)} />}
       </FormModal>
       <ConfirmDialog opened={sheet === 'delete'} title={T.removeTitle} body={T.removeBody(project.title)} confirmLabel={T.remove}
-        loading={remove.isPending} failed={remove.isError} failedMessage={T.removeFailed} onConfirm={confirm} onClose={() => setSheet(null)} />
+        loading={remove.isPending || quotes.isLoading} failed={remove.isError || quotes.isError}
+        failedMessage={quotes.isError ? he.projects.quotes.loadFailed : T.removeFailed} onConfirm={confirm} onClose={() => setSheet(null)} />
     </Group>
   )
 }

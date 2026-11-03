@@ -50,14 +50,19 @@ export interface Progress {
   levyTotal: number
   levyDue: number
   levyCollected: number
+  /** Levy written off ("מחיקת חוב"): neither collected nor owed. */
+  levyWrittenOff: number
   apartmentsCharged: number
   apartmentsOpen: number
   spent: number
   expenseCount: number
+  /** Fewer than 3 apartments charged (non-admins): no apartment counts and no write-off are given. */
+  countsHidden: boolean
 }
 
 export const NO_PROGRESS: Progress = {
-  levyTotal: 0, levyDue: 0, levyCollected: 0, apartmentsCharged: 0, apartmentsOpen: 0, spent: 0, expenseCount: 0,
+  levyTotal: 0, levyDue: 0, levyCollected: 0, levyWrittenOff: 0, apartmentsCharged: 0, apartmentsOpen: 0, spent: 0, expenseCount: 0,
+  countsHidden: false,
 }
 
 export interface ProjectInput {

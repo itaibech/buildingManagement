@@ -3,7 +3,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(42);
+select plan(55);
 
 -- ---------------------------------------------------------------- fixtures (as postgres)
 insert into auth.users (id, email, aud, role) values
@@ -149,6 +149,77 @@ set local request.jwt.claims = '{"sub":"a3000000-0000-0000-0000-000000000002","r
 select is((select count(*)::int from public.project_quotes where project_id = 'e3000000-0000-0000-0000-000000000001'), 2,
   'resident: every quote once the admin shows them');
 select is((select count(*)::int from storage.objects where bucket_id = 'project-files'), 1, 'resident: and the quote files');
+reset role;
+
+-- ---------------------------------------------------------------- allocation: oldest month first, EV before the levy
+-- "ביוב בדיקה" in two instalments, each linked to its own project. D paid the first instalment but owes this month's
+-- instalment and an EV charge; E paid one instalment's worth last month; F's first instalment was written off and
+-- the second paid. G was archived before this month: its instalment is left out.
+insert into public.apartments (id, number, archived_at) values
+  ('b3000000-0000-0000-0000-00000000000d', 9304, null),
+  ('b3000000-0000-0000-0000-00000000000e', 9305, null),
+  ('b3000000-0000-0000-0000-00000000000f', 9306, null),
+  ('b3000000-0000-0000-0000-000000000010', 9307, (public.current_month() - interval '2 months')::timestamptz + interval '3 days');
+insert into public.ev_chargers (id, apartment_id) values ('c3000000-0000-0000-0000-0000000000e1', 'b3000000-0000-0000-0000-00000000000d');
+insert into public.ev_readings (id, charger_id, month, reading) values
+  ('c3000000-0000-0000-0000-0000000000e2', 'c3000000-0000-0000-0000-0000000000e1', public.current_month(), 100);
+insert into public.charges (apartment_id, month, amount, kind, label, ev_reading_id, note) values
+  ('b3000000-0000-0000-0000-00000000000d', (public.current_month() - interval '1 month')::date, 500, 'levy', 'ביוב בדיקה', null, ''),
+  ('b3000000-0000-0000-0000-00000000000d', public.current_month(), 500, 'levy', 'ביוב בדיקה', null, ''),
+  ('b3000000-0000-0000-0000-00000000000d', public.current_month(), 300, 'extra', 'טעינה', 'c3000000-0000-0000-0000-0000000000e2', ''),
+  ('b3000000-0000-0000-0000-00000000000e', (public.current_month() - interval '1 month')::date, 500, 'levy', 'ביוב בדיקה', null, ''),
+  ('b3000000-0000-0000-0000-00000000000e', public.current_month(), 500, 'levy', 'ביוב בדיקה', null, ''),
+  ('b3000000-0000-0000-0000-00000000000f', (public.current_month() - interval '1 month')::date, 500, 'levy', 'ביוב בדיקה', null, ''),
+  ('b3000000-0000-0000-0000-00000000000f', (public.current_month() - interval '1 month')::date, -500, 'adjustment', 'מחיקת חוב', null, 'ויתור'),
+  ('b3000000-0000-0000-0000-00000000000f', public.current_month(), 500, 'levy', 'ביוב בדיקה', null, ''),
+  ('b3000000-0000-0000-0000-000000000010', public.current_month(), 500, 'levy', 'ביוב בדיקה', null, ''),
+  ('b3000000-0000-0000-0000-00000000000a', public.current_month(), 100, 'levy', 'מעלית בדיקה', null, '');
+insert into public.payments (apartment_id, paid_on, amount, method) values
+  ('b3000000-0000-0000-0000-00000000000d', (public.current_month() - interval '1 month')::date, 500, 'cash'),
+  ('b3000000-0000-0000-0000-00000000000e', (public.current_month() - interval '1 month')::date, 500, 'cash'),
+  ('b3000000-0000-0000-0000-00000000000f', public.current_month(), 500, 'cash');
+insert into public.projects (id, title, levy_label, levy_month) values
+  ('e3000000-0000-0000-0000-000000000003', 'ביוב: תשלום ראשון', 'ביוב בדיקה', (public.current_month() - interval '1 month')::date),
+  ('e3000000-0000-0000-0000-000000000004', 'ביוב: תשלום שני', 'ביוב בדיקה', public.current_month()),
+  ('e3000000-0000-0000-0000-000000000005', 'מעלית', 'מעלית בדיקה', null);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"a3000000-0000-0000-0000-000000000002","role":"authenticated"}';
+select results_eq($$select levy_total, levy_due, levy_collected, levy_written_off, apartments_charged, apartments_open
+  from public.project_progress() where project_id = 'e3000000-0000-0000-0000-000000000003'$$,
+  $$values (1500.00::numeric, 1500.00::numeric, 1000.00::numeric, 500.00::numeric, 3, 0)$$,
+  'first instalment: paid despite a later EV debt, the write-off is not collected, the archived apartment left out');
+select results_eq($$select levy_total, levy_collected, levy_written_off, apartments_charged, apartments_open
+  from public.project_progress() where project_id = 'e3000000-0000-0000-0000-000000000004'$$,
+  $$values (1500.00::numeric, 500.00::numeric, 0::numeric, 3, 2)$$,
+  'second instalment, its own project: the current debts sit on it (EV first, then the levy)');
+select results_eq($$select counts_hidden, apartments_charged, apartments_open, levy_written_off
+  from public.project_progress() where project_id = 'e3000000-0000-0000-0000-000000000005'$$,
+  $$values (true, 0, 0, 0::numeric)$$, 'resident: fewer than 3 apartments charged hides the counts');
+select throws_ok('select created_by from public.projects', '42501', null, 'resident: created_by is not readable');
+select throws_ok('select actor from public.project_events', '42501', null, 'resident: the timeline actor is not readable');
+select throws_ok('select created_by from public.project_quotes', '42501', null, 'resident: a quote''s created_by is not readable');
+select ok(not public.project_file_shown('not-a-uuid/x.pdf'), 'project_file_shown: a malformed path is simply false');
+reset role;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"a3000000-0000-0000-0000-000000000001","role":"authenticated"}';
+select results_eq($$select counts_hidden, apartments_charged, apartments_open from public.project_progress()
+  where project_id = 'e3000000-0000-0000-0000-000000000005'$$, $$values (false, 1, 1)$$, 'admin: the counts are shown');
+select throws_ok($$insert into public.projects (title, levy_label, levy_month) values ('כפול', ' ביוב בדיקה', public.current_month())$$,
+  '23505', null, 'the same levy month cannot be linked twice');
+select throws_ok($$insert into public.projects (title, levy_label) values ('כפול', 'ביוב בדיקה')$$,
+  '23505', null, 'an all-months link cannot overlap another link of the label');
+select lives_ok($$update public.projects set title = 'ביוב: תשלום ראשון (עודכן)' where id = 'e3000000-0000-0000-0000-000000000003'$$,
+  'a project keeps its own levy link when edited');
+-- Deleting the chosen quote takes the decision with it.
+insert into public.project_quotes (id, project_id, vendor, amount) values
+  ('f3000000-0000-0000-0000-000000000003', 'e3000000-0000-0000-0000-000000000002', 'צנרת', 5000);
+select lives_ok($$select public.choose_project_quote('e3000000-0000-0000-0000-000000000002', 'f3000000-0000-0000-0000-000000000003', 'הזולה')$$,
+  'admin: chooses the pipe quote');
+delete from public.project_quotes where id = 'f3000000-0000-0000-0000-000000000003';
+select is((select status || '/' || decision_note || '/' || coalesce(decision_meeting_id::text, '-') from public.projects
+  where id = 'e3000000-0000-0000-0000-000000000002'), 'quotes//-', 'deleting the chosen quote clears the decision and the approval');
 reset role;
 
 select * from finish();

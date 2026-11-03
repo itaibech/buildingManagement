@@ -8,16 +8,22 @@ import { formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
 import { theme } from '../../ui/theme'
 import { ProgressCard } from './Overview'
+import { ProjectForm } from './ProjectForm'
 import { QuotesTab } from './QuotesTab'
 import { NO_PROGRESS, type Project, type Quote } from './types'
 
-const m = vi.hoisted(() => ({ quotes: [] as unknown[], show: vi.fn(), choose: vi.fn() }))
+const m = vi.hoisted(() => ({ quotes: [] as unknown[], quotesFailed: false, show: vi.fn(), choose: vi.fn(), saveError: null as Error | null }))
 const idle = (mutate: () => void = vi.fn()) => ({ mutate, isPending: false, isError: false })
 
 vi.mock('../../lib/supabase', () => ({ supabase: {} }))
-vi.mock('./api', () => ({ useQuotes: () => ({ data: m.quotes, isLoading: false }), useProjectProgress: () => ({ data: new Map() }) }))
+vi.mock('./api', () => ({
+  useQuotes: () => (m.quotesFailed ? { data: undefined, isLoading: false, isError: true } : { data: m.quotes, isLoading: false, isError: false }),
+  useProjectProgress: () => ({ data: new Map() }), useLevyOptions: () => ({ data: [{ label: 'דלת כניסה', months: ['2026-10-01'] }] }),
+}))
 vi.mock('./mutations', () => ({
   useShowQuotes: () => idle(m.show), useDeleteQuote: () => idle(), useSaveQuote: () => idle(), useChooseQuote: () => idle(m.choose),
+  useSaveProject: () => ({ mutate: vi.fn(), isPending: false, isError: m.saveError !== null, error: m.saveError }),
+  LEVY_TAKEN: 'project:levy_taken',
 }))
 vi.mock('../meetings/api', () => ({ useMeetings: () => ({ data: [{ id: 'mt1', title: 'ישיבת ועד', scheduled_at: '2026-10-20T17:00:00Z' }] }) }))
 vi.mock('../../auth/AuthProvider', () => ({ useAuth: () => ({ isAdmin: true, can: () => true }) }))
@@ -38,6 +44,8 @@ const cards = (): HTMLElement[] => screen.getAllByRole('listitem')
 beforeEach(() => {
   m.quotes = [quote('a', 'דלתות בע"מ', 17000, { file_path: 'p1/x.pdf', file_name: 'הצעה.pdf', url: 'https://files.test/x' }), quote('b', 'שערים', 15000)]
   m.show.mockClear()
+  m.quotesFailed = false
+  m.saveError = null
   m.choose.mockClear()
 })
 afterEach(cleanup)
@@ -82,7 +90,32 @@ describe('quote comparison view', () => {
   })
 })
 
+describe('quotes and project form errors', () => {
+  it('quotes that fail to load say so', () => {
+    m.quotesFailed = true
+    ui(<QuotesTab project={project} isAdmin />)
+    expect(screen.getByText(he.projects.quotes.loadFailed)).toBeTruthy()
+  })
+
+  it('a levy already linked to another project gets the Hebrew explanation', () => {
+    m.saveError = new Error('project:levy_taken')
+    ui(<ProjectForm project={project} onDone={vi.fn()} />)
+    expect(screen.getByText(he.projects.form.levyTaken)).toBeTruthy()
+  })
+})
+
 describe('progress card', () => {
+  it('a write-off shows as "נמחק", and few apartments hide the counts', () => {
+    const progress = { ...NO_PROGRESS, levyTotal: 1500, levyDue: 1500, levyCollected: 1000, levyWrittenOff: 500, apartmentsCharged: 3, apartmentsOpen: 0 }
+    ui(<ProgressCard project={project} progress={progress} />)
+    expect(norm(document.body.textContent)).toContain(norm(he.projects.progress.writtenOff(formatILS(500))))
+    expect(norm(document.body.textContent)).toContain(he.projects.progress.apartmentsOwing(0, 3))
+    cleanup()
+    ui(<ProgressCard project={project} progress={{ ...progress, countsHidden: true, levyWrittenOff: 0, apartmentsCharged: 0 }} />)
+    expect(norm(document.body.textContent)).not.toContain(he.projects.progress.apartmentsOwing(0, 3))
+    expect(norm(document.body.textContent)).not.toContain('נמחק')
+  })
+
   it('cost, collected of the levy with the apartments still owing, and spent', () => {
     const progress = { ...NO_PROGRESS, levyTotal: 17000, levyDue: 16000, levyCollected: 8000, apartmentsCharged: 16, apartmentsOpen: 9, spent: 4000, expenseCount: 2 }
     ui(<ProgressCard project={{ ...project, chosen_amount: 15000 }} progress={progress} />)

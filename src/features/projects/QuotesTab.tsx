@@ -21,7 +21,7 @@ function AdminBar({ project, onAdd }: { project: Project; onAdd: () => void }) {
   return (
     <Card>
       <Group justify="space-between" gap="sm" wrap="wrap">
-        <Switch label={Q.show} description={Q.showHint} checked={project.show_quotes} disabled={show.isPending}
+        <Switch size="md" label={Q.show} description={Q.showHint} checked={project.show_quotes} disabled={show.isPending}
           onChange={(e) => show.mutate({ id: project.id, show: e.currentTarget.checked })} />
         <Button leftSection={<IconPlus size={18} stroke={1.75} />} onClick={onAdd}>{Q.add}</Button>
       </Group>
@@ -61,6 +61,7 @@ export function QuotesTab({ project, isAdmin }: { project: Project; isAdmin: boo
       {isAdmin && <AdminBar project={project} onAdd={add} />}
       {!isAdmin && !project.show_quotes && rows.length > 0 && <Text size="sm" c="dimmed">{Q.hiddenNote}</Text>}
       {quotes.isLoading && <ListSkeleton rows={2} />}
+      {quotes.isError && <Text c="debt.7">{Q.loadFailed}</Text>}
       {quotes.data && rows.length === 0 && (
         <EmptyState title={Q.empty} body={isAdmin ? Q.emptyAdmin : Q.emptyResident} action={isAdmin ? { label: Q.add, onClick: add } : undefined} />
       )}

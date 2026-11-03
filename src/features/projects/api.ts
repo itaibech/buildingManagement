@@ -10,7 +10,8 @@ import {
 export const PROJECTS_KEY = ['projects'] as const
 export const PROJECT_BUCKET = 'project-files'
 const SIGNED_URL_SECONDS = 60 * 60
-const PROJECT_COLUMNS = '*, project_quotes(amount, is_chosen)'
+// Explicit columns: created_by is not readable by API users (0030 column privileges).
+const PROJECT_COLUMNS = 'id, title, description, status, estimated_cost, final_cost, start_date, end_date, levy_label, levy_month, show_quotes, decision_note, decision_meeting_id, created_at, project_quotes(amount, is_chosen)'
 
 export const fail = (error: { message: string } | null): void => {
   if (error) throw new Error(error.message)
@@ -103,7 +104,8 @@ export function useProjectProgress() {
       fail(error)
       return new Map((data ?? []).map((r) => [r.project_id, {
         levyTotal: Number(r.levy_total), levyDue: Number(r.levy_due), levyCollected: Number(r.levy_collected),
-        apartmentsCharged: r.apartments_charged, apartmentsOpen: r.apartments_open, spent: Number(r.spent), expenseCount: r.expense_count,
+        levyWrittenOff: Number(r.levy_written_off), apartmentsCharged: r.apartments_charged, apartmentsOpen: r.apartments_open,
+        countsHidden: r.counts_hidden, spent: Number(r.spent), expenseCount: r.expense_count,
       }]))
     },
   })

@@ -27,6 +27,8 @@ export interface ProgressSummary {
   hasLevy: boolean
   collected: number
   due: number
+  /** Written off ("נמחק"), neither collected nor owed. */
+  writtenOff: number
   /** Levy charged for later months (not owed yet). */
   scheduled: number
   collectedPct: number
@@ -46,6 +48,7 @@ export function summarize(project: Project, progress: Progress): ProgressSummary
     hasLevy,
     collected: progress.levyCollected,
     due: progress.levyDue,
+    writtenOff: progress.levyWrittenOff,
     scheduled: ils(Math.max(ag(progress.levyTotal) - ag(progress.levyDue), 0)),
     collectedPct: percent(progress.levyCollected, progress.levyDue),
     spent: progress.spent,

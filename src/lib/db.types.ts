@@ -1626,9 +1626,14 @@ isOneToOne: false
 "project_file_shown":
 { Args: { "p_name": string }; Returns: boolean
                            },
+"project_levy_lines":
+{ Args: { "p_building": string }; Returns: {
+              "amount": number,"apartment_id": string,"month": string,"open": number,"project_id": string,"written_off": number
+            }[]
+                           },
 "project_progress":
 { Args: Record<PropertyKey, never>; Returns: {
-              "apartments_charged": number,"apartments_open": number,"expense_count": number,"levy_collected": number,"levy_due": number,"levy_total": number,"project_id": string,"spent": number
+              "apartments_charged": number,"apartments_open": number,"counts_hidden": boolean,"expense_count": number,"levy_collected": number,"levy_due": number,"levy_total": number,"levy_written_off": number,"project_id": string,"spent": number
             }[]
                            },
 "publish_meeting":

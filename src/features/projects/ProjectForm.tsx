@@ -6,7 +6,7 @@ import { DateInput, focusFirstError, notifySuccess } from '../../ui'
 import { MoneyInput } from '../finance/fields'
 import { useLevyOptions } from './api'
 import { toInput, toValues, validate, type ProjectValues } from './form'
-import { useSaveProject } from './mutations'
+import { LEVY_TAKEN, useSaveProject } from './mutations'
 import { isProjectStatus, PROJECT_STATUSES, type Project } from './types'
 
 const F = he.projects.form
@@ -61,7 +61,7 @@ export function ProjectForm({ project, onDone }: { project?: Project; onDone: (i
           <DateInput label={F.end} {...form.getInputProps('end')} />
         </Group>
         <LevyFields form={form} />
-        {save.isError && <Alert color="debt">{F.failed}</Alert>}
+        {save.isError && <Alert color="debt">{save.error.message === LEVY_TAKEN ? F.levyTaken : F.failed}</Alert>}
         <Button type="submit" fullWidth loading={save.isPending}>{project ? F.save : F.create}</Button>
       </Stack>
     </form>

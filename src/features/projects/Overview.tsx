@@ -32,7 +32,8 @@ function Collected({ s, progress }: { s: ProgressSummary; progress: Progress }) 
       <Money amount={s.collected} tone="neutral" size="lg" />
       <Text size="sm" className="bm-num">{P.collectedOf(formatILS(s.collected), formatILS(s.due))}</Text>
       <Bar value={s.collectedPct} color="paid.7" size="md" radius="xl" aria-label={P.collectedBar(s.collectedPct)} />
-      {progress.apartmentsCharged > 0 && (
+      {s.writtenOff > 0 && <Text size="sm" c="dimmed" className="bm-num">{P.writtenOff(formatILS(s.writtenOff))}</Text>}
+      {!progress.countsHidden && progress.apartmentsCharged > 0 && (
         <Text size="sm" c="dimmed" className="bm-num">{P.apartmentsOwing(progress.apartmentsOpen, progress.apartmentsCharged)}</Text>
       )}
       {s.scheduled > 0 && <Text size="xs" c="dimmed" className="bm-num">{P.scheduled(formatILS(s.scheduled))}</Text>}
@@ -98,6 +99,7 @@ function DecisionCard({ project, isAdmin }: { project: Project; isAdmin: boolean
 function StatusTimeline({ project }: { project: Project }) {
   const events = useProjectEvents(project.id)
   if (events.isLoading) return <ListSkeleton rows={2} />
+  if (events.isError) return <Card><Text size="sm" c="debt.7">{he.projects.timeline.loadFailed}</Text></Card>
   const steps = timeline(project.status, events.data ?? [])
   const active = steps.reduce((last, s, i) => (s.state === 'upcoming' ? last : i), -1)
   return (
@@ -121,6 +123,7 @@ export function Overview({ project, isAdmin }: { project: Project; isAdmin: bool
   return (
     <Stack gap="lg">
       <Text style={{ whiteSpace: 'pre-wrap' }} c={project.description ? undefined : 'dimmed'}>{project.description || he.projects.noDescription}</Text>
+      {progress.isError && <Text size="sm" c="debt.7">{he.projects.progress.loadFailed}</Text>}
       <ProgressCard project={project} progress={progress.data?.get(project.id) ?? NO_PROGRESS} />
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
         <DecisionCard project={project} isAdmin={isAdmin} />

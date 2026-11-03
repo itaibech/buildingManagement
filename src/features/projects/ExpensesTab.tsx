@@ -30,6 +30,7 @@ function LinkPicker({ projectId, onDone }: { projectId: string; onDone: () => vo
       <TextInput aria-label={E.search} placeholder={E.search} type="search" data-autofocus value={query}
         leftSection={<IconSearch size={18} stroke={1.75} aria-hidden="true" />} onChange={(e) => setQuery(e.currentTarget.value)} />
       {candidates.isLoading && <ListSkeleton rows={3} />}
+      {candidates.isError && <Text size="sm" c="debt.7">{E.loadFailed}</Text>}
       {candidates.data && list.length === 0 && <EmptyState title={E.noCandidates} />}
       <Stack gap={0} mx={-16}>
         {list.map((e) => (
@@ -53,6 +54,7 @@ function AdminExpenses({ project }: { project: Project }) {
         <Button variant="default" leftSection={<IconLink size={18} stroke={1.75} />} onClick={() => setPicking(true)}>{E.link}</Button>
       </Group>
       {linked.isLoading && <ListSkeleton rows={2} />}
+      {linked.isError && <Text size="sm" c="debt.7">{E.loadFailed}</Text>}
       {linked.data && rows.length === 0 && <EmptyState title={E.empty} body={E.emptyAdmin} />}
       <Stack gap={0} mx={-16}>
         {rows.map((e) => (
@@ -70,10 +72,12 @@ function AdminExpenses({ project }: { project: Project }) {
 
 /** "הוצאות": the total paid to vendors (everyone); the expense rows and linking for admins only. */
 export function ExpensesTab({ project, isAdmin }: { project: Project; isAdmin: boolean }) {
-  const progress = useProjectProgress().data?.get(project.id) ?? NO_PROGRESS
+  const q = useProjectProgress()
+  const progress = q.data?.get(project.id) ?? NO_PROGRESS
   return (
     <Stack gap="md">
       <Card>
+        {q.isError && <Text size="sm" c="debt.7">{he.projects.progress.loadFailed}</Text>}
         <Text size="sm" fw={600} c="dimmed">{E.total}</Text>
         <Money amount={progress.spent} tone="neutral" size="lg" />
         <Text size="sm" c="dimmed">{he.projects.progress.spentOf(progress.expenseCount)}</Text>
