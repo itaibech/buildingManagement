@@ -75,7 +75,7 @@ describe('PermissionsPage', () => {
     expect(home).toBeDisabled()
     expect(screen.getByRole('switch', { name: /^הודעות/ })).toBeChecked()
     expect(screen.getByRole('switch', { name: /^דיירים/ })).not.toBeChecked()
-    expect(screen.getAllByRole('switch')).toHaveLength(13)
+    expect(screen.getAllByRole('switch')).toHaveLength(14)
   })
 
   it('a toggle calls the mutation for that group and key, then confirms', () => {

@@ -22,12 +22,21 @@ export const meetingISODate = (iso: string | Date): string => { const p = parts(
 /** Date and time inputs (Israel time) for a timestamp. */
 export const toInputs = (iso: string | Date): { date: string; time: string } => ({ date: meetingISODate(iso), time: meetingTime(iso) })
 
-/** The timestamp for a date and time typed in Israel time. */
+/** Israel's offset from UTC (ms) at an instant. */
+function offsetAt(ms: number): number {
+  const p = parts(new Date(ms))
+  return Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), Number(p.hour), Number(p.minute)) - ms
+}
+
+/**
+ * The timestamp for a date and time typed in Israel time. The offset is taken at the wall time read as UTC, then
+ * again at that first result: near a DST change (00:00–02:59 on the transition day) the two differ, and the second wins.
+ */
 export function fromInputs(date: string, time: string): string {
-  const guess = new Date(`${date}T${time}:00Z`)
-  const p = parts(guess)
-  const shown = Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), Number(p.hour), Number(p.minute))
-  return new Date(guess.getTime() - (shown - guess.getTime())).toISOString()
+  const wall = Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10)),
+    Number(time.slice(0, 2)), Number(time.slice(3, 5)))
+  const first = wall - offsetAt(wall)
+  return new Date(wall - offsetAt(first)).toISOString()
 }
 
 /** The arrival for a typed time: on the opening's date (Israel time), or the next day when earlier than the opening. */

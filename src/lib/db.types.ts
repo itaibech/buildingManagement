@@ -313,6 +313,32 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"calendar_events": {
+                  Row: {
+                    "all_day": boolean,"building_id": string,"category": string,"created_at": string,"created_by": string | null,"description": string,"ends_at": string | null,"id": string,"location": string,"recurrence": string,"recurrence_until": string | null,"starts_at": string,"title": string,"visibility": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "all_day"?: boolean,"building_id"?: string,"category"?: string,"created_at"?: string,"created_by"?: string | null,"description"?: string,"ends_at"?: string | null,"id"?: string,"location"?: string,"recurrence"?: string,"recurrence_until"?: string | null,"starts_at": string,"title": string,"visibility"?: string
+                  }
+                  Update: {
+                    "all_day"?: boolean,"building_id"?: string,"category"?: string,"created_at"?: string,"created_by"?: string | null,"description"?: string,"ends_at"?: string | null,"id"?: string,"location"?: string,"recurrence"?: string,"recurrence_until"?: string | null,"starts_at"?: string,"title"?: string,"visibility"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "calendar_events_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "calendar_events_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"charges": {
                   Row: {
                     "amount": number,"apartment_id": string,"building_id": string,"created_at": string,"ev_reading_id": string | null,"id": string,"is_special": boolean | null,"kind": string,"label": string,"month": string,"note": string,"settlement_id": string | null,"source": string,"special_id": string | null

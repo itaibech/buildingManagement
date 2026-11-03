@@ -38,12 +38,14 @@ describe('searchAll', () => {
     tickets: [{ id: 't1', title: 'נזילה בחדר מדרגות' }],
     projects: [{ id: 'p1', title: 'שיפוץ חדר מדרגות' }],
     polls: [{ id: 'q1', title: 'צביעת חדר המדרגות' }],
+    events: [{ id: 'e1', title: 'שטיפת חדר מדרגות' }],
   }
   it('groups results: apartments, people, announcements, tickets, projects, polls', () => {
     const r = searchAll('מדרגות', data)
     expect(r.announcements.map((x) => x.id)).toEqual(['n1'])
     expect(r.polls.map((x) => x.id)).toEqual(['q1'])
     expect(r.tickets.map((x) => x.id)).toEqual(['t1'])
+    expect(r.events.map((x) => x.id)).toEqual(['e1'])
     expect(r.projects.map((x) => x.id)).toEqual(['p1'])
     expect(r.people).toEqual([])
   })

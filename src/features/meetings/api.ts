@@ -17,9 +17,10 @@ const fail = (error: { message: string } | null): void => {
 }
 
 /** Every meeting the user may see (RLS: residents get invited and published ones), newest first, with decisions. */
-export function useMeetings() {
+export function useMeetings(enabled = true) {
   return useQuery({
     queryKey: [...KEY, 'list'],
+    enabled,
     queryFn: async (): Promise<MeetingListItem[]> => {
       const { data, error } = await supabase.from('meetings').select('*, meeting_agenda_items(decision)').order('scheduled_at', { ascending: false })
       fail(error)

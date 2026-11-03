@@ -1,6 +1,7 @@
 import { Badge, Group } from '@mantine/core'
 import { IconBolt } from '@tabler/icons-react'
 import { he } from '../lib/he'
+import { CALENDAR_COLOR } from './calendarColor'
 import { feeBadge, type FeeMode } from './feeBadge'
 
 export type StatusBadgeProps =
@@ -13,6 +14,7 @@ export type StatusBadgeProps =
   | { kind: 'project'; value: 'planning' | 'quotes' | 'approved' | 'in_progress' | 'done' | 'cancelled' }
   | { kind: 'poll'; value: 'draft' | 'open' | 'ended' | 'closed' }
   | { kind: 'contract'; value: 'active' | 'ending' | 'expired' }
+  | { kind: 'calendar'; value: keyof typeof CALENDAR_COLOR }
 
 // The only place the status colour mapping lives (docs/design-system.md); fee sources are in feeBadge.ts.
 const TICKET_COLOR = { open: 'signal', in_progress: 'enamel', closed: 'stone' } as const
@@ -39,6 +41,7 @@ function resolve(props: StatusBadgeProps): { color: string; label: string } {
   if (props.kind === 'poll') return { color: POLL_COLOR[props.value], label: he.polls.statuses[props.value] }
   if (props.kind === 'budget') return { color: BUDGET_COLOR[props.value], label: he.finance.budget.sources[props.value] }
   if (props.kind === 'contract') return { color: CONTRACT_COLOR[props.value], label: he.contractStatus[props.value] }
+  if (props.kind === 'calendar') return { color: CALENDAR_COLOR[props.value], label: he.calendar.categories[props.value] }
   if (props.kind === 'reading') return { color: READING_COLOR[props.value], label: he.readingStatus[props.value] }
   return { color: DUE_COLOR[props.value], label: he.dueStatus[props.value] }
 }

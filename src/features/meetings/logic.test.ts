@@ -86,6 +86,12 @@ describe('Israel time', () => {
     const { fromInputs, meetingDate, meetingTime, toInputs } = await import('./fmt')
     expect(fromInputs('2026-11-03', '19:30')).toBe('2026-11-03T17:30:00.000Z')
     expect(fromInputs('2026-07-01', '20:00')).toBe('2026-07-01T17:00:00.000Z')
+    // Early hours of the DST transition days: still the old offset until 02:00.
+    expect(fromInputs('2027-03-26', '01:00')).toBe('2027-03-25T23:00:00.000Z')
+    expect(fromInputs('2027-03-26', '03:00')).toBe('2027-03-26T00:00:00.000Z')
+    expect(fromInputs('2027-10-31', '00:30')).toBe('2027-10-30T21:30:00.000Z')
+    expect(fromInputs('2027-10-31', '03:00')).toBe('2027-10-31T01:00:00.000Z')
+    expect(fromInputs('2026-10-25', '00:30')).toBe('2026-10-24T21:30:00.000Z')
     expect(meetingDate('2026-11-03T17:30:00Z')).toBe('03/11/2026')
     expect(meetingTime('2026-11-03T17:30:00Z')).toBe('19:30')
     expect(toInputs('2026-07-01T17:00:00Z')).toEqual({ date: '2026-07-01', time: '20:00' })
