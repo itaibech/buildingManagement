@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { he } from '../../lib/he'
 import { focusFirstError, notifyError, notifySuccess } from '../../ui'
 import { useCreatePost, useUpdatePost, type Post, type PostInput } from './api'
-import { asCategory, CATEGORIES, limitMessage, MAX_BODY, MAX_TITLE, photoError } from './board'
+import { asCategory, CATEGORIES, hasText, limitMessage, MAX_BODY, MAX_TITLE, photoError } from './board'
 
 const C = he.community
 const CATEGORY_OPTIONS = CATEGORIES.map((c) => ({ value: c, label: C.categories[c] }))
@@ -64,7 +64,7 @@ function useSubmit(post: Post | undefined, onDone: () => void) {
   return { submit, pending: m.isPending, error }
 }
 
-const trimmed = (v: PostInput): PostInput => ({ category: v.category, title: v.title.trim(), body: v.body.trim() })
+const trimmed = (v: PostInput): PostInput => ({ category: v.category, title: v.title.trim(), body: hasText(v.body) ? v.body.trim() : '' })
 
 /** The create dialog's form (with one photo), or the author's edit of the text and category. */
 export function PostForm({ post, onDone }: { post?: Post; onDone: () => void }) {
@@ -72,7 +72,7 @@ export function PostForm({ post, onDone }: { post?: Post; onDone: () => void }) 
   const { submit, pending, error } = useSubmit(post, onDone)
   const form = useForm<PostInput>({
     initialValues: { category: post?.category ?? 'general', title: post?.title ?? '', body: post?.body ?? '' },
-    validate: { title: (v) => (v.trim() ? null : C.errors.title) },
+    validate: { title: (v) => (hasText(v) ? null : C.errors.title) },
   })
   return (
     <form onSubmit={form.onSubmit((v) => submit(trimmed(v), file), focusFirstError)} noValidate>

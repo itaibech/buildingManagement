@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { he } from '../../lib/he'
-import { boardPosts, daysLeft, expiresSoon, isExpired, limitMessage, newestPosts, photoError, postState, type BoardPost } from './board'
+import { boardPosts, daysLeft, hasText, expiresSoon, isExpired, limitMessage, newestPosts, photoError, postState, type BoardPost } from './board'
 
 const NOW = new Date('2026-11-03T12:00:00Z')
 const day = (n: number) => new Date(NOW.getTime() + n * 86400_000).toISOString()
@@ -59,6 +59,15 @@ describe('postState', () => {
     expect(postState(post({ expires_at: day(-1), status: 'resolved' }), NOW)).toBe('expired')
     expect(postState(post({ status: 'resolved' }), NOW)).toBe('resolved')
     expect(postState(post(), NOW)).toBe('active')
+  })
+})
+
+describe('hasText', () => {
+  it('rejects whitespace, newlines, tabs and zero-width characters only', () => {
+    expect(hasText('מפתח')).toBe(true)
+    expect(hasText(' \n\t\u00a0')).toBe(false)
+    expect(hasText('\u200b\u200d\ufeff\u2060')).toBe(false)
+    expect(hasText('')).toBe(false)
   })
 })
 

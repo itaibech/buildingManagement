@@ -64,6 +64,11 @@ export function postState(p: BoardPost & { status: PostStatus }, now: Date = new
   return p.status
 }
 
+/** Some visible text: not only whitespace, newlines, tabs or zero-width characters (the DB checks the same). */
+export function hasText(value: string): boolean {
+  return /[^\s\u200b-\u200d\u2060\ufeff]/.test(value)
+}
+
 /** The Hebrew message for a known server refusal (the rate limits), or null. */
 export function limitMessage(error: unknown, messages: { post: string; comment: string }): string | null {
   const text = error instanceof Error ? error.message : ''

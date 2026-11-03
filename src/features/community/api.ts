@@ -9,7 +9,7 @@ type CommentRow = Database['public']['Tables']['community_comments']['Row']
 
 export const COMMUNITY_BUCKET = 'community-photos'
 const KEY = ['community'] as const
-const SIGNED_URL_SECONDS = 60 * 60
+const SIGNED_URL_SECONDS = 5 * 60
 
 /** Name always; apartment only when the viewer may read the directory (community_authors decides). */
 export interface Author { name: string | null; apartment: number | null }
@@ -67,7 +67,7 @@ async function fetchPosts(): Promise<Post[]> {
   return rows.map(({ community_comments, ...r }) => toPost(r, community_comments[0]?.count ?? 0, authors, urls))
 }
 
-/** Every post the viewer may see (RLS), newest first, with authors, comment counts and photo URLs (1 hour). */
+/** Every post the viewer may see (RLS), newest first, with authors, comment counts and photo URLs (5 minutes). */
 export function usePosts(enabled = true) {
   return useQuery({ queryKey: [...KEY, 'list'], queryFn: fetchPosts, enabled })
 }

@@ -519,6 +519,20 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"community_quota_events": {
+                  Row: {
+                    "created_at": string,"id": string,"kind": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"id"?: string,"kind": string,"user_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"id"?: string,"kind"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+
+                  ]
                 },"community_removals": {
                   Row: {
                     "building_id": string,"created_at": string,"id": string,"kind": string,"reason": string,"title": string,"user_id": string

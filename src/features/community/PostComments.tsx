@@ -5,7 +5,7 @@ import { useAuth } from '../../auth/AuthProvider'
 import { he } from '../../lib/he'
 import { notifyError, notifySuccess } from '../../ui'
 import { useAddComment, useDeleteComment, useModerate, type PostComment } from './api'
-import { limitMessage, MAX_COMMENT } from './board'
+import { hasText, limitMessage, MAX_COMMENT } from './board'
 import { ModerateDialog } from './ModerateDialog'
 import { AuthorLine } from './PostCard'
 
@@ -59,7 +59,7 @@ function Composer({ postId }: { postId: string }) {
   const add = useAddComment()
   const send = () => {
     const text = body.trim()
-    if (!text) return
+    if (!hasText(text)) return
     add.mutate({ postId, body: text }, {
       onSuccess: () => setBody(''),
       onError: (e) => notifyError(limitMessage(e, { post: C.errors.postLimit, comment: C.errors.commentLimit }) ?? he.toast.failed),
@@ -69,7 +69,7 @@ function Composer({ postId }: { postId: string }) {
     <Group className="bm-composer" gap="xs" wrap="nowrap" align="flex-end">
       <Textarea aria-label={C.comment} placeholder={C.commentPlaceholder} autosize minRows={1} maxRows={5} maxLength={MAX_COMMENT}
         value={body} onChange={(e) => setBody(e.currentTarget.value)} style={{ flex: 1 }} />
-      <ActionIcon size={44} aria-label={C.sendComment} onClick={send} loading={add.isPending} disabled={!body.trim()}>
+      <ActionIcon size={44} aria-label={C.sendComment} onClick={send} loading={add.isPending} disabled={!hasText(body)}>
         <IconSend size={20} stroke={1.75} className="bm-mirror" />
       </ActionIcon>
     </Group>
