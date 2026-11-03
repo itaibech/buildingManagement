@@ -3,8 +3,8 @@ import { isPermissionKey, makeCan, PERMISSION_KEYS, PERMISSIONS, toPermissionSet
 
 describe('permission registry', () => {
   it('lists the catalog in order, with Hebrew labels and descriptions', () => {
-    expect(PERMISSION_KEYS).toEqual(['home', 'announcements', 'tickets', 'maintenance', 'directory', 'finance_own', 'finance_reports', 'ev_own', 'meetings', 'contact_committee', 'projects'])
-    expect(PERMISSIONS.map((p) => p.label)).toEqual(['דף הבית', 'הודעות', 'תקלות', 'משימות תחזוקה', 'דיירים', 'הכספים שלי', 'דוחות כספיים כלליים', 'טעינת רכב (שלי)', 'ישיבות ופרוטוקולים', 'פנייה לוועד', 'פרויקטים'])
+    expect(PERMISSION_KEYS).toEqual(['home', 'announcements', 'tickets', 'maintenance', 'directory', 'finance_own', 'finance_reports', 'ev_own', 'meetings', 'contact_committee', 'projects', 'polls'])
+    expect(PERMISSIONS.map((p) => p.label)).toEqual(['דף הבית', 'הודעות', 'תקלות', 'משימות תחזוקה', 'דיירים', 'הכספים שלי', 'דוחות כספיים כלליים', 'טעינת רכב (שלי)', 'ישיבות ופרוטוקולים', 'פנייה לוועד', 'פרויקטים', 'סקרים'])
     expect(PERMISSIONS.every((p) => p.description.length > 0)).toBe(true)
   })
 

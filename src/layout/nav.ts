@@ -1,6 +1,6 @@
 // Navigation config shared by the shell (tab bar, side nav) and the "עוד" page.
 import {
-  IconAddressBook, IconBuilding, IconGavel, IconCalendarCheck, IconChargingPile, IconCoin, IconDots, IconFileImport, IconHammer, IconHome2,
+  IconAddressBook, IconBuilding, IconCheckbox, IconGavel, IconCalendarCheck, IconChargingPile, IconCoin, IconDots, IconFileImport, IconHammer, IconHome2,
   IconMessages, IconSettings, IconShieldLock, IconSpeakerphone, IconTool, IconUsers, type Icon,
 } from '@tabler/icons-react'
 import { he } from '../lib/he'
@@ -27,6 +27,7 @@ export const GENERAL_NAV: NavItem[] = [
   { to: '/maintenance', label: he.nav.maintenance, icon: IconCalendarCheck, need: 'maintenance' },
   { to: '/meetings', label: he.nav.meetings, icon: IconGavel, need: 'meetings' },
   { to: '/projects', label: he.nav.projects, icon: IconHammer, need: 'projects' },
+  { to: '/polls', label: he.nav.polls, icon: IconCheckbox, need: 'polls' },
 ]
 
 /** Admin pages (under "עוד" on mobile, a "ניהול" group in the desktop side nav). */

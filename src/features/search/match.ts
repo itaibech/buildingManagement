@@ -4,8 +4,8 @@ export interface SearchFields { text?: readonly string[]; phones?: readonly stri
 export interface AptHit { id: string; number: number; names: string[] }
 export interface PersonHit { id: string; name: string; phone: string | null; email: string | null; apartmentId: string; apartmentNumber: number }
 export interface TitleHit { id: string; title: string }
-export interface SearchData { apartments: AptHit[]; people: PersonHit[]; announcements: TitleHit[]; tickets: TitleHit[]; projects: TitleHit[] }
-export interface SearchResults { apartments: AptHit[]; people: PersonHit[]; announcements: TitleHit[]; tickets: TitleHit[]; projects: TitleHit[] }
+export interface SearchData { apartments: AptHit[]; people: PersonHit[]; announcements: TitleHit[]; tickets: TitleHit[]; projects: TitleHit[]; polls: TitleHit[] }
+export interface SearchResults { apartments: AptHit[]; people: PersonHit[]; announcements: TitleHit[]; tickets: TitleHit[]; projects: TitleHit[]; polls: TitleHit[] }
 
 const MIN_PHONE_DIGITS = 3
 const MAX_PER_GROUP = 6
@@ -33,7 +33,9 @@ export function searchAll(query: string, data: SearchData): SearchResults {
     announcements: pick(data.announcements, (a) => ({ text: [a.title] })),
     tickets: pick(data.tickets, (t) => ({ text: [t.title] })),
     projects: pick(data.projects, (p) => ({ text: [p.title] })),
+    polls: pick(data.polls, (p) => ({ text: [p.title] })),
   }
 }
 
-export const resultCount = (r: SearchResults): number => r.apartments.length + r.people.length + r.announcements.length + r.tickets.length + r.projects.length
+export const resultCount = (r: SearchResults): number =>
+  r.apartments.length + r.people.length + r.announcements.length + r.tickets.length + r.projects.length + r.polls.length

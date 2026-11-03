@@ -14,6 +14,7 @@ import { SetupChecklist } from './SetupChecklist'
 import { AdminInbox } from './InboxCard'
 import { LoadError, Section } from './parts'
 import { LatestAnnouncement, ResidentHero } from './ResidentHero'
+import { HomePollsCard } from '../polls/HomePollsCard'
 
 /** Resident: the calls this user opened that are still active. */
 function MyTickets({ onReport }: { onReport: () => void }) {
@@ -39,6 +40,7 @@ function ResidentHome({ onReport }: { onReport: () => void }) {
   return (
     <Stack gap="lg">
       <ResidentHero />
+      <HomePollsCard />
       {news && <LatestAnnouncement showUnread />}
       {calls && <MyTickets onReport={onReport} />}
       {can('projects') && <ActiveProjects />}
@@ -53,6 +55,7 @@ function AdminHome() {
     <Stack gap="lg">
       <AdminInbox />
       <SetupChecklist />
+      <HomePollsCard />
       <CollectionHero />
       <CashMini />
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg" verticalSpacing="lg">
