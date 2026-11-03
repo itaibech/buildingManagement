@@ -16,6 +16,9 @@ export type StatusBadgeProps =
   | { kind: 'contract'; value: 'active' | 'ending' | 'expired' }
   | { kind: 'calendar'; value: keyof typeof CALENDAR_COLOR }
   | { kind: 'expiry'; value: 'expired' | 'soon' }
+  | { kind: 'community'; value: CommunityState }
+
+export type CommunityState = 'active' | 'resolved' | 'expired' | 'hidden'
 
 // The only place the status colour mapping lives (docs/design-system.md); fee sources are in feeBadge.ts.
 const TICKET_COLOR = { open: 'signal', in_progress: 'enamel', closed: 'stone' } as const
@@ -35,6 +38,10 @@ const POLL_COLOR = { draft: 'stone', open: 'enamel', ended: 'signal', closed: 'p
 const CONTRACT_COLOR = { active: 'paid', ending: 'signal', expired: 'debt' } as const
 // Document expiry, like maintenance due: expired = debt, within 30 days = signal.
 const EXPIRY_COLOR = { expired: 'debt', soon: 'signal' } as const
+// Community posts: active = enamel, resolved = paid (done), expired = stone (off the board), hidden by the committee = debt.
+const COMMUNITY_COLOR = { active: 'enamel', resolved: 'paid', expired: 'stone', hidden: 'debt' } as const
+const communityLabel = (v: CommunityState): string =>
+  (v === 'expired' ? he.community.expired : v === 'hidden' ? he.community.hiddenBadge : he.community.statuses[v])
 
 function resolve(props: StatusBadgeProps): { color: string; label: string } {
   if (props.kind === 'ticket') return { color: TICKET_COLOR[props.value], label: he.ticketStatus[props.value] }
@@ -45,6 +52,7 @@ function resolve(props: StatusBadgeProps): { color: string; label: string } {
   if (props.kind === 'budget') return { color: BUDGET_COLOR[props.value], label: he.finance.budget.sources[props.value] }
   if (props.kind === 'contract') return { color: CONTRACT_COLOR[props.value], label: he.contractStatus[props.value] }
   if (props.kind === 'calendar') return { color: CALENDAR_COLOR[props.value], label: he.calendar.categories[props.value] }
+  if (props.kind === 'community') return { color: COMMUNITY_COLOR[props.value], label: communityLabel(props.value) }
   if (props.kind === 'expiry') return { color: EXPIRY_COLOR[props.value], label: he.documents.expiry[props.value] }
   if (props.kind === 'reading') return { color: READING_COLOR[props.value], label: he.readingStatus[props.value] }
   return { color: DUE_COLOR[props.value], label: he.dueStatus[props.value] }

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useAuth } from '../../auth/AuthProvider'
 import { he } from '../../lib/he'
 import { EmptyState, ListSkeleton, PageHeader } from '../../ui'
+import { CommunityHomeCard } from '../community/CommunityHomeCard'
 import { useTickets } from '../tickets/api'
 import { TicketForm } from '../tickets/TicketForm'
 import { TicketRow } from '../tickets/TicketsPage'
@@ -48,7 +49,8 @@ function ResidentHome({ onReport }: { onReport: () => void }) {
       {calendar && <WeekCard />}
       {calls && <MyTickets onReport={onReport} />}
       {can('projects') && <ActiveProjects />}
-      {!news && !calls && !calendar && !can('finance_own') && !can('projects') && <Card><EmptyState title={he.permissions.homeEmpty} body={he.permissions.homeEmptyBody} /></Card>}
+      {can('community') && <CommunityHomeCard />}
+      {!news && !calls && !calendar && !can('finance_own') && !can('projects') && !can('community') && <Card><EmptyState title={he.permissions.homeEmpty} body={he.permissions.homeEmptyBody} /></Card>}
     </Stack>
   )
 }

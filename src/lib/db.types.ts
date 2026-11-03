@@ -461,6 +461,90 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"community_comments": {
+                  Row: {
+                    "author_id": string | null,"body": string,"building_id": string,"created_at": string,"hidden_at": string | null,"hidden_by": string | null,"hidden_reason": string | null,"id": string,"post_author_id": string | null,"post_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "author_id"?: string | null,"body": string,"building_id"?: string,"created_at"?: string,"hidden_at"?: string | null,"hidden_by"?: string | null,"hidden_reason"?: string | null,"id"?: string,"post_author_id"?: string | null,"post_id": string
+                  }
+                  Update: {
+                    "author_id"?: string | null,"body"?: string,"building_id"?: string,"created_at"?: string,"hidden_at"?: string | null,"hidden_by"?: string | null,"hidden_reason"?: string | null,"id"?: string,"post_author_id"?: string | null,"post_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "community_comments_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "community_comments_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "community_comments_post_id_fkey"
+      columns: ["post_id"]
+isOneToOne: false
+      referencedRelation: "community_posts"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"community_posts": {
+                  Row: {
+                    "author_id": string | null,"body": string,"building_id": string,"category": string,"created_at": string,"expires_at": string,"hidden_at": string | null,"hidden_by": string | null,"hidden_reason": string | null,"id": string,"photo_path": string | null,"status": string,"title": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "author_id"?: string | null,"body"?: string,"building_id"?: string,"category"?: string,"created_at"?: string,"expires_at"?: string,"hidden_at"?: string | null,"hidden_by"?: string | null,"hidden_reason"?: string | null,"id"?: string,"photo_path"?: string | null,"status"?: string,"title": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "author_id"?: string | null,"body"?: string,"building_id"?: string,"category"?: string,"created_at"?: string,"expires_at"?: string,"hidden_at"?: string | null,"hidden_by"?: string | null,"hidden_reason"?: string | null,"id"?: string,"photo_path"?: string | null,"status"?: string,"title"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "community_posts_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "community_posts_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"community_removals": {
+                  Row: {
+                    "building_id": string,"created_at": string,"id": string,"kind": string,"reason": string,"title": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "building_id": string,"created_at"?: string,"id"?: string,"kind": string,"reason": string,"title": string,"user_id": string
+                  }
+                  Update: {
+                    "building_id"?: string,"created_at"?: string,"id"?: string,"kind"?: string,"reason"?: string,"title"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "community_removals_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "community_removals_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"debt_followup_settings": {
                   Row: {
                     "building_id": string,"enabled": boolean,"firm_days": number,"firm_on": boolean,"friendly_days": number,"friendly_on": boolean,"letter_days": number,"letter_on": boolean,"min_amount": number,"updated_at": string
@@ -1706,6 +1790,9 @@ isOneToOne: false
 "building_fee_at":
 { Args: { "p_building_id": string,"p_month": string }; Returns: number
                            },
+"can_manage_community_post":
+{ Args: { "p_post_id": string }; Returns: boolean
+                           },
 "can_manage_ticket":
 { Args: { "p_ticket_id": string }; Returns: boolean
                            },
@@ -1739,6 +1826,17 @@ isOneToOne: false
 { Args: Record<PropertyKey, never>; Returns: {
               "full_name": string,"user_id": string
             }[]
+                           },
+"community_authors":
+{ Args: { "ids": (string)[] }; Returns: {
+              "apartment_number": number,"full_name": string,"user_id": string
+            }[]
+                           },
+"community_check_quota":
+{ Args: { "p_kind": string }; Returns: undefined
+                           },
+"community_moderate":
+{ Args: { "p_action": string,"p_id": string,"p_kind": string,"p_reason"?: string }; Returns: undefined
                            },
 "complete_debt_followup_task":
 { Args: { "p_id": string }; Returns: boolean

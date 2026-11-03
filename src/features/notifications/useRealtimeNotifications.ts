@@ -30,8 +30,11 @@ async function lookupTicket(ticketId: string): Promise<TicketRef | null> {
 }
 
 /** The queries a change affects. */
-const queryKeyOf = (event: ChangeEvent, ticketId: string | null): string[] =>
-  event.table === 'committee_messages' ? ['committee-messages'] : ticketId === null ? ['announcements'] : ['tickets']
+function queryKeyOf(event: ChangeEvent, ticketId: string | null): string[] {
+  if (event.table === 'committee_messages') return ['committee-messages']
+  if (event.table === 'community_comments') return ['community']
+  return ticketId === null ? ['announcements'] : ['tickets']
+}
 
 /**
  * One Realtime change: refresh what it affects, then toast (and maybe a system notification) if it qualifies.
@@ -69,6 +72,7 @@ export function useRealtimeNotifications(): void {
       void client.invalidateQueries({ queryKey: ['tickets'] })
       void client.invalidateQueries({ queryKey: ['announcements'] })
       void client.invalidateQueries({ queryKey: ['committee-messages'] })
+      void client.invalidateQueries({ queryKey: ['community'] })
     }
     return subscribeToChanges(userId, (event) => {
       if (ctx.current) void handleChange(event, ctx.current)

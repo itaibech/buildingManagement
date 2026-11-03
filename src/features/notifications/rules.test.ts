@@ -113,3 +113,18 @@ describe('qualify: committee messages', () => {
     expect(qualify(message('res'), RES, null, TODAY)).toBeNull()
   })
 })
+
+describe('qualify: community comments', () => {
+  const event = (author: string | null, postAuthor: string | null): ChangeEvent =>
+    ({ table: 'community_comments', row: { id: 'k1', post_id: 'p1', author_id: author, post_author_id: postAuthor } })
+  const member = ONLY('community')
+  it('notifies the post author about a comment by someone else, with a link to the post', () => {
+    expect(qualify(event('other', 'res'), member, null, TODAY)).toMatchObject({ kind: 'communityComment', path: '/community/p1' })
+    expect(needsTicketRef(event('other', 'res'), ADMIN)).toBe(false)
+  })
+  it('not their own comment, not someone else\'s post, not without the permission', () => {
+    expect(qualify(event('res', 'res'), member, null, TODAY)).toBeNull()
+    expect(qualify(event('other', 'someone'), member, null, TODAY)).toBeNull()
+    expect(qualify(event('other', 'res'), ONLY('tickets'), null, TODAY)).toBeNull()
+  })
+})
