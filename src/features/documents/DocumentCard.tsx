@@ -3,7 +3,7 @@ import { IconDots, IconDownload, IconHistory, IconPencil, IconTrash } from '@tab
 import { formatDate } from '../../lib/format'
 import { he } from '../../lib/he'
 import { StatusBadge } from '../../ui'
-import type { BuildingDocument } from './api'
+import { useOpenFile, type BuildingDocument } from './api'
 import { expiryStatus } from './logic'
 
 const T = he.documents
@@ -42,6 +42,7 @@ export function DocumentCard({ doc, today, onHistory, actions }: {
 }) {
   const expiry = expiryStatus(doc.expires_on, today)
   const current = doc.versions[0]
+  const open = useOpenFile()
   return (
     <Card data-testid={`doc-${doc.id}`}>
       <Stack gap={6}>
@@ -54,8 +55,8 @@ export function DocumentCard({ doc, today, onHistory, actions }: {
         <Meta doc={doc} />
         <Group justify="space-between" gap="xs" mt={4}>
           <Group gap="xs">
-            {current?.url && (
-              <Button component="a" href={current.url} target="_blank" rel="noopener noreferrer" variant="light" mih={44}
+            {current && (
+              <Button variant="light" mih={44} loading={open.isPending} onClick={() => open.mutate(current)}
                 leftSection={<IconDownload {...ICON} />} aria-label={T.downloadLabel(current.file_name)}>{T.download}</Button>
             )}
             <Button variant="subtle" mih={44} leftSection={<IconHistory {...ICON} />} aria-label={T.versionsLabel(doc.title)}

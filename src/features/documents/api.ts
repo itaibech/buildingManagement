@@ -9,7 +9,8 @@ import { orderVersions, toCategory, type Category, type Visibility } from './log
 
 export const DOCS_BUCKET = 'building-docs'
 export const MAX_DOC_BYTES = 20 * 1024 * 1024
-const SIGNED_URL_SECONDS = 60 * 60
+/** Links are signed on click and live one minute, so a switch to committee-only takes effect at once. */
+const SIGNED_URL_SECONDS = 60
 const KEY = ['documents'] as const
 
 type DocRow = Database['public']['Tables']['building_documents']['Row']
@@ -17,7 +18,6 @@ type VersionRow = Database['public']['Tables']['building_document_versions']['Ro
 
 export interface DocVersion extends Pick<VersionRow, 'id' | 'file_path' | 'file_name' | 'size_bytes' | 'created_at'> {
   number: number
-  url: string | null
 }
 export interface BuildingDocument extends Omit<DocRow, 'category' | 'visibility'> {
   category: Category
@@ -57,40 +57,23 @@ export function docFileProblem(file: File): 'type' | 'empty' | 'size' | null {
   return file.size > MAX_DOC_BYTES ? 'size' : null
 }
 
-/** A signed URL that downloads under the file's own name (the storage `download` query parameter). */
-const withDownloadName = (url: string, name: string): string => `${url}&download=${encodeURIComponent(name)}`
-
 type Fetched = DocRow & { building_document_versions: Omit<VersionRow, 'document_id' | 'created_by'>[] }
 
-/** Every version's short-lived link, signed in one call (RLS: a file the user may not read gets no URL). */
-async function signAll(paths: string[]): Promise<Map<string, string>> {
-  if (!paths.length) return new Map()
-  const { data, error } = await supabase.storage.from(DOCS_BUCKET).createSignedUrls(paths, SIGNED_URL_SECONDS)
-  fail(error)
-  return new Map((data ?? []).flatMap((u) => (u.path && u.signedUrl ? [[u.path, u.signedUrl]] : [])))
+function toDocument({ building_document_versions: versions, ...d }: Fetched): BuildingDocument {
+  return { ...d, category: toCategory(d.category), visibility: d.visibility === 'committee' ? 'committee' : 'residents',
+    versions: orderVersions(versions) }
 }
 
-function toDocument({ building_document_versions: versions, ...d }: Fetched, urls: Map<string, string>): BuildingDocument {
-  const ordered = orderVersions(versions).map((v) => {
-    const url = urls.get(v.file_path)
-    return { ...v, url: url ? withDownloadName(url, v.file_name) : null }
-  })
-  return { ...d, category: toCategory(d.category), visibility: d.visibility === 'committee' ? 'committee' : 'residents', versions: ordered }
-}
-
-/** The documents the user may see, each with its versions and download links. */
+/** The documents the user may see, each with its versions (no links: those are signed on click). */
 export function useDocuments(enabled = true) {
   return useQuery({
     queryKey: [...KEY, 'list'],
     enabled,
-    staleTime: (SIGNED_URL_SECONDS / 2) * 1000,
     queryFn: async (): Promise<BuildingDocument[]> => {
       const { data, error } = await supabase.from('building_documents')
         .select('*, building_document_versions(id, file_path, file_name, size_bytes, created_at)').order('title')
       fail(error)
-      const docs = data ?? []
-      const urls = await signAll(docs.flatMap((d) => d.building_document_versions.map((v) => v.file_path)))
-      return docs.map((d) => toDocument(d, urls))
+      return (data ?? []).map(toDocument)
     },
   })
 }
@@ -126,15 +109,30 @@ export async function updateDocument(id: string, input: DocumentInput, file: Fil
   fail(error)
 }
 
-/** Removes every version's file (checked, so a refused removal keeps the row), then the document. */
+/**
+ * Deletes the document (its versions go by cascade), then its files. A file left behind by a failed removal is
+ * unreadable to non-admins (its document is gone), so the row goes first.
+ */
 export async function deleteDocument(doc: Pick<BuildingDocument, 'id' | 'versions'>): Promise<void> {
-  const paths = doc.versions.map((v) => v.file_path)
-  if (paths.length) {
-    const { data, error } = await supabase.storage.from(DOCS_BUCKET).remove(paths)
-    fail(error)
-    if ((data ?? []).length < paths.length) throw new Error('documents:files_kept')
-  }
   fail((await supabase.from('building_documents').delete().eq('id', doc.id)).error)
+  const paths = doc.versions.map((v) => v.file_path)
+  if (paths.length) fail((await supabase.storage.from(DOCS_BUCKET).remove(paths)).error)
+}
+
+/** Signs one file for a minute (downloading under its own name) and opens it; RLS refuses a file the user can't read. */
+export async function openDocumentFile(version: Pick<DocVersion, 'file_path' | 'file_name'>): Promise<void> {
+  const { data, error } = await supabase.storage.from(DOCS_BUCKET)
+    .createSignedUrl(version.file_path, SIGNED_URL_SECONDS, { download: version.file_name })
+  fail(error)
+  if (data?.signedUrl) window.location.assign(data.signedUrl)
+}
+
+/** A download button's call: signs on click, toasts when the file can't be opened. */
+export function useOpenFile() {
+  return useMutation({
+    mutationFn: openDocumentFile,
+    onError: () => notifyError(he.documents.errors.download),
+  })
 }
 
 /** Runs a document change, then refreshes the list; failures toast `failMessage`. */

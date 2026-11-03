@@ -1,4 +1,4 @@
-import { Stack, Text, TextInput, Title } from '@mantine/core'
+import { Button, Stack, Text, TextInput, Title } from '@mantine/core'
 import { IconSearch } from '@tabler/icons-react'
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
@@ -68,7 +68,12 @@ export default function DocumentsPage() {
   return (
     <Stack gap="lg">
       <PageHeader title={he.nav.documents} action={add} />
-      {list.isError && <Text c="debt.7">{T.errors.load}</Text>}
+      {list.isError && (
+        <Stack gap="xs" align="flex-start" role="alert">
+          <Text c="debt.7">{T.errors.load}</Text>
+          <Button variant="default" mih={44} loading={list.isFetching} onClick={() => void list.refetch()}>{he.retry}</Button>
+        </Stack>
+      )}
       {list.isLoading && <ListSkeleton rows={4} />}
       {list.data?.length === 0 && <EmptyState title={T.empty} body={T.emptyBody} action={add} />}
       {docs.length > 0 && (

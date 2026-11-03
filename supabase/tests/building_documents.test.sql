@@ -4,7 +4,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(45);
+select plan(56);
 
 -- ---------------------------------------------------------------- fixtures (as postgres)
 insert into auth.users (id, email, aud, role) values
@@ -80,6 +80,14 @@ select throws_ok($$update public.building_documents set category = 'secret' wher
   '23514', null, 'category: one of the fixed list');
 select lives_ok($$update public.building_documents set description = 'אושר באסיפה', expires_on = '2030-01-01'
   where id = (select v from p where k = 'res_doc')::uuid$$, 'admin: edits the details');
+select throws_ok($$delete from public.building_document_versions where file_path = (select v from p where k = 'res_v1')$$,
+  '42501', null, 'admin: a single version can''t be deleted through the API (only with its document)');
+with u as (update storage.objects set metadata = '{"x":1}' where bucket_id = 'building-docs'
+  and name = (select v from p where k = 'res_v1') returning 1)
+select is((select count(*) from u), 0::bigint, 'admin: a stored file can''t be updated');
+select throws_ok($$insert into storage.objects (id, bucket_id, name) select id, bucket_id, name from storage.objects
+  where bucket_id = 'building-docs' and name = (select v from p where k = 'res_v1') on conflict (id) do update set metadata = '{"x":1}'$$, '42501', null, 'admin: an upsert over an existing file is refused');
+set local storage.allow_delete_query = 'true';
 
 -- ---------------------------------------------------------------- resident with 'documents'
 set local request.jwt.claims = '{"sub":"a3400000-0000-0000-0000-000000000002","role":"authenticated"}';
@@ -97,9 +105,16 @@ select throws_ok($$select public.create_building_document(gen_random_uuid(), 'x'
 select throws_ok($$insert into public.building_document_versions (document_id, file_path, file_name, size_bytes)
   select (select v from p where k = 'res_doc')::uuid, v, 'x.png', 10 from p where k = 'res_x'$$, '42501', null,
   'resident: cannot add versions');
+with d as (delete from storage.objects where bucket_id = 'building-docs'
+  and name = (select v from p where k = 'res_v1') returning 1)
+select is((select count(*) from d), 0::bigint, 'resident: cannot delete a file, even with a valid path');
+with u as (update storage.objects set metadata = '{"x":1}' where bucket_id = 'building-docs'
+  and name = (select v from p where k = 'res_v1') returning 1)
+select is((select count(*) from u), 0::bigint, 'resident: cannot update a file');
+select throws_ok($$insert into storage.objects (id, bucket_id, name) select id, bucket_id, name from storage.objects
+  where bucket_id = 'building-docs' and name = (select v from p where k = 'res_v1') on conflict (id) do update set metadata = '{"x":1}'$$, '42501', null, 'resident: cannot upsert over a file');
 update public.building_documents set visibility = 'residents' where id = (select v from p where k = 'com_doc')::uuid;
 delete from public.building_documents;
-set local storage.allow_delete_query = 'true';
 delete from storage.objects where bucket_id = 'building-docs';
 
 -- ---------------------------------------------------------------- no permission, pending, anon
@@ -122,11 +137,28 @@ set local request.jwt.claims = '{"sub":"a3400000-0000-0000-0000-000000000001","r
 select is((select string_agg(visibility, ',' order by visibility) from public.building_documents), 'committee,residents',
   'resident: could not change visibility or delete documents');
 select is((select count(*) from storage.objects where bucket_id = 'building-docs'), 3::bigint, 'resident: could not delete files');
-select lives_ok($$delete from storage.objects where bucket_id = 'building-docs' and name like 'd3400000-0000-0000-0000-000000000001/%'$$,
-  'admin: deletes a document''s files');
+
+-- ---------------------------------------------------------------- residents -> committee hides the files at once
+select lives_ok($$update public.building_documents set visibility = 'committee' where id = (select v from p where k = 'res_doc')::uuid$$,
+  'admin: switches a document to committee only');
+set local request.jwt.claims = '{"sub":"a3400000-0000-0000-0000-000000000002","role":"authenticated"}';
+select is((select count(*) from public.building_document_versions), 0::bigint, 'switched: the resident sees no versions');
+select is((select count(*) from storage.objects where bucket_id = 'building-docs'), 0::bigint, 'switched: the resident reads no files');
+select ok(not public.building_doc_readable((select v from p where k = 'res_v2')), 'switched: the file is not signable');
+set local request.jwt.claims = '{"sub":"a3400000-0000-0000-0000-000000000001","role":"authenticated"}';
+update public.building_documents set visibility = 'residents' where id = (select v from p where k = 'res_doc')::uuid;
+
+-- ---------------------------------------------------------------- delete: the row first, then the files
 select lives_ok($$delete from public.building_documents where id = (select v from p where k = 'res_doc')::uuid$$, 'admin: deletes the document');
 select is((select count(*) from public.building_document_versions where document_id = (select v from p where k = 'res_doc')::uuid),
-  0::bigint, 'its versions go with it');
+  0::bigint, 'its versions go with it (cascade)');
+set local request.jwt.claims = '{"sub":"a3400000-0000-0000-0000-000000000002","role":"authenticated"}';
+select is((select count(*) from storage.objects where bucket_id = 'building-docs'), 0::bigint,
+  'an orphaned file (row gone, file not yet removed) is unreadable to residents');
+set local request.jwt.claims = '{"sub":"a3400000-0000-0000-0000-000000000001","role":"authenticated"}';
+with d as (delete from storage.objects where bucket_id = 'building-docs'
+  and name like 'd3400000-0000-0000-0000-000000000001/%' returning 1)
+select is((select count(*) from d), 2::bigint, 'admin: then removes its files');
 
 select * from finish();
 rollback;

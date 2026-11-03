@@ -3,7 +3,8 @@
 --   * building_documents: title, category, description, document date, optional expiry, and visibility
 --     ('residents' = everyone with the 'documents' permission, 'committee' = admins only).
 --   * building_document_versions: the files. Uploading a new version adds a row and keeps the old ones; the newest
---     (created_at) is the current one. Versions are never edited, only added (and removed with their document).
+--     (created_at) is the current one. Versions are never edited and never deleted one by one: only the document's
+--     delete removes them (on delete cascade).
 --   * Storage: private bucket 'building-docs', `<document_id>/<uuid>.<ext>`, PDF / Word / images up to 20 MB.
 --     A file is readable exactly when its document is: admins always; others with 'documents' only for
 --     residents-visibility documents, so a committee file can't be read (or signed) by a resident even with its path.
@@ -17,7 +18,8 @@ select id, 'documents' from public.user_groups where is_default
 on conflict do nothing;
 
 -- ---------------------------------------------------------------- file paths
--- `<document_id>/<uuid>.<ext>`, lower-case uuids, the extensions the client maps types to.
+-- `<document_id>/<uuid>.<ext>` with the extensions the client maps types to. The regex expects LOWER-CASE uuids
+-- (gen_random_uuid / crypto.randomUUID both produce them): an upper-case path is rejected, never matched loosely.
 create function public.is_building_doc_storage_path(p_name text) returns boolean
 language sql immutable set search_path = ''
 as $$
@@ -111,14 +113,17 @@ alter table public.building_documents enable row level security;
 alter table public.building_document_versions enable row level security;
 revoke all on public.building_documents from anon;
 revoke all on public.building_document_versions from anon;
-revoke update on public.building_document_versions from authenticated;
+revoke update, delete on public.building_document_versions from authenticated;
 
 create policy building_documents_admin on public.building_documents for all to authenticated
   using ((select public.is_admin())) with check ((select public.is_admin()));
 create policy building_documents_select on public.building_documents for select to authenticated
   using ((select public.has_permission('documents')) and visibility = 'residents');
-create policy building_document_versions_admin on public.building_document_versions for all to authenticated
-  using ((select public.is_admin())) with check ((select public.is_admin()));
+-- Admins read and add versions; no update or delete policy (and no grant): the cascade from the document removes them.
+create policy building_document_versions_admin_select on public.building_document_versions for select to authenticated
+  using ((select public.is_admin()));
+create policy building_document_versions_admin_insert on public.building_document_versions for insert to authenticated
+  with check ((select public.is_admin()));
 create policy building_document_versions_select on public.building_document_versions for select to authenticated
   using ((select public.has_permission('documents')) and exists (
     select 1 from public.building_documents d where d.id = document_id and d.visibility = 'residents'));
@@ -165,6 +170,7 @@ $$;
 revoke execute on function public.building_doc_readable(text) from public, anon;
 grant execute on function public.building_doc_readable(text) to authenticated;
 
+-- No update policy: overwriting a file (update, or an upsert hitting an existing name) is refused for everyone.
 create policy building_docs_read on storage.objects for select to authenticated
   using (bucket_id = 'building-docs' and public.building_doc_readable(name));
 create policy building_docs_insert on storage.objects for insert to authenticated
