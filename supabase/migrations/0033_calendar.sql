@@ -12,7 +12,7 @@
 
 -- ---------------------------------------------------------------- permission
 insert into public.permissions (key, label, description, sort_order) values
-  ('calendar', 'לוח שנה', 'אירועים בבניין: ימי ניקיון, הדברה, הפסקות מים וחשמל, תחזוקה וישיבות', 10);
+  ('calendar', 'לוח שנה', 'אירועים בבניין: ימי ניקיון, הדברה, הפסקות מים וחשמל, תחזוקה וישיבות', 13);
 insert into public.group_permissions (group_id, permission)
 select id, 'calendar' from public.user_groups where is_default
 on conflict do nothing;
@@ -43,6 +43,8 @@ create index calendar_events_building_starts_idx on public.calendar_events (buil
 create index calendar_events_created_by_idx on public.calendar_events (created_by);
 
 alter table public.calendar_events enable row level security;
+-- Signed-in users only: anon gets no table privileges at all (RLS would return nothing anyway).
+revoke all on public.calendar_events from anon;
 create policy calendar_events_admin on public.calendar_events for all to authenticated
   using ((select public.is_admin())) with check ((select public.is_admin()));
 create policy calendar_events_select on public.calendar_events for select to authenticated

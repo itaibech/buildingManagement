@@ -3,7 +3,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(24);
+select plan(25);
 
 -- ---------------------------------------------------------------- fixtures (as postgres)
 insert into auth.users (id, email, aud, role) values
@@ -21,6 +21,7 @@ update public.profiles set group_id = 'a3300000-0000-0000-0000-0000000000a1' whe
 select is((select label from public.permissions where key = 'calendar'), 'לוח שנה', 'catalog: calendar key');
 select ok(exists (select 1 from public.group_permissions gp join public.user_groups g on g.id = gp.group_id
   where g.is_default and gp.permission = 'calendar'), 'the default group "דייר" has calendar');
+select ok(not has_table_privilege('anon', 'public.calendar_events', 'select, insert, update, delete'), 'anon: no table privileges');
 
 -- ---------------------------------------------------------------- admin
 set local role authenticated;
@@ -65,7 +66,7 @@ select throws_ok($$insert into public.calendar_events (title, starts_at) values 
 -- ---------------------------------------------------------------- anon
 set local role anon;
 set local request.jwt.claims = '{"role":"anon"}';
-select is((select count(*) from public.calendar_events), 0::bigint, 'anon: sees nothing');
+select throws_ok($$select count(*) from public.calendar_events$$, '42501', null, 'anon: cannot read');
 select throws_ok($$insert into public.calendar_events (title, starts_at) values ('x', now())$$, '42501', null, 'anon: cannot create');
 
 -- ---------------------------------------------------------------- the resident's writes changed nothing (as postgres)
