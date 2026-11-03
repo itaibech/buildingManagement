@@ -173,6 +173,8 @@ create function public.projects_levy_guard() returns trigger
 language plpgsql security definer set search_path = ''
 as $$
 begin
+  -- Serialises concurrent links of one label in a building, so two inserts can't both pass the check.
+  perform pg_advisory_xact_lock(hashtext(new.building_id::text || '/' || trim(coalesce(new.levy_label, ''))));
   if new.levy_label is not null and exists (
     select 1 from public.projects p
     where p.building_id = new.building_id and p.id <> new.id and trim(p.levy_label) = trim(new.levy_label)
@@ -350,8 +352,9 @@ revoke execute on function public.project_levy_lines(uuid) from public, anon, au
 -- One row per project of the caller's building: levy_total (every linked charge), levy_due (through the current
 -- month), levy_collected (due minus open minus written off), levy_written_off, apartments_charged / apartments_open,
 -- spent (linked expenses) and expense_count. Admins and holders of 'projects' only; definer so residents get
--- building-wide sums. For non-admins, a levy charged to fewer than 3 apartments returns no apartment counts and no
--- write-off (counts_hidden), so the numbers can't single out one apartment.
+-- building-wide sums. For non-admins, a levy charged to fewer than 3 apartments returns none of its levy numbers
+-- (total, due, collected, write-off, apartment counts: all 0, counts_hidden), so they can't single out one apartment.
+-- Cost and spent stay.
 create function public.project_progress()
 returns table (project_id uuid, levy_total numeric, levy_due numeric, levy_collected numeric, levy_written_off numeric,
   apartments_charged int, apartments_open int, counts_hidden boolean, spent numeric, expense_count int)
@@ -390,8 +393,9 @@ begin
     left join spend on spend.pid = pr.id
     where pr.building_id = v_building
   )
-  select res.id, res.total::numeric(12,2), res.due::numeric(12,2),
-    (res.due - res.open - res.written_off)::numeric(12,2),
+  select res.id, case when res.hidden then 0 else res.total end::numeric(12,2),
+    case when res.hidden then 0 else res.due end::numeric(12,2),
+    case when res.hidden then 0 else res.due - res.open - res.written_off end::numeric(12,2),
     case when res.hidden then 0 else res.written_off end::numeric(12,2),
     case when res.hidden then 0 else res.charged end, case when res.hidden then 0 else res.owing end, res.hidden,
     res.spent::numeric(12,2), res.n

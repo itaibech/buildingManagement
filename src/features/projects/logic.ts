@@ -50,7 +50,8 @@ export function summarize(project: Project, progress: Progress): ProgressSummary
     due: progress.levyDue,
     writtenOff: progress.levyWrittenOff,
     scheduled: ils(Math.max(ag(progress.levyTotal) - ag(progress.levyDue), 0)),
-    collectedPct: percent(progress.levyCollected, progress.levyDue),
+    // Written off is neither collected nor owed: a levy settled by payments and write-offs is 100%.
+    collectedPct: percent(progress.levyCollected, progress.levyDue - progress.levyWrittenOff),
     spent: progress.spent,
     spentPct: cost ? percent(progress.spent, cost.amount) : 0,
     gap: cost ? ils(Math.max(ag(cost.amount) - ag(progress.levyCollected), 0)) : null,

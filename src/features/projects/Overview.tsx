@@ -27,6 +27,7 @@ function Stat({ label, children }: { label: string; children: ReactNode }) {
 
 function Collected({ s, progress }: { s: ProgressSummary; progress: Progress }) {
   if (!s.hasLevy) return <Stat label={P.collected}><Text size="sm" c="dimmed">{P.noLevy}</Text></Stat>
+  if (progress.countsHidden) return <Stat label={P.collected}><Text size="sm" c="dimmed">{P.committeeOnly}</Text></Stat>
   return (
     <Stat label={P.collected}>
       <Money amount={s.collected} tone="neutral" size="lg" />
@@ -58,7 +59,7 @@ export function ProgressCard({ project, progress }: { project: Project; progress
           {s.cost !== null && <Bar value={s.spentPct} color="enamel" size="md" radius="xl" aria-label={P.spentBar(s.spentPct)} />}
         </Stat>
       </SimpleGrid>
-      {s.hasLevy && <Text size="xs" c="dimmed" mt="sm">{P.rule}</Text>}
+      {s.hasLevy && !progress.countsHidden && <Text size="xs" c="dimmed" mt="sm">{P.rule}</Text>}
     </Card>
   )
 }

@@ -111,9 +111,15 @@ describe('progress card', () => {
     expect(norm(document.body.textContent)).toContain(norm(he.projects.progress.writtenOff(formatILS(500))))
     expect(norm(document.body.textContent)).toContain(he.projects.progress.apartmentsOwing(0, 3))
     cleanup()
-    ui(<ProgressCard project={project} progress={{ ...progress, countsHidden: true, levyWrittenOff: 0, apartmentsCharged: 0 }} />)
-    expect(norm(document.body.textContent)).not.toContain(he.projects.progress.apartmentsOwing(0, 3))
-    expect(norm(document.body.textContent)).not.toContain('נמחק')
+    const hidden = { ...NO_PROGRESS, countsHidden: true, spent: 4000, expenseCount: 1 }
+    ui(<ProgressCard project={project} progress={hidden} />)
+    const text = norm(document.body.textContent)
+    expect(text).toContain(he.projects.progress.committeeOnly)
+    expect(text).not.toContain(he.projects.progress.apartmentsOwing(0, 3))
+    expect(text).not.toContain('נמחק')
+    expect(screen.queryByRole('progressbar', { name: he.projects.progress.collectedBar(0) })).toBeNull()
+    expect(text).toContain(he.projects.progress.costEstimated)
+    expect(text).toContain(he.projects.progress.spentOf(1))
   })
 
   it('cost, collected of the levy with the apartments still owing, and spent', () => {

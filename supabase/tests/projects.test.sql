@@ -193,9 +193,10 @@ select results_eq($$select levy_total, levy_collected, levy_written_off, apartme
   from public.project_progress() where project_id = 'e3000000-0000-0000-0000-000000000004'$$,
   $$values (1500.00::numeric, 500.00::numeric, 0::numeric, 3, 2)$$,
   'second instalment, its own project: the current debts sit on it (EV first, then the levy)');
-select results_eq($$select counts_hidden, apartments_charged, apartments_open, levy_written_off
+select results_eq($$select counts_hidden, apartments_charged, apartments_open, levy_written_off, levy_total, levy_due, levy_collected
   from public.project_progress() where project_id = 'e3000000-0000-0000-0000-000000000005'$$,
-  $$values (true, 0, 0, 0::numeric)$$, 'resident: fewer than 3 apartments charged hides the counts');
+  $$values (true, 0, 0, 0::numeric, 0::numeric, 0::numeric, 0::numeric)$$,
+  'resident: fewer than 3 apartments charged hides every levy number');
 select throws_ok('select created_by from public.projects', '42501', null, 'resident: created_by is not readable');
 select throws_ok('select actor from public.project_events', '42501', null, 'resident: the timeline actor is not readable');
 select throws_ok('select created_by from public.project_quotes', '42501', null, 'resident: a quote''s created_by is not readable');
@@ -204,8 +205,9 @@ reset role;
 
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"a3000000-0000-0000-0000-000000000001","role":"authenticated"}';
-select results_eq($$select counts_hidden, apartments_charged, apartments_open from public.project_progress()
-  where project_id = 'e3000000-0000-0000-0000-000000000005'$$, $$values (false, 1, 1)$$, 'admin: the counts are shown');
+select results_eq($$select counts_hidden, apartments_charged, apartments_open, levy_due, levy_collected from public.project_progress()
+  where project_id = 'e3000000-0000-0000-0000-000000000005'$$, $$values (false, 1, 1, 100.00::numeric, 90.91::numeric)$$,
+  'admin: the counts and amounts are shown (A''s ₪100 open this month is shared by its two levies in proportion)');
 select throws_ok($$insert into public.projects (title, levy_label, levy_month) values ('כפול', ' ביוב בדיקה', public.current_month())$$,
   '23505', null, 'the same levy month cannot be linked twice');
 select throws_ok($$insert into public.projects (title, levy_label) values ('כפול', 'ביוב בדיקה')$$,

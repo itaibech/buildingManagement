@@ -40,7 +40,8 @@ describe('progress math', () => {
 
   it('summarize: a write-off is neither collected nor in the collection rate', () => {
     const s = summarize(project(), progress({ levyDue: 1500, levyCollected: 1000, levyWrittenOff: 500 }))
-    expect(s).toMatchObject({ collected: 1000, writtenOff: 500, collectedPct: 67 })
+    expect(s).toMatchObject({ collected: 1000, writtenOff: 500, collectedPct: 100 })
+    expect(summarize(project(), progress({ levyDue: 1500, levyCollected: 500, levyWrittenOff: 500 })).collectedPct).toBe(50)
   })
 
   it('summarize: agorot, so cents add up exactly', () => {
