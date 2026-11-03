@@ -13,6 +13,7 @@ import { useMyApartment, useMyBalance } from '../finance/api'
 import { heroState } from '../finance/ledger'
 import { telHref, useBuilding } from '../settings/api'
 import { billingOf, useApartmentBilling } from '../tenants/api'
+import { OnlinePaySoon } from '../finance/OnlinePay'
 import { LoadError, Section } from './parts'
 
 const H = he.home.hero
@@ -92,6 +93,7 @@ function HowToPayPart({ money }: { money: boolean }) {
           {text && <Button color="signal" fullWidth leftSection={<IconCopy size={20} stroke={1.75} aria-hidden="true" />} onClick={() => void copyText(text)}>{he.pay.copy}</Button>}
         </>
       )}
+      {money && <OnlinePaySoon />}
       {!phone && !owes && <NoContact />}
       {phone && (
         <Anchor href={telHref(phone)} fw={600} mih={44} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>

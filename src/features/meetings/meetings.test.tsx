@@ -69,9 +69,19 @@ describe('buttons per state', () => {
     expect(screen.getByText('נדונה הצעת התקציב')).toBeInTheDocument()
   })
 
-  it('residents get no actions', () => {
+  it('residents get no actions, only "שיתוף בוואטסאפ" on an invitation', () => {
     wrap(<MeetingOverview meeting={withStatus('invited')} isAdmin={false} onRun={vi.fn()} />)
-    expect(screen.queryAllByRole('button')).toHaveLength(0)
+    expect(screen.queryAllByRole('button').map((b) => b.textContent)).toEqual([he.share.whatsapp])
+  })
+
+  it('a draft has no share button', () => {
+    wrap(<MeetingOverview meeting={withStatus('draft')} isAdmin onRun={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: he.share.whatsapp })).toBeNull()
+  })
+
+  it('a published protocol can be shared', () => {
+    wrap(<ClosedMeeting meeting={withStatus('published')} isAdmin={false} />)
+    expect(screen.getByRole('button', { name: he.share.whatsapp })).toBeInTheDocument()
   })
 
   it('closed: publish waits for both signatures; print and addendum are there', () => {

@@ -16,6 +16,7 @@ import { MeetingEmailDialog } from './MeetingEmailDialog'
 import { MeetingForm } from './MeetingForm'
 import { QuickStartDialog } from './QuickStart'
 import type { MeetingDetail } from './types'
+import { ShareButton } from '../share/ShareButton'
 
 type Dialog = 'edit' | 'invite' | 'updateInvite' | 'delete' | 'quickStart' | 'emailInvite' | 'emailUpdate' | null
 const A = he.meetings.actions
@@ -68,6 +69,7 @@ export function MeetingOverview({ meeting, isAdmin, onRun }: { meeting: MeetingD
   return (
     <Stack gap="md">
       {isAdmin && <Actions meeting={meeting} onAction={onAction} />}
+      {meeting.status === 'invited' && <Group><ShareButton kind="meeting" item={meeting} /></Group>}
       <MeetingDetails meeting={meeting} total={apartments.data?.length ?? null} />
       <MeetingDocuments meetingId={meeting.id} status={meeting.status} isAdmin={isAdmin} />
       {isAdmin && <EventLog meetingId={meeting.id} />}
