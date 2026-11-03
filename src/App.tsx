@@ -38,6 +38,8 @@ const SuppliersPage = lazy(() => import('./features/suppliers/SuppliersPage'))
 const CalendarPage = lazy(() => import('./features/calendar/CalendarPage'))
 const DocumentsPage = lazy(() => import('./features/documents/DocumentsPage'))
 const DebtLetterPage = lazy(() => import('./features/followup/DebtLetterPage'))
+const CommunityPage = lazy(() => import('./features/community/CommunityPage'))
+const PostPage = lazy(() => import('./features/community/PostPage'))
 
 // Pages load inside Shell's own Suspense (the chrome stays put); this only covers routes outside the shell.
 const fallback = (
@@ -102,6 +104,10 @@ export default function App() {
               </Route>
               <Route element={<RequirePermission need="calendar" />}>
                 <Route path="calendar" element={<CalendarPage />} />
+              </Route>
+              <Route element={<RequirePermission need="community" />}>
+                <Route path="community" element={<CommunityPage />} />
+                <Route path="community/:id" element={<PostPage />} />
               </Route>
               <Route element={<RequirePermission need="documents" />}>
                 <Route path="documents" element={<DocumentsPage />} />

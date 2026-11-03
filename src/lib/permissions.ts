@@ -19,6 +19,7 @@ export const PERMISSION_KEYS = [
   'polls',
   'documents',
   'calendar',
+  'community',
   'suppliers',
 ] as const
 

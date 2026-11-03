@@ -14,6 +14,7 @@ import { useTickets } from '../tickets/api'
 import { useUpcoming } from '../calendar/display'
 import { usePolls } from '../polls/api'
 import { useDocuments } from '../documents/api'
+import { usePosts } from '../community/api'
 import { searchAll, type SearchData, type SearchResults } from './match'
 
 const S = he.search
@@ -31,6 +32,7 @@ function useSearchData(): SearchData {
   const suppliers = useSupplierDirectory(can('suppliers'))
   const calendar = useUpcoming()
   const documents = useDocuments(can('documents'))
+  const posts = usePosts(can('community'))
   return useMemo(() => ({
     apartments: people ? (apartments.data ?? []).map((a) => ({
       id: a.id, number: a.number, names: (directory.data ?? []).filter((r) => r.apartment_id === a.id).map((r) => r.full_name),
@@ -47,7 +49,8 @@ function useSearchData(): SearchData {
     // The calendar's own upcoming events, once each (a series has many occurrences).
     events: [...new Map(calendar.occurrences.filter((o) => o.item.source === 'event').map((o) => [o.item.id, o.item.title])).entries()]
       .map(([id, title]) => ({ id, title })),
-  }), [people, can, apartments.data, directory.data, announcements.data, tickets.data, projects.data, polls.data, suppliers.data, calendar.occurrences, documents.data])
+    community: can('community') ? (posts.data ?? []).map((p) => ({ id: p.id, title: p.title })) : [],
+  }), [people, can, apartments.data, directory.data, announcements.data, tickets.data, projects.data, polls.data, suppliers.data, calendar.occurrences, documents.data, posts.data])
 }
 
 interface Hit { key: string; to: string; label: ReactNode; plate?: number }
@@ -67,6 +70,7 @@ function hitsOf(r: SearchResults, admin: boolean): [keyof SearchResults, Hit[]][
       to: admin ? `/suppliers?supplier=${x.id}` : '/suppliers' }))],
     ['events', r.events.map((e) => ({ key: e.id, label: e.title, to: `/calendar?open=${e.id}` }))],
     ['documents', r.documents.map((d) => ({ key: d.id, label: d.title, to: `/documents?q=${encodeURIComponent(d.title)}` }))],
+    ['community', r.community.map((p) => ({ key: p.id, label: p.title, to: `/community/${p.id}` }))],
   ]
 }
 

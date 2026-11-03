@@ -40,6 +40,7 @@ describe('searchAll', () => {
     polls: [{ id: 'q1', title: 'צביעת חדר המדרגות' }],
     documents: [{ id: 'd1', title: 'תוכנית חדר מדרגות' }, { id: 'd2', title: 'פוליסת ביטוח' }],
     events: [{ id: 'e1', title: 'שטיפת חדר מדרגות' }],
+    community: [{ id: 'c1', title: 'נמצא מפתח בחדר מדרגות' }],
   }
   it('groups results: apartments, people, announcements, tickets, projects, polls, documents', () => {
     const r = searchAll('מדרגות', data)
@@ -49,6 +50,7 @@ describe('searchAll', () => {
     expect(r.events.map((x) => x.id)).toEqual(['e1'])
     expect(r.projects.map((x) => x.id)).toEqual(['p1'])
     expect(r.documents.map((x) => x.id)).toEqual(['d1'])
+    expect(r.community.map((x) => x.id)).toEqual(['c1'])
     expect(r.people).toEqual([])
   })
   it('a name finds the person and their apartment; an email finds the person', () => {

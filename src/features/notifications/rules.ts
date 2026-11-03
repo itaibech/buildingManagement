@@ -9,6 +9,7 @@ export type AnnouncementRowLite = Pick<Tables['announcements']['Row'], 'id' | 't
 export type TicketRowLite = Pick<Tables['tickets']['Row'], 'id' | 'title' | 'status' | 'opened_by' | 'last_activity_by' | 'last_activity_kind'>
 export type CommentRowLite = Pick<Tables['ticket_comments']['Row'], 'id' | 'ticket_id' | 'author_id'>
 export type MessageRowLite = Pick<Tables['committee_messages']['Row'], 'id' | 'subject' | 'sender_id' | 'apartment_number'>
+export type CommunityCommentRowLite = Pick<Tables['community_comments']['Row'], 'id' | 'post_id' | 'author_id' | 'post_author_id'>
 
 /** One Realtime change, as delivered by the subscription (only the columns the rules read). */
 export type ChangeEvent =
@@ -16,6 +17,7 @@ export type ChangeEvent =
   | { table: 'tickets'; type: 'INSERT' | 'UPDATE'; row: TicketRowLite }
   | { table: 'ticket_comments'; row: CommentRowLite }
   | { table: 'committee_messages'; row: MessageRowLite }
+  | { table: 'community_comments'; row: CommunityCommentRowLite }
 
 export interface Viewer {
   userId: string
@@ -25,7 +27,7 @@ export interface Viewer {
 }
 
 /** The page an event belongs to: no notice for an area the viewer's group can't open. */
-const areaOf = (event: Exclude<ChangeEvent, { table: 'committee_messages' }>): PermissionKey =>
+const areaOf = (event: Exclude<ChangeEvent, { table: 'committee_messages' | 'community_comments' }>): PermissionKey =>
   (event.table === 'announcements' ? 'announcements' : 'tickets')
 
 /** What the viewer may know about the call an event is about (from my_ticket_activity). */
@@ -35,7 +37,7 @@ export interface TicketRef {
   apartment_number: number | null
 }
 
-export type NoticeKind = 'announcement' | 'ticketNew' | 'ticketEdited' | 'ticketStatus' | 'ticketComment' | 'committeeMessage'
+export type NoticeKind = 'announcement' | 'ticketNew' | 'ticketEdited' | 'ticketStatus' | 'ticketComment' | 'committeeMessage' | 'communityComment'
 
 export interface Notice {
   kind: NoticeKind
@@ -84,12 +86,19 @@ function forMessage(row: MessageRowLite, viewer: Viewer): Notice | null {
   return { kind: 'committeeMessage', text: he.notifications.newMessage(row.subject, row.apartment_number), path: '/committee-messages' }
 }
 
+/** The author of a community post: a comment by someone else on it (post_author_id is set by the server). */
+function forCommunityComment(row: CommunityCommentRowLite, viewer: Viewer): Notice | null {
+  if (!viewer.can('community') || row.post_author_id !== viewer.userId || row.author_id === viewer.userId) return null
+  return { kind: 'communityComment', text: he.notifications.newCommunityComment, path: `/community/${row.post_id}` }
+}
+
 /**
  * The notice a change should raise for this viewer, or null. The viewer's own actions never notify them.
  * `ticket` is the call the event is about (needed for comments and the apartment number), when the viewer can see it.
  */
 export function qualify(event: ChangeEvent, viewer: Viewer, ticket: TicketRef | null, today: string): Notice | null {
   if (event.table === 'committee_messages') return forMessage(event.row, viewer)
+  if (event.table === 'community_comments') return forCommunityComment(event.row, viewer)
   if (!viewer.can(areaOf(event))) return null
   switch (event.table) {
     case 'announcements':
