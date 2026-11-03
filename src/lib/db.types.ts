@@ -577,14 +577,14 @@ isOneToOne: false
                   ]
                 },"expenses": {
                   Row: {
-                    "amount": number,"building_id": string,"category_id": string,"created_at": string,"id": string,"note": string,"receipt_name": string | null,"receipt_path": string | null,"source": string,"special_id": string | null,"spent_on": string,"template_id": string | null,"vendor": string
+                    "amount": number,"building_id": string,"category_id": string,"created_at": string,"id": string,"note": string,"project_id": string | null,"receipt_name": string | null,"receipt_path": string | null,"source": string,"special_id": string | null,"spent_on": string,"template_id": string | null,"vendor": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount": number,"building_id"?: string,"category_id": string,"created_at"?: string,"id"?: string,"note"?: string,"receipt_name"?: string | null,"receipt_path"?: string | null,"source"?: string,"special_id"?: string | null,"spent_on"?: string,"template_id"?: string | null,"vendor"?: string
+                    "amount": number,"building_id"?: string,"category_id": string,"created_at"?: string,"id"?: string,"note"?: string,"project_id"?: string | null,"receipt_name"?: string | null,"receipt_path"?: string | null,"source"?: string,"special_id"?: string | null,"spent_on"?: string,"template_id"?: string | null,"vendor"?: string
                   }
                   Update: {
-                    "amount"?: number,"building_id"?: string,"category_id"?: string,"created_at"?: string,"id"?: string,"note"?: string,"receipt_name"?: string | null,"receipt_path"?: string | null,"source"?: string,"special_id"?: string | null,"spent_on"?: string,"template_id"?: string | null,"vendor"?: string
+                    "amount"?: number,"building_id"?: string,"category_id"?: string,"created_at"?: string,"id"?: string,"note"?: string,"project_id"?: string | null,"receipt_name"?: string | null,"receipt_path"?: string | null,"source"?: string,"special_id"?: string | null,"spent_on"?: string,"template_id"?: string | null,"vendor"?: string
                   }
                   Relationships: [
                     {
@@ -604,6 +604,12 @@ isOneToOne: false
       columns: ["category_id"]
 isOneToOne: false
       referencedRelation: "expense_categories"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "expenses_project_id_fkey"
+      columns: ["project_id"]
+isOneToOne: false
+      referencedRelation: "projects"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "expenses_template_id_fkey"
@@ -1001,6 +1007,78 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"project_events": {
+                  Row: {
+                    "actor": string | null,"created_at": string,"id": string,"project_id": string,"status": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "actor"?: string | null,"created_at"?: string,"id"?: string,"project_id": string,"status": string
+                  }
+                  Update: {
+                    "actor"?: string | null,"created_at"?: string,"id"?: string,"project_id"?: string,"status"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "project_events_project_id_fkey"
+      columns: ["project_id"]
+isOneToOne: false
+      referencedRelation: "projects"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"project_quotes": {
+                  Row: {
+                    "amount": number,"created_at": string,"created_by": string | null,"file_name": string | null,"file_path": string | null,"file_size": number | null,"id": string,"is_chosen": boolean,"notes": string,"project_id": string,"vendor": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount": number,"created_at"?: string,"created_by"?: string | null,"file_name"?: string | null,"file_path"?: string | null,"file_size"?: number | null,"id"?: string,"is_chosen"?: boolean,"notes"?: string,"project_id": string,"vendor": string
+                  }
+                  Update: {
+                    "amount"?: number,"created_at"?: string,"created_by"?: string | null,"file_name"?: string | null,"file_path"?: string | null,"file_size"?: number | null,"id"?: string,"is_chosen"?: boolean,"notes"?: string,"project_id"?: string,"vendor"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "project_quotes_project_id_fkey"
+      columns: ["project_id"]
+isOneToOne: false
+      referencedRelation: "projects"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"projects": {
+                  Row: {
+                    "building_id": string,"created_at": string,"created_by": string | null,"decision_meeting_id": string | null,"decision_note": string,"description": string,"end_date": string | null,"estimated_cost": number | null,"final_cost": number | null,"id": string,"levy_label": string | null,"levy_month": string | null,"show_quotes": boolean,"start_date": string | null,"status": string,"title": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "building_id"?: string,"created_at"?: string,"created_by"?: string | null,"decision_meeting_id"?: string | null,"decision_note"?: string,"description"?: string,"end_date"?: string | null,"estimated_cost"?: number | null,"final_cost"?: number | null,"id"?: string,"levy_label"?: string | null,"levy_month"?: string | null,"show_quotes"?: boolean,"start_date"?: string | null,"status"?: string,"title": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "building_id"?: string,"created_at"?: string,"created_by"?: string | null,"decision_meeting_id"?: string | null,"decision_note"?: string,"description"?: string,"end_date"?: string | null,"estimated_cost"?: number | null,"final_cost"?: number | null,"id"?: string,"levy_label"?: string | null,"levy_month"?: string | null,"show_quotes"?: boolean,"start_date"?: string | null,"status"?: string,"title"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "projects_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "projects_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "projects_decision_meeting_id_fkey"
+      columns: ["decision_meeting_id"]
+isOneToOne: false
+      referencedRelation: "meetings"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"residents": {
                   Row: {
                     "apartment_id": string,"building_id": string,"created_at": string,"email": string | null,"full_name": string,"id": string,"is_owner": boolean,"phone": string | null
@@ -1300,6 +1378,9 @@ isOneToOne: false
 "cancel_postponement":
 { Args: { "p_meeting": string }; Returns: undefined
                            },
+"choose_project_quote":
+{ Args: { "p_meeting"?: string,"p_note"?: string,"p_project": string,"p_quote"?: string }; Returns: undefined
+                           },
 "close_meeting":
 { Args: { "p_closed_at"?: string,"p_meeting": string }; Returns: undefined
                            },
@@ -1447,6 +1528,9 @@ isOneToOne: false
 "is_meeting_storage_path":
 { Args: { "p_name": string }; Returns: boolean
                            },
+"is_project_storage_path":
+{ Args: { "p_name": string }; Returns: boolean
+                           },
 "is_receipt_path":
 { Args: { "p_name": string }; Returns: boolean
                            },
@@ -1538,6 +1622,14 @@ isOneToOne: false
                            },
 "postpone_meeting":
 { Args: { "p_meeting": string }; Returns: string
+                           },
+"project_file_shown":
+{ Args: { "p_name": string }; Returns: boolean
+                           },
+"project_progress":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "apartments_charged": number,"apartments_open": number,"expense_count": number,"levy_collected": number,"levy_due": number,"levy_total": number,"project_id": string,"spent": number
+            }[]
                            },
 "publish_meeting":
 { Args: { "p_meeting": string }; Returns: string
