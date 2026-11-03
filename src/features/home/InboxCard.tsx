@@ -1,10 +1,12 @@
 import { Alert, Anchor, Badge, Card, Group, Stack, Text, Title, UnstyledButton } from '@mantine/core'
-import { IconBriefcase, IconCalendarCheck, IconChevronLeft, IconCoin, IconGavel, IconTool, IconUserPlus, type Icon } from '@tabler/icons-react'
+import { IconBriefcase, IconCalendarCheck, IconChevronLeft, IconCoin, IconFolder, IconGavel, IconTool, IconUserPlus, type Icon } from '@tabler/icons-react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { todayISO } from '../../lib/dates'
 import { he } from '../../lib/he'
 import { ListSkeleton } from '../../ui'
+import { useDocuments } from '../documents/api'
+import { expiringSoon } from '../documents/logic'
 import { useLastReminders } from '../email/useReminders'
 import { useBalances } from '../finance/api'
 import { useTasks } from '../maintenance/api'
@@ -19,7 +21,7 @@ import { inboxItems, staleDebtors, upcomingInvited, type InboxItem, type InboxKe
 
 const I = he.home.inbox
 const ICONS: Record<InboxKey, Icon> = {
-  users: IconUserPlus, tickets: IconTool, maintenance: IconCalendarCheck, contracts: IconBriefcase, publish: IconGavel, invited: IconGavel, debtors: IconCoin,
+  users: IconUserPlus, tickets: IconTool, maintenance: IconCalendarCheck, contracts: IconBriefcase, publish: IconGavel, invited: IconGavel, debtors: IconCoin, documents: IconFolder,
 }
 // Maintenance overdue is `debt` by the status mapping; everything else waiting on the admin is `signal`.
 const TONE: Partial<Record<InboxKey, string>> = { maintenance: 'debt' }
@@ -46,6 +48,7 @@ function useInbox() {
   const meetings = useMeetings()
   const balances = useBalances()
   const last = useLastReminders()
+  const documents = useDocuments()
   const [now] = useState(() => new Date())
   const items = useMemo(() => {
     const today = todayISO()
@@ -57,8 +60,9 @@ function useInbox() {
       toPublish: (meetings.data ?? []).filter((m) => m.status === 'closed').length,
       invited: upcomingInvited(meetings.data ?? [], now),
       staleDebtors: staleDebtors(balances.data ?? [], last, today),
+      expiringDocuments: expiringSoon(documents.data ?? [], today),
     })
-  }, [pending.data, unseen, tasks.data, contracts.data, meetings.data, balances.data, last, now])
+  }, [pending.data, unseen, tasks.data, contracts.data, meetings.data, balances.data, last, now, documents.data])
   return { items, isLoading: pending.isLoading || tasks.isLoading || meetings.isLoading }
 }
 

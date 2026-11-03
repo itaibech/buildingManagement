@@ -4,6 +4,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { he } from '../../lib/he'
+import { PERMISSION_KEYS } from '../../lib/permissions'
 import { theme } from '../../ui/theme'
 import PermissionsPage from './PermissionsPage'
 
@@ -75,7 +76,7 @@ describe('PermissionsPage', () => {
     expect(home).toBeDisabled()
     expect(screen.getByRole('switch', { name: /^הודעות/ })).toBeChecked()
     expect(screen.getByRole('switch', { name: /^דיירים/ })).not.toBeChecked()
-    expect(screen.getAllByRole('switch')).toHaveLength(14)
+    expect(screen.getAllByRole('switch')).toHaveLength(PERMISSION_KEYS.length)
   })
 
   it('a toggle calls the mutation for that group and key, then confirms', () => {

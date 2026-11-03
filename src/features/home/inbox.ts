@@ -1,7 +1,7 @@
 /** The admin "לטיפולך" inbox (Task 26): what needs a decision, as counts with deep links. Pure. */
 import { daysSince, type LastReminder } from '../email/reminders'
 
-export type InboxKey = 'users' | 'tickets' | 'maintenance' | 'contracts' | 'publish' | 'invited' | 'debtors'
+export type InboxKey = 'users' | 'tickets' | 'maintenance' | 'contracts' | 'publish' | 'invited' | 'debtors' | 'documents'
 export interface InboxItem { key: InboxKey; count: number; to: string }
 export interface InboxInput {
   pendingUsers: number
@@ -15,6 +15,8 @@ export interface InboxInput {
   invited: { count: number; firstId: string | null }
   /** Debtors with no reminder in the last 30 days. */
   staleDebtors: number
+  /** Building documents that expire within the next 30 days. */
+  expiringDocuments: number
 }
 
 const DAY = 86_400_000
@@ -30,6 +32,7 @@ export function inboxItems(i: InboxInput): InboxItem[] {
     { key: 'publish', count: i.toPublish, to: '/meetings?tab=pending' },
     { key: 'invited', count: i.invited.count, to: i.invited.count === 1 && i.invited.firstId ? `/meetings/${i.invited.firstId}` : '/meetings' },
     { key: 'debtors', count: i.staleDebtors, to: '/finance?tab=balances' },
+    { key: 'documents', count: i.expiringDocuments, to: '/documents' },
   ]
   return rows.filter((r) => r.count > 0)
 }

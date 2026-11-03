@@ -73,6 +73,7 @@ vi.mock('../email/api', () => ({
 vi.mock('../ev/api', () => ({ useMyCharger: () => ({ data: m.charger, isLoading: false, isError: false }) }))
 vi.mock('../meetings/api', () => ({ useMeetings: () => ({ data: m.meetings, isLoading: false }) }))
 vi.mock('../calendar/api', () => ({ useCalendarEvents: () => ({ data: m.events, isLoading: false, isError: false, refetch: vi.fn() }) }))
+vi.mock('../documents/api', () => ({ useDocuments: () => ({ data: [], isLoading: false }) }))
 vi.mock('../notifications/api', () => ({ useUnseenTicketCount: () => m.unseen }))
 vi.mock('../permissions/api', () => ({ useGroups: () => ({ data: m.groups }) }))
 vi.mock('../tenants/api', async (orig) => ({

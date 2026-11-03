@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { inboxItems, staleDebtors, upcomingInvited } from './inbox'
 
-const none = { pendingUsers: 0, unseenTickets: 0, overdueTasks: 0, toPublish: 0, invited: { count: 0, firstId: null }, staleDebtors: 0 }
+const none = { pendingUsers: 0, unseenTickets: 0, overdueTasks: 0, toPublish: 0, invited: { count: 0, firstId: null }, staleDebtors: 0, expiringDocuments: 0 }
 
 describe('inboxItems', () => {
   it('nothing to do: no rows', () => {
     expect(inboxItems(none)).toEqual([])
   })
   it('one row per open kind, with its count and deep link, in a fixed order', () => {
-    const items = inboxItems({ pendingUsers: 2, unseenTickets: 3, overdueTasks: 1, toPublish: 1, invited: { count: 2, firstId: 'm1' }, staleDebtors: 4 })
+    const items = inboxItems({ pendingUsers: 2, unseenTickets: 3, overdueTasks: 1, toPublish: 1, invited: { count: 2, firstId: 'm1' }, staleDebtors: 4, expiringDocuments: 2 })
     expect(items.map((i) => [i.key, i.count, i.to])).toEqual([
       ['users', 2, '/users'],
       ['tickets', 3, '/tickets'],
@@ -16,6 +16,7 @@ describe('inboxItems', () => {
       ['publish', 1, '/meetings?tab=pending'],
       ['invited', 2, '/meetings'],
       ['debtors', 4, '/finance?tab=balances'],
+      ['documents', 2, '/documents'],
     ])
   })
   it('a single upcoming meeting links to the meeting itself', () => {
