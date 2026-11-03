@@ -2179,8 +2179,15 @@ export const he = {
     timeRange: (from: string, to: string) => `${from}–${to}`,
     visibilities: { residents: 'כל הדיירים', committee: 'הוועד בלבד' },
     committeeOnly: 'הוועד בלבד',
-    fromMeetings: 'מתוך ישיבות ועד',
-    openMeeting: 'לדף הישיבה',
+    // Where a read-only item comes from, and the link to its page.
+    sources: {
+      event: { from: 'לוח השנה', open: 'ללוח השנה' },
+      meeting: { from: 'מתוך ישיבות ועד', open: 'לדף הישיבה' },
+      poll: { from: 'מתוך הסקרים', open: 'לדף הסקר' },
+      maintenance: { from: 'מתוך משימות התחזוקה', open: 'למשימת התחזוקה' },
+    },
+    pollCloses: (question: string) => `סגירת הסקר: ${question}`,
+    maintenanceDue: (title: string) => `מועד תחזוקה: ${title}`,
     add: 'הוספת אירוע',
     edit: 'עריכה',
     editTitle: 'עריכת אירוע',

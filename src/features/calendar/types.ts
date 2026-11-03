@@ -14,7 +14,7 @@ export const VISIBILITIES = ['residents', 'committee'] as const
 export type Visibility = (typeof VISIBILITIES)[number]
 
 /** Where an item comes from: the calendar's own table (editable) or another feature's data (read-only). */
-export type SourceKey = 'event' | 'meeting'
+export type SourceKey = 'event' | 'meeting' | 'poll' | 'maintenance'
 
 /**
  * One calendar entry from any source: a single event or a recurring series. Timed: startsAt / endsAt are timestamps.

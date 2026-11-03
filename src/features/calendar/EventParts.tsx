@@ -63,7 +63,7 @@ export function EventDetails({ o, today, actions }: { o: Occurrence; today: stri
       {item.description && <Text style={{ whiteSpace: 'pre-wrap' }}>{item.description}</Text>}
       {item.link && (
         <Text size="sm" c="dimmed">
-          {C.fromMeetings} · <Anchor component={Link} to={item.link} fw={600}>{C.openMeeting}</Anchor>
+          {C.sources[item.source].from} · <Anchor component={Link} to={item.link} fw={600}>{C.sources[item.source].open}</Anchor>
         </Text>
       )}
       <AddToCalendar item={item} />

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildIcs, escapeText, foldLine, googleCalendarUrl, rruleOf } from './ics'
+import { maintenanceItems, pollItems } from './items'
+import type { Poll } from '../polls/types'
 import { addMonthsClamped, expandAll, expandItem, groupByDay, upcoming } from './recurrence'
 import type { CalendarItem } from './types'
 
@@ -76,6 +78,23 @@ describe('recurrence expansion', () => {
     const all = expandAll([item({ id: 'b', startsAt: '2026-11-06T07:00:00.000Z' }), item({ id: 'a' })], '2026-11-01', '2026-11-30')
     expect(all.map((o) => o.item.id)).toEqual(['a', 'b'])
     expect(upcoming(all, new Date('2026-11-05T09:00:00Z'), '2026-11-05').map((o) => o.item.id)).toEqual(['b'])
+  })
+})
+
+describe('read-only sources', () => {
+  it('polls: open ones only, on their closing time, linking to the poll', () => {
+    const poll = (id: string, status: Poll['status']) => ({ id, status, question: 'צביעת הלובי', closes_at: '2026-11-20T18:00:00.000Z' }) as Poll
+    const items = pollItems([poll('p1', 'open'), poll('p2', 'draft'), poll('p3', 'closed')])
+    expect(items.map((i) => [i.id, i.startsAt, i.link, i.source])).toEqual([['p1', '2026-11-20T18:00:00.000Z', '/polls/p1', 'poll']])
+    expect(items[0].title).toContain('צביעת הלובי')
+  })
+
+  it('maintenance: all-day on the due date (Israel midnight), undated tasks skipped', () => {
+    const items = maintenanceItems([{ id: 'k1', title: 'בדיקת מעלית', next_due: '2026-11-09' }, { id: 'k2', title: 'x', next_due: null }])
+    expect(items.map((i) => [i.id, i.allDay, i.startsAt, i.category, i.link])).toEqual([
+      ['k1', true, '2026-11-08T22:00:00.000Z', 'maintenance', '/maintenance?task=k1'],
+    ])
+    expect(expandItem(items[0], '2026-11-01', '2026-11-30').map((o) => o.day)).toEqual(['2026-11-09'])
   })
 })
 

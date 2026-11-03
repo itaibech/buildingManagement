@@ -15,15 +15,17 @@ import type { CalendarEventRow } from './types'
 import { WeekCard } from './WeekCard'
 
 const C = he.calendar
-const db = vi.hoisted(() => ({ events: [] as unknown[], meetings: [] as unknown[], inserts: [] as unknown[] }))
+const db = vi.hoisted(() => ({ events: [] as unknown[], meetings: [] as unknown[], tasks: [] as unknown[], inserts: [] as unknown[] }))
 const auth = vi.hoisted(() => ({ isAdmin: true }))
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: (table: string) => ({
       select: () => {
-        const result = { data: table === 'calendar_events' ? db.events : table === 'meetings' ? db.meetings : [], error: null }
-        return { order: () => Promise.resolve(result) }
+        const rows: Record<string, unknown[]> = { calendar_events: db.events, meetings: db.meetings, maintenance_tasks: db.tasks }
+        const result = { data: rows[table] ?? [], error: null }
+        const chain = { order: () => chain, then: (done: (r: typeof result) => unknown) => Promise.resolve(result).then(done) }
+        return chain
       },
       insert: (values: unknown) => { db.inserts.push(values); return Promise.resolve({ error: null }) },
     }),
@@ -55,6 +57,10 @@ beforeEach(() => {
     row({ id: 'e3', title: 'ישיבת ועד פנימית', category: 'meeting', visibility: 'committee', starts_at: fromInputs(addDays(today, 5), '20:00') }),
     row({ id: 'e4', title: 'הדברה', category: 'pest_control', starts_at: fromInputs(addDays(today, 8), '10:00') }),
   ]
+  db.tasks = [
+    { id: 'k1', title: 'בדיקת מעלית', vendor: '', frequency: 'semiannual', next_due: addDays(today, 4), remind_days: 30 },
+    { id: 'k2', title: 'ללא מועד', vendor: '', frequency: 'yearly', next_due: null, remind_days: 30 },
+  ]
   db.meetings = [
     { id: 'm1', kind: 'general', title: 'אסיפה כללית', status: 'invited', scheduled_at: fromInputs(addDays(today, 2), '19:00'), location: 'מקלט', meeting_agenda_items: [] },
     { id: 'm3', kind: 'committee', title: 'ישיבת ועד חודשית', status: 'invited', scheduled_at: fromInputs(addDays(today, 6), '20:00'), location: '', meeting_agenda_items: [] },
@@ -82,11 +88,20 @@ describe('CalendarPage', () => {
     expect(within(dialog).getByRole('button', { name: C.edit })).toBeInTheDocument()
   })
 
+  it('maintenance and inspection due dates appear as all-day read-only items', async () => {
+    wrap(<CalendarPage />)
+    fireEvent.click(await screen.findByText(C.maintenanceDue('בדיקת מעלית')))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('link', { name: C.sources.maintenance.open })).toHaveAttribute('href', '/maintenance?task=k1')
+    expect(within(dialog).queryByRole('button', { name: C.edit })).not.toBeInTheDocument()
+    expect(screen.queryByText(C.maintenanceDue('ללא מועד'))).not.toBeInTheDocument()
+  })
+
   it('a meeting opens read-only, linking to its page', async () => {
     wrap(<CalendarPage />)
     fireEvent.click(await screen.findByText('אסיפה כללית'))
     const dialog = await screen.findByRole('dialog')
-    expect(within(dialog).getByRole('link', { name: C.openMeeting })).toHaveAttribute('href', '/meetings/m1')
+    expect(within(dialog).getByRole('link', { name: C.sources.meeting.open })).toHaveAttribute('href', '/meetings/m1')
     expect(within(dialog).queryByRole('button', { name: C.edit })).not.toBeInTheDocument()
   })
 

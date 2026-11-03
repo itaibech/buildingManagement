@@ -50,9 +50,10 @@ const KEY = ['maintenance'] as const
 const logKey = (taskId: string) => [...KEY, 'log', taskId] as const
 
 /** All tasks, soonest due first (undated last). */
-export function useTasks() {
+export function useTasks(enabled = true) {
   return useQuery({
     queryKey: [...KEY, 'tasks'],
+    enabled,
     queryFn: async (): Promise<Task[]> => {
       const { data, error } = await supabase.from('maintenance_tasks').select('*').order('next_due', { nullsFirst: false }).order('title')
       if (error) throw new Error(error.message)
