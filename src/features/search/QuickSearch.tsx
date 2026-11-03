@@ -8,6 +8,7 @@ import { AptPlate } from '../../ui'
 import { useAnnouncements } from '../announcements/api'
 import { useDirectory, useApartments } from '../tenants/api'
 import { useDesktop } from '../finance/hooks'
+import { useProjects } from '../projects/api'
 import { useTickets } from '../tickets/api'
 import { searchAll, type SearchData, type SearchResults } from './match'
 
@@ -21,6 +22,7 @@ function useSearchData(): SearchData {
   const apartments = useApartments()
   const announcements = useAnnouncements()
   const tickets = useTickets()
+  const projects = useProjects()
   return useMemo(() => ({
     apartments: people ? (apartments.data ?? []).map((a) => ({
       id: a.id, number: a.number, names: (directory.data ?? []).filter((r) => r.apartment_id === a.id).map((r) => r.full_name),
@@ -30,7 +32,8 @@ function useSearchData(): SearchData {
     })) : [],
     announcements: can('announcements') ? (announcements.data ?? []).map((a) => ({ id: a.id, title: a.title })) : [],
     tickets: can('tickets') ? (tickets.data ?? []).map((t) => ({ id: t.id, title: t.title })) : [],
-  }), [people, can, apartments.data, directory.data, announcements.data, tickets.data])
+    projects: can('projects') ? (projects.data ?? []).map((p) => ({ id: p.id, title: p.title })) : [],
+  }), [people, can, apartments.data, directory.data, announcements.data, tickets.data, projects.data])
 }
 
 interface Hit { key: string; to: string; label: ReactNode; plate?: number }
@@ -44,6 +47,7 @@ function hitsOf(r: SearchResults, admin: boolean): [keyof SearchResults, Hit[]][
       to: admin ? `/apartments/${p.apartmentId}?tab=residents` : `/directory?q=${encodeURIComponent(p.name)}` }))],
     ['announcements', r.announcements.map((a) => ({ key: a.id, label: a.title, to: `/announcements?open=${a.id}` }))],
     ['tickets', r.tickets.map((t) => ({ key: t.id, label: t.title, to: `/tickets/${t.id}` }))],
+    ['projects', r.projects.map((p) => ({ key: p.id, label: p.title, to: `/projects/${p.id}` }))],
   ]
 }
 

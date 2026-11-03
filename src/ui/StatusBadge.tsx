@@ -10,6 +10,7 @@ export type StatusBadgeProps =
   | { kind: 'fee'; value: FeeMode }
   | { kind: 'meeting'; value: 'draft' | 'invited' | 'in_progress' | 'closed' | 'published' }
   | { kind: 'budget'; value: 'default' | 'one_off' }
+  | { kind: 'project'; value: 'planning' | 'quotes' | 'approved' | 'in_progress' | 'done' | 'cancelled' }
 
 // The only place the status colour mapping lives (docs/design-system.md); fee sources are in feeBadge.ts.
 const TICKET_COLOR = { open: 'signal', in_progress: 'enamel', closed: 'stone' } as const
@@ -20,11 +21,15 @@ const READING_COLOR = { recorded: 'paid', pending: 'signal' } as const
 const MEETING_COLOR = { draft: 'stone', invited: 'enamel', in_progress: 'signal', closed: 'signal', published: 'paid' } as const
 // Budget line source: a recurring yearly default ("קבוע") is enamel, like a custom fee; a one-off is stone.
 const BUDGET_COLOR = { default: 'enamel', one_off: 'stone' } as const
+// Projects: planning and cancelled = stone, collecting quotes = signal (needs a decision), approved and in progress =
+// enamel, done = paid.
+const PROJECT_COLOR = { planning: 'stone', quotes: 'signal', approved: 'enamel', in_progress: 'enamel', done: 'paid', cancelled: 'stone' } as const
 
 function resolve(props: StatusBadgeProps): { color: string; label: string } {
   if (props.kind === 'ticket') return { color: TICKET_COLOR[props.value], label: he.ticketStatus[props.value] }
   if (props.kind === 'fee') return feeBadge(props.value)
   if (props.kind === 'meeting') return { color: MEETING_COLOR[props.value], label: he.meetings.statuses[props.value] }
+  if (props.kind === 'project') return { color: PROJECT_COLOR[props.value], label: he.projects.statuses[props.value] }
   if (props.kind === 'budget') return { color: BUDGET_COLOR[props.value], label: he.finance.budget.sources[props.value] }
   if (props.kind === 'reading') return { color: READING_COLOR[props.value], label: he.readingStatus[props.value] }
   return { color: DUE_COLOR[props.value], label: he.dueStatus[props.value] }

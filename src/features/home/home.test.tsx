@@ -25,6 +25,7 @@ const m = vi.hoisted(() => ({
   debtLog: [] as unknown[],
   charger: null as unknown,
   meetings: [] as unknown[],
+  projects: [] as unknown[],
   unseen: 0,
   groups: [] as unknown[],
   pending: [] as unknown[],
@@ -79,6 +80,7 @@ vi.mock('../settings/api', async (orig) => ({
   ...(await orig<typeof import('../settings/api')>()),
   useBuilding: () => ({ data: m.building, isLoading: false, isError: false }),
 }))
+vi.mock('../projects/api', () => ({ useProjects: () => ({ data: m.projects }), useProjectProgress: () => ({ data: new Map() }) }))
 vi.mock('../maintenance/api', () => ({ useTasks: () => ({ data: m.tasks, isLoading: false, isError: false, refetch: vi.fn() }) }))
 
 /** Testing Library collapses whitespace (Intl puts a no-break space before ₪). */
@@ -112,9 +114,26 @@ beforeEach(() => {
   ]
   m.tickets = [ticket('t1', 'נזילה בחדר מדרגות', 'me'), ticket('t2', 'תקלה של שכן', 'other')]
   m.tasks = [{ id: 'k1', title: 'בדיקת מעלית', vendor: '', frequency: 'yearly', next_due: '2020-01-01' }]
+  m.projects = []
 })
 
 describe('HomePage', () => {
+  it('residents with projects see the active ones (not finished), linked to their page', () => {
+    const project = (id: string, title: string, status: string) => ({ id, title, status, estimated_cost: 16000, final_cost: null,
+      chosen_amount: null, levy_label: null, levy_month: null })
+    m.projects = [project('p1', 'דלת כניסה חדשה', 'in_progress'), project('p2', 'צביעת הלובי', 'done')]
+    renderHome()
+    expect(screen.queryByRole('heading', { name: he.projects.home.title })).toBeNull()
+    cleanup()
+    m.granted = [...m.granted, 'projects']
+    renderHome()
+    const card = screen.getByRole('heading', { name: he.projects.home.title }).closest('.mantine-Card-root') as HTMLElement
+    expect(within(card).getByText('דלת כניסה חדשה')).toBeTruthy()
+    expect(within(card).getByText(he.projects.statuses.in_progress)).toBeTruthy()
+    expect(within(card).queryByText('צביעת הלובי')).toBeNull()
+    expect(within(card).getByRole('link', { name: he.projects.home.all }).getAttribute('href')).toBe('/projects')
+  })
+
   it('admin sees the maintenance-due section with an overdue item', () => {
     m.isAdmin = true
     renderHome()

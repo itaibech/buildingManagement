@@ -8,6 +8,7 @@ import { useTickets } from '../tickets/api'
 import { TicketForm } from '../tickets/TicketForm'
 import { TicketRow } from '../tickets/TicketsPage'
 import { FormModal } from '../tenants/dialogs'
+import { ActiveProjects } from '../projects/ActiveProjects'
 import { CashMini, CollectionHero, Debtors, MaintenanceDue, OpenTickets } from './AdminCards'
 import { SetupChecklist } from './SetupChecklist'
 import { AdminInbox } from './InboxCard'
@@ -40,7 +41,8 @@ function ResidentHome({ onReport }: { onReport: () => void }) {
       <ResidentHero />
       {news && <LatestAnnouncement showUnread />}
       {calls && <MyTickets onReport={onReport} />}
-      {!news && !calls && !can('finance_own') && <Card><EmptyState title={he.permissions.homeEmpty} body={he.permissions.homeEmptyBody} /></Card>}
+      {can('projects') && <ActiveProjects />}
+      {!news && !calls && !can('finance_own') && !can('projects') && <Card><EmptyState title={he.permissions.homeEmpty} body={he.permissions.homeEmptyBody} /></Card>}
     </Stack>
   )
 }
@@ -55,7 +57,7 @@ function AdminHome() {
       <CashMini />
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg" verticalSpacing="lg">
         <Stack gap="lg"><Debtors /><OpenTickets /></Stack>
-        <Stack gap="lg"><MaintenanceDue /><LatestAnnouncement showUnread={false} /></Stack>
+        <Stack gap="lg"><MaintenanceDue /><ActiveProjects /><LatestAnnouncement showUnread={false} /></Stack>
       </SimpleGrid>
     </Stack>
   )

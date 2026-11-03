@@ -36,11 +36,13 @@ describe('searchAll', () => {
     people: [{ id: 'r1', name: 'דנה כהן', phone: '050-1234567', email: 'dana@example.test', apartmentId: 'a3', apartmentNumber: 3 }],
     announcements: [{ id: 'n1', title: 'ניקיון חדר מדרגות' }],
     tickets: [{ id: 't1', title: 'נזילה בחדר מדרגות' }],
+    projects: [{ id: 'p1', title: 'שיפוץ חדר מדרגות' }],
   }
-  it('groups results: apartments, people, announcements, tickets', () => {
+  it('groups results: apartments, people, announcements, tickets, projects', () => {
     const r = searchAll('מדרגות', data)
     expect(r.announcements.map((x) => x.id)).toEqual(['n1'])
     expect(r.tickets.map((x) => x.id)).toEqual(['t1'])
+    expect(r.projects.map((x) => x.id)).toEqual(['p1'])
     expect(r.people).toEqual([])
   })
   it('a name finds the person and their apartment; an email finds the person', () => {
