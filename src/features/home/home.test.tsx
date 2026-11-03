@@ -71,6 +71,7 @@ vi.mock('../email/api', () => ({
   sendableCount: () => 0,
 }))
 vi.mock('../ev/api', () => ({ useMyCharger: () => ({ data: m.charger, isLoading: false, isError: false }) }))
+vi.mock('../followup/FollowupHomeCard', () => ({ FollowupHomeCard: () => null }))
 vi.mock('../meetings/api', () => ({ useMeetings: () => ({ data: m.meetings, isLoading: false }) }))
 vi.mock('../calendar/api', () => ({ useCalendarEvents: () => ({ data: m.events, isLoading: false, isError: false, refetch: vi.fn() }) }))
 vi.mock('../documents/api', () => ({ useDocuments: () => ({ data: [], isLoading: false }) }))

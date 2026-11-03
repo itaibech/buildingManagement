@@ -2,6 +2,7 @@ import { checkCap, readCap } from './cap.ts'
 import { planContact, planTicketNew } from './committee.ts'
 import { announcementContent, debtContent, meetingContent, testContent, ticketContent } from './content.ts'
 import { openMonths, splitDebtors } from './debt.ts'
+import { handleFollowup, type Delivery } from './followup.ts'
 import { buildRecipients } from './recipients.ts'
 import { DuplicateLogError, fail, reply, type Plan, type Reply } from './plan.ts'
 import { render, type Brand, type EmailContent } from './template.ts'
@@ -116,20 +117,22 @@ function buildPlan(req: EmailRequest, caller: Caller, ctx: Context, deps: Deps, 
   return planTest(ctx, brand)
 }
 
-/** Sends one by one, ~500 ms apart (real sends only); counts successes and failures. */
-async function deliver(messages: MailMessage[], deps: Deps): Promise<{ sent: number; failed: number; error: string | null }> {
+/** Sends one by one, ~500 ms apart (real sends only); counts successes and failures (oks: each message's outcome). */
+async function deliver(messages: MailMessage[], deps: Deps): Promise<Delivery> {
   const { transport } = deps
   let sent = 0
   let failed = 0
   let error: string | null = null
+  const oks: boolean[] = []
   for (const [i, m] of messages.entries()) {
     if (i > 0 && !transport.dryRun) await deps.sleep(THROTTLE_MS)
     const r = await transport.send(m)
     if (transport.dryRun) deps.log?.(`dry run → ${mask(m.to)}: ${m.subject}`)
+    oks.push(r.ok)
     if (r.ok) sent += 1
     else { failed += 1; error ??= r.error ?? 'failed' }
   }
-  return { sent, failed, error }
+  return { sent, failed, error, oks }
 }
 
 const isResidentKind = (body: unknown): boolean =>
@@ -206,6 +209,12 @@ export async function handle(body: unknown, deps: Deps): Promise<Reply> {
   if (req.status) return reply(200, { status: true, dryRun: deps.transport.dryRun, reason: deps.transport.reason })
   const ctx = await deps.data.context(caller.userId)
   const brand: Brand = { buildingName: ctx.building.name, appUrl: deps.env.APP_URL || APP_URL }
+  if (req.kind === 'debt_followup') {
+    // The follow-ups' share of the cap leaves MAX_PER_CALL for the committee's own sends (like residents', capFor).
+    const cap = Math.max(0, readCap(deps.env.EMAIL_DAILY_CAP) - MAX_PER_CALL)
+    return handleFollowup({ caller, ctx, data: deps.data, transport: deps.transport, brand, cap, maxPerCall: MAX_PER_CALL,
+      preview: req.preview, deliver: (m) => deliver(m, deps) })
+  }
   const plan = await buildPlan(req, caller, ctx, deps, brand)
   if ('status' in plan) return plan
   const { dryRun, reason } = deps.transport

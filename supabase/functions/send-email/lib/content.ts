@@ -86,6 +86,27 @@ export function debtContent(d: DebtInfo, name: string, appUrl: string): EmailCon
   }
 }
 
+/**
+ * kind 'debt_followup', step 2: the firmer reminder. Same months and payment details as debtContent; it says the
+ * debt is overdue, asks to pay or contact the committee within 14 days, and that the committee may take further steps.
+ */
+export function debtFirmContent(d: DebtInfo, name: string, appUrl: string, days: number): EmailContent {
+  const base = debtContent(d, name, appUrl)
+  return {
+    ...base,
+    subject: `תזכורת נוספת: חוב פתוח – דירה ${d.number}`,
+    heading: `חוב פתוח: ${money(d.balance)}`,
+    paragraphs: [
+      `זו תזכורת נוספת: היתרה של דירה ${d.number}, ${money(d.balance)}, פתוחה כבר ${days} ימים.`,
+      'נבקש להסדיר את התשלום, או לפנות לוועד, בתוך 14 ימים.',
+      'החודשים הפתוחים, מהישן לחדש:',
+    ],
+    after: [...(base.after ?? []).slice(0, -1),
+      'אם החוב לא יוסדר, הוועד ישקול צעדים נוספים לגביית החוב.',
+      'אם כבר שילמתם, תודה, ואפשר להתעלם מהודעה זו.'],
+  }
+}
+
 export function testContent(name: string, appUrl: string): EmailContent {
   return {
     subject: 'מייל בדיקה מאפליקציית ניהול הבניין', greeting: greeting(name), heading: 'שליחת המיילים עובדת',

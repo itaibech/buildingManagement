@@ -10,6 +10,7 @@ import { TicketRow } from '../tickets/TicketsPage'
 import { FormModal } from '../tenants/dialogs'
 import { ActiveProjects } from '../projects/ActiveProjects'
 import { CashMini, CollectionHero, Debtors, MaintenanceDue, OpenTickets } from './AdminCards'
+import { FollowupHomeCard } from '../followup/FollowupHomeCard'
 import { SetupChecklist } from './SetupChecklist'
 import { AdminInbox } from './InboxCard'
 import { LoadError, Section } from './parts'
@@ -52,11 +53,12 @@ function ResidentHome({ onReport }: { onReport: () => void }) {
   )
 }
 
-/** "לטיפולך" and the setup checklist on top, the collection hero and cash, then money and calls beside maintenance and news. */
+/** "לטיפולך", the debt follow-up and the setup checklist on top, the collection hero and cash, then money and calls beside maintenance and news. */
 function AdminHome() {
   return (
     <Stack gap="lg">
       <AdminInbox />
+      <FollowupHomeCard />
       <SetupChecklist />
       <HomePollsCard />
       <CollectionHero />

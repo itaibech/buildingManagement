@@ -44,6 +44,8 @@ function fakeData(over: Partial<DataSource> = {}, used = 0): Fake {
     logged: async () => false,
     countSince: async () => 0,
     storeMessage: async () => 'm1',
+    followupsReady: async () => [],
+    finishFollowups: async () => undefined,
     ...over,
   }
 }

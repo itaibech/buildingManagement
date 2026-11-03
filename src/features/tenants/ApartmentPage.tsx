@@ -8,6 +8,7 @@ import { useChargers } from '../ev/api'
 import { useBalances } from '../finance/api'
 import { ApartmentYear } from '../finance/ApartmentLedger'
 import { useDesktop } from '../finance/hooks'
+import { FollowupTimeline } from '../followup/FollowupTimeline'
 import { telHref } from '../settings/api'
 import { ApartmentForm } from './ApartmentForm'
 import { useAllApartments, useDeleteResident, useResidents, useRestoreApartment, type Apartment, type Resident } from './api'
@@ -123,7 +124,7 @@ function SectionBody({ k, apartment, setDialog, setSection }: BodyProps) {
   const id = apartment.id
   if (k === 'overview') return <AptOverview apartment={apartment} balance={balance} onEdit={() => setDialog({ kind: 'editApartment' })} onLedger={() => setSection('ledger')} />
   if (k === 'payments') return <PaymentsSection apartmentId={id} />
-  if (k === 'ledger') return <ApartmentYear apartmentId={id} admin />
+  if (k === 'ledger') return <Stack gap="lg"><ApartmentYear apartmentId={id} admin /><FollowupTimeline apartmentId={id} archived={!!apartment.archived_at} /></Stack>
   if (k === 'fees') return <FeesSection apartmentId={id} />
   if (k === 'ev') return charger ? <EvSection charger={charger} /> : null
   if (k === 'residents') return <ResidentsSection apartmentId={id} setDialog={setDialog} />
