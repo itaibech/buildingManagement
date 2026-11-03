@@ -4,7 +4,7 @@ import { useAuth } from '../../auth/AuthProvider'
 import { supabase } from '../../lib/supabase'
 import { useAnnouncements, useMarkRead, useUnreadCount } from '../announcements/api'
 import { buildFeed, unseenTicketCount, unseenTicketIds, type ActivityKind, type FeedItem, type TicketActivity } from './feed'
-import type { AnnouncementRowLite, ChangeEvent, CommentRowLite, TicketRowLite } from './rules'
+import type { AnnouncementRowLite, ChangeEvent, CommentRowLite, MessageRowLite, TicketRowLite } from './rules'
 
 /** Under ['tickets'], so every ticket mutation that refreshes the lists refreshes the badge too. */
 export const activityKey = (userId: string | undefined) => ['tickets', 'activity', userId] as const
@@ -82,7 +82,8 @@ export function useMarkAllRead(): () => void {
 let channelSeq = 0
 
 /**
- * One Realtime channel for the signed-in user: new announcements, new and changed calls, new comments.
+ * One Realtime channel for the signed-in user: new announcements, new and changed calls, new comments, and (admins)
+ * residents' messages to the committee.
  * Realtime applies each table's SELECT policy to the subscriber. Each call gets its own topic, so a quick
  * unsubscribe/resubscribe (StrictMode, user switch) never reuses a channel that is still closing. `onResync` runs
  * when the channel re-joins after a drop: events sent while offline are lost, so the caller refetches.
@@ -102,6 +103,8 @@ export function subscribeToChanges(userId: string, onEvent: (event: ChangeEvent)
       (p) => onEvent({ table: 'tickets', type: 'UPDATE', row: p.new }))
     .on<CommentRowLite>('postgres_changes', { ...pg, event: 'INSERT', table: 'ticket_comments' },
       (p) => onEvent({ table: 'ticket_comments', row: p.new }))
+    .on<MessageRowLite>('postgres_changes', { ...pg, event: 'INSERT', table: 'committee_messages' },
+      (p) => onEvent({ table: 'committee_messages', row: p.new }))
     .subscribe((status) => {
       if (status !== 'SUBSCRIBED') return
       if (joined) onResync()

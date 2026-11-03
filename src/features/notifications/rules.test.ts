@@ -99,3 +99,17 @@ describe('permissions (Task 18)', () => {
     expect(qualify(ticket('UPDATE', { last_activity_by: 'admin', last_activity_kind: 'status' }), RES, null, TODAY)).not.toBeNull()
   })
 })
+
+describe('qualify: committee messages', () => {
+  const message = (sender: string | null, apartment: number | null = 4): ChangeEvent =>
+    ({ table: 'committee_messages', row: { id: 'm1', subject: 'רעש בלילה', sender_id: sender, apartment_number: apartment } })
+  it('admins: a resident\'s message, with the apartment, opening "פניות דיירים"', () => {
+    expect(qualify(message('res'), ADMIN, null, TODAY)).toEqual({ kind: 'committeeMessage', text: 'פנייה חדשה לוועד: רעש בלילה · דירה 4', path: '/committee-messages' })
+    expect(qualify(message('res', null), ADMIN, null, TODAY)?.text).toBe('פנייה חדשה לוועד: רעש בלילה')
+    expect(needsTicketRef(message('res'), ADMIN)).toBe(false)
+  })
+  it('never the sender, never a resident', () => {
+    expect(qualify(message('admin'), ADMIN, null, TODAY)).toBeNull()
+    expect(qualify(message('res'), RES, null, TODAY)).toBeNull()
+  })
+})

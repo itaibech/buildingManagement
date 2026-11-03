@@ -1,4 +1,4 @@
-// send-email: the only place the app sends email (admins only). Thin HTTP shell: CORS, clients, then lib/handler.ts.
+// send-email: the only place the app sends email (admins; any approved user for ticket_new / contact, see lib/handler.ts). Thin HTTP shell: CORS, clients, then lib/handler.ts.
 // verify_jwt stays on (the default): the platform rejects calls without a valid JWT before this code runs.
 import { createClient } from '@supabase/supabase-js'
 import { corsHeaders } from './lib/cors.ts'

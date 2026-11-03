@@ -1,18 +1,24 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Balance, Caller, Context, DataSource, LedgerRow, LogRow, MeetingInfo, Reservation, Resident, TicketInfo } from './types.ts'
+import type {
+  Admin, Balance, Caller, CommitteeMessage, Context, DataSource, EmailKind, LedgerRow, LogRow, MeetingInfo, NewTicket, Reservation,
+  Resident, TicketInfo,
+} from './types.ts'
 
 /** The slice of a supabase-js client (built with the caller's JWT) used to identify the caller. */
 export interface AuthClient {
   auth: { getUser(): Promise<{ data: { user: { id: string } | null }; error: unknown }> }
-  rpc(fn: 'is_admin'): PromiseLike<{ data: unknown; error: unknown }>
+  rpc(fn: 'is_admin' | 'my_permissions'): PromiseLike<{ data: unknown; error: unknown }>
 }
 
-/** Who is calling, from their own JWT (RLS context): null when not signed in. */
+const keysOf = (r: { data: unknown; error: unknown }): string[] =>
+  !r.error && Array.isArray(r.data) ? r.data.filter((k): k is string => typeof k === 'string') : []
+
+/** Who is calling, from their own JWT (RLS context): null when not signed in. Permissions: my_permissions (0016). */
 export async function callerFrom(client: AuthClient): Promise<Caller | null> {
   const { data, error } = await client.auth.getUser()
   if (error || !data.user) return null
-  const admin = await client.rpc('is_admin')
-  return { userId: data.user.id, isAdmin: !admin.error && admin.data === true }
+  const [admin, keys] = await Promise.all([client.rpc('is_admin'), client.rpc('my_permissions')])
+  return { userId: data.user.id, isAdmin: !admin.error && admin.data === true, permissions: keysOf(keys) }
 }
 
 interface Result<T> { data: T | null; error: { message: string } | null }
@@ -83,6 +89,41 @@ async function reserve(db: SupabaseClient, r: Reservation): Promise<string | nul
   return typeof id === 'string' ? id : null
 }
 
+async function newTicket(db: SupabaseClient, id: string, buildingId: string): Promise<NewTicket | null> {
+  const t = maybe<{ id: string; title: string; description: string; location: string; opened_by: string | null; created_at: string }>(
+    await db.from('tickets').select('id, title, description, location, opened_by, created_at').eq('id', id).eq('building_id', buildingId).maybeSingle())
+  return t && { id: t.id, title: t.title, description: t.description, location: t.location, openedBy: t.opened_by, createdAt: t.created_at }
+}
+
+async function admins(db: SupabaseClient, buildingId: string): Promise<Admin[]> {
+  const rows = must<{ user_id: string; full_name: string; email: string | null }[]>(await db.from('profiles')
+    .select('user_id, full_name, email').eq('building_id', buildingId).eq('role', 'admin').eq('status', 'approved'))
+  return rows.map((r) => ({ userId: r.user_id, name: r.full_name, email: r.email }))
+}
+
+async function apartmentNumber(db: SupabaseClient, userId: string): Promise<number | null> {
+  const id = await openerApartment(db, userId)
+  if (!id) return null
+  const a = maybe<{ number: number }>(await db.from('apartments').select('number').eq('id', id).maybeSingle())
+  return a?.number ?? null
+}
+
+async function countSince(db: SupabaseClient, userId: string, kind: EmailKind, since: string): Promise<number> {
+  const { count, error } = await db.from('email_log').select('id', { count: 'exact', head: true })
+    .eq('sent_by', userId).eq('kind', kind).gte('created_at', since)
+  if (error) throw new Error(error.message)
+  return count ?? 0
+}
+
+async function logged(db: SupabaseClient, kind: EmailKind, refId: string): Promise<boolean> {
+  const rows = must<{ id: string }[]>(await db.from('email_log').select('id').eq('kind', kind).eq('ref_id', refId).limit(1))
+  return rows.length > 0
+}
+
+async function storeMessage(db: SupabaseClient, m: CommitteeMessage): Promise<string> {
+  return must<{ id: string }>(await db.from('committee_messages').insert(m).select('id').single()).id
+}
+
 /** Reads and the audit insert, with the service-role client (server only; never exposed to the browser). */
 export function dataSource(db: SupabaseClient): DataSource {
   return {
@@ -99,5 +140,11 @@ export function dataSource(db: SupabaseClient): DataSource {
     reserve: (r) => reserve(db, r),
     finish: async (id, o) => { maybe(await db.from('email_log').update({ ...o, status: 'done' }).eq('id', id)) },
     log: async (row: LogRow) => { maybe(await db.from('email_log').insert(row)) },
+    newTicket: (id, b) => newTicket(db, id, b),
+    admins: (b) => admins(db, b),
+    apartmentNumber: (userId) => apartmentNumber(db, userId),
+    logged: (kind, refId) => logged(db, kind, refId),
+    countSince: (userId, kind, since) => countSince(db, userId, kind, since),
+    storeMessage: (m) => storeMessage(db, m),
   }
 }

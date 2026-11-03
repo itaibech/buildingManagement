@@ -1,11 +1,13 @@
 import { Anchor, Button, Card, Group, Stack, Text, Title, UnstyledButton } from '@mantine/core'
-import { IconCopy, IconPhone, IconUsersGroup } from '@tabler/icons-react'
+import { IconCopy, IconMessageCircle, IconPhone, IconUsersGroup } from '@tabler/icons-react'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { useAuth } from '../../auth/AuthProvider'
 import { formatDate, formatILS, formatKwh, monthLabel } from '../../lib/format'
 import { he } from '../../lib/he'
 import { ApartmentTags, AptPlate, EmptyState, ListSkeleton, Money, notifyError, notifySuccess, UnreadDot } from '../../ui'
 import { useAnnouncements } from '../announcements/api'
+import { ContactDialog } from '../committee/ContactDialog'
 import { useMyCharger } from '../ev/api'
 import { useMyApartment, useMyBalance } from '../finance/api'
 import { heroState } from '../finance/ledger'
@@ -60,7 +62,21 @@ function NoContact() {
   )
 }
 
-/** "איך משלמים" (while something is owed) and the committee's phone. Without finance_own: the phone only. */
+/** "פנייה לוועד" beside the committee's phone (contact_committee): opens the message dialog. */
+function ContactButton() {
+  const [open, setOpen] = useState(false)
+  if (!useAuth().can('contact_committee')) return null
+  return (
+    <>
+      <Button variant="light" fullWidth leftSection={<IconMessageCircle size={20} stroke={1.75} aria-hidden="true" />} onClick={() => setOpen(true)}>
+        {he.committee.contact}
+      </Button>
+      <ContactDialog opened={open} onClose={() => setOpen(false)} />
+    </>
+  )
+}
+
+/** "איך משלמים" (while something is owed), the committee's phone and "פנייה לוועד". Without finance_own: no payment part. */
 function HowToPayPart({ money }: { money: boolean }) {
   const building = useBuilding()
   const balance = useMyBalance(money)
@@ -82,6 +98,7 @@ function HowToPayPart({ money }: { money: boolean }) {
           <IconPhone size={20} stroke={1.75} aria-hidden="true" /><span>{he.pay.call(phone)}</span>
         </Anchor>
       )}
+      <ContactButton />
     </Stack>
   )
 }

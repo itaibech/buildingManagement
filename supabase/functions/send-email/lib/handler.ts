@@ -1,11 +1,15 @@
 import { checkCap, readCap } from './cap.ts'
+import { planContact, planTicketNew } from './committee.ts'
 import { announcementContent, debtContent, meetingContent, testContent, ticketContent } from './content.ts'
 import { openMonths, splitDebtors } from './debt.ts'
 import { buildRecipients } from './recipients.ts'
+import { fail, reply, type Plan, type Reply } from './plan.ts'
 import { render, type Brand, type EmailContent } from './template.ts'
 import type { MailMessage, Transport } from './transport.ts'
-import type { Apartment, Caller, Context, DataSource, EmailRequest, Env, Recipient } from './types.ts'
+import { RESIDENT_KINDS, type Apartment, type Caller, type Context, type DataSource, type EmailRequest, type Env, type Recipient } from './types.ts'
 import { parseRequest } from './validate.ts'
+
+export type { Reply } from './plan.ts'
 
 export interface Deps {
   caller(): Promise<Caller | null>
@@ -15,10 +19,9 @@ export interface Deps {
   sleep(ms: number): Promise<void>
   /** Function log (dry runs print what would have been sent, with masked addresses). */
   log?: (line: string) => void
+  /** The clock, in ms (tests pin it). */
+  now?: () => number
 }
-export interface Reply { status: number; body: Record<string, unknown> }
-/** perApartment: emails per apartment id, so the app can split a large send into calls of at most MAX_PER_CALL. */
-interface Plan { messages: MailMessage[]; apartmentIds: string[] | null; skipped: number[]; perApartment: Record<string, number> }
 
 export const THROTTLE_MS = 500
 /** At most this many emails per call (~20 s at the throttle), well inside the function's wall-clock limit. */
@@ -26,8 +29,6 @@ export const MAX_PER_CALL = 40
 const APP_URL = 'https://itaibech.github.io/buildingManagement/'
 const SAMPLES = 3
 
-const reply = (status: number, body: Record<string, unknown>): Reply => ({ status, body })
-const fail = (status: number, error: string): Reply => reply(status, { error })
 const mask = (email: string): string => email.replace(/^(.).*(@.*)$/, '$1***$2')
 
 const toMessages = (brand: Brand, recipients: Recipient[], content: (r: Recipient) => EmailContent): MailMessage[] =>
@@ -103,7 +104,11 @@ function planTest(ctx: Context, brand: Brand): Plan | Reply {
   return { messages: [{ to: ctx.email, ...render(brand, testContent(ctx.name, brand.appUrl)) }], apartmentIds: null, skipped: [], perApartment: {} }
 }
 
-function buildPlan(req: EmailRequest, ctx: Context, data: DataSource, brand: Brand): Promise<Plan | Reply> | Plan | Reply {
+function buildPlan(req: EmailRequest, caller: Caller, ctx: Context, deps: Deps, brand: Brand): Promise<Plan | Reply> | Plan | Reply {
+  const { data } = deps
+  const scope = { req, caller, ctx, data, brand, now: deps.now?.() ?? Date.now() }
+  if (req.kind === 'ticket_new') return planTicketNew(scope)
+  if (req.kind === 'contact') return planContact(scope)
   if (req.kind === 'announcement') return planAnnouncement(req, ctx, data, brand)
   if (req.kind === 'ticket') return planTicket(req, ctx, data, brand)
   if (req.kind === 'debt') return planDebt(req, ctx, data, brand)
@@ -127,13 +132,25 @@ async function deliver(messages: MailMessage[], deps: Deps): Promise<{ sent: num
   return { sent, failed, error }
 }
 
+const isResidentKind = (body: unknown): boolean =>
+  typeof body === 'object' && body !== null && RESIDENT_KINDS.some((k) => k === (body as Record<string, unknown>).kind)
+
+/**
+ * Admins may send every kind. Any approved user (my_permissions has 'home') may send ticket_new and, with the
+ * contact_committee permission, contact; each kind then checks its own rules (committee.ts).
+ */
 async function authorize(body: unknown, deps: Deps): Promise<{ caller: Caller; req: EmailRequest } | Reply> {
   const caller = await deps.caller()
   if (!caller) return fail(401, 'נדרשת התחברות')
-  if (!caller.isAdmin) return fail(403, 'רק מנהלי הבניין יכולים לשלוח מיילים')
+  if (!caller.isAdmin && !isResidentKind(body)) return fail(403, 'רק מנהלי הבניין יכולים לשלוח מיילים')
+  if (!caller.isAdmin && !(caller.permissions ?? []).includes('home')) return fail(403, 'החשבון שלך ממתין לאישור הוועד')
   const parsed = parseRequest(body)
   if (!parsed.ok) return fail(400, `בקשה לא תקינה (${parsed.error})`)
-  return { caller, req: parsed.value }
+  const req = parsed.value
+  if (req.kind === 'contact' && !caller.isAdmin && !(caller.permissions ?? []).includes('contact_committee')) {
+    return fail(403, 'אין לך הרשאה לפנות לוועד מהאפליקציה')
+  }
+  return { caller, req }
 }
 
 interface Job { caller: Caller; req: EmailRequest; ctx: Context; plan: Plan }
@@ -141,10 +158,15 @@ interface Job { caller: Caller; req: EmailRequest; ctx: Context; plan: Plan }
 /** Real sends: reserve the quota atomically (pending row), deliver, then finalize the row with the outcome. */
 async function sendReal(job: Job, deps: Deps, cap: number): Promise<Reply> {
   const { caller, req, ctx, plan } = job
-  const base = { building_id: ctx.building.id, sent_by: caller.userId, kind: req.kind, ref_id: req.id ?? null, apartment_ids: plan.apartmentIds }
+  const base = { building_id: ctx.building.id, sent_by: caller.userId, kind: req.kind, ref_id: plan.refId ?? req.id ?? null, apartment_ids: plan.apartmentIds }
   const count = plan.messages.length
   const id = count ? await deps.data.reserve({ ...base, count, cap }) : null
   if (count && !id) {
+    // A message is already stored: log the attempt (it counts toward the sender's limit) and report it as kept in the app.
+    if (req.kind === 'contact') {
+      await deps.data.log({ ...base, recipients: count, sent: 0, failed: 0, skipped: 0, dry_run: false, error: 'daily cap' })
+      return reply(200, { sent: 0, failed: 0, skipped: [], recipients: count, dryRun: false, reason: null, quotaFull: true })
+    }
     const check = checkCap(await deps.data.sentToday(ctx.building.id), cap, count)
     return reply(429, { error: check.ok ? 'נסו שוב בעוד רגע' : check.message, remainingToday: check.remaining })
   }
@@ -159,15 +181,16 @@ async function sendReal(job: Job, deps: Deps, cap: number): Promise<Reply> {
 async function sendDry(job: Job, deps: Deps): Promise<Reply> {
   const { caller, req, ctx, plan } = job
   const r = await deliver(plan.messages, deps)
-  await deps.data.log({ building_id: ctx.building.id, sent_by: caller.userId, kind: req.kind, ref_id: req.id ?? null,
+  await deps.data.log({ building_id: ctx.building.id, sent_by: caller.userId, kind: req.kind, ref_id: plan.refId ?? req.id ?? null,
     apartment_ids: plan.apartmentIds, recipients: plan.messages.length, sent: r.sent, failed: r.failed,
     skipped: plan.skipped.length, dry_run: true, error: r.error })
-  const samples = plan.messages.slice(0, SAMPLES).map((m) => ({ subject: m.subject, text: m.text }))
+  // Samples are the admin's preview of what would have gone out; a resident's own send gets none.
+  const samples = caller.isAdmin ? plan.messages.slice(0, SAMPLES).map((m) => ({ subject: m.subject, text: m.text })) : []
   return reply(200, { sent: r.sent, failed: r.failed, skipped: plan.skipped, recipients: plan.messages.length,
     dryRun: true, reason: deps.transport.reason, samples })
 }
 
-/** POST body → reply. Admin only; preview counts without sending; at most MAX_PER_CALL emails per call. */
+/** POST body → reply. Admin only (but ticket_new / contact, see authorize); preview counts without sending; at most MAX_PER_CALL emails per call. */
 export async function handle(body: unknown, deps: Deps): Promise<Reply> {
   const auth = await authorize(body, deps)
   if ('status' in auth) return auth
@@ -176,7 +199,7 @@ export async function handle(body: unknown, deps: Deps): Promise<Reply> {
   if (req.status) return reply(200, { status: true, dryRun: deps.transport.dryRun, reason: deps.transport.reason })
   const ctx = await deps.data.context(caller.userId)
   const brand: Brand = { buildingName: ctx.building.name, appUrl: deps.env.APP_URL || APP_URL }
-  const plan = await buildPlan(req, ctx, deps.data, brand)
+  const plan = await buildPlan(req, caller, ctx, deps, brand)
   if ('status' in plan) return plan
   const { dryRun, reason } = deps.transport
   const cap = readCap(deps.env.EMAIL_DAILY_CAP)

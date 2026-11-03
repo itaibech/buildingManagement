@@ -28,6 +28,7 @@ const SettingsPage = lazy(() => import('./features/settings/SettingsPage'))
 const PermissionsPage = lazy(() => import('./features/permissions/PermissionsPage'))
 const MeetingsPage = lazy(() => import('./features/meetings/MeetingsPage'))
 const MeetingPage = lazy(() => import('./features/meetings/MeetingPage'))
+const CommitteeMessagesPage = lazy(() => import('./features/committee/CommitteeMessagesPage'))
 
 // Pages load inside Shell's own Suspense (the chrome stays put); this only covers routes outside the shell.
 const fallback = (
@@ -86,6 +87,7 @@ export default function App() {
                 <Route path="ev/:id" element={<ChargerPage />} />
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="settings/permissions" element={<PermissionsPage />} />
+                <Route path="committee-messages" element={<CommitteeMessagesPage />} />
               </Route>
             </Route>
           </Route>
