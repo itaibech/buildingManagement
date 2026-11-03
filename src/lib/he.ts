@@ -1938,6 +1938,7 @@ export const he = {
       majority: 'הרוב הנדרש',
       percent: 'אחוז נדרש',
       base: 'מחושב',
+      baseHints: { building: 'מתוך כל הדירות הפעילות בבניין', eligible: 'מתוך הדירות שנבחרו להשתתף' },
       scope: 'מי מצביע',
       scopes: { all: 'כל הדירות', selected: 'דירות נבחרות' },
       apartments: 'הדירות שמצביעות',
@@ -1949,6 +1950,7 @@ export const he = {
       errors: {
         question: 'כתבו את השאלה',
         options: 'נדרשות 2 עד 10 אפשרויות, כולן מלאות',
+        duplicateOptions: 'כל אפשרות צריכה להיות שונה מהאחרות',
         closes: 'מועד הסגירה צריך להיות אחרי מועד הפתיחה ובעתיד',
         percent: 'אחוז בין 1 ל-100',
         apartments: 'בחרו לפחות דירה אחת',

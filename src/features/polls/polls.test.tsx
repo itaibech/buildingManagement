@@ -70,6 +70,13 @@ describe('ResultsCard', () => {
     expect(screen.getByText(he.polls.majority.notReached)).toBeTruthy()
   })
 
+  it('a closed poll shows the outcome stored at closing', () => {
+    const outcome = { reached: true, required: 13, base: 19, top: 13, next: 2, leader: 0, tie: false }
+    wrap(<ResultsCard poll={poll({ status: 'closed' })} tally={{ counts: [13, 2, 1], voted: 16, eligible: 19, building: 19, outcome }} loading={false} />)
+    expect(screen.getByText(he.polls.majority.passed)).toBeTruthy()
+    expect(screen.getByText('נדרשו 13 מתוך 19, הצביעו בעד 13')).toBeTruthy()
+  })
+
   it('hides the counts until closing when the poll says so', () => {
     wrap(<ResultsCard poll={poll({ results_visibility: 'after_close' })} tally={{ counts: null, voted: 3, eligible: 19, building: 19 }} loading={false} />)
     expect(screen.getByText(he.polls.results.hidden)).toBeTruthy()

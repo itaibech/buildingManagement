@@ -5,7 +5,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(64);
+select plan(71);
 
 -- ---------------------------------------------------------------- fixtures (as postgres)
 -- a1 admin; r1 and r1b both live in apartment 1; r2 in 2; r0 approved without an apartment; pd pending, linked to 3.
@@ -50,6 +50,7 @@ select ok(not has_function_privilege('anon', 'public.open_poll(uuid)', 'execute'
 select ok(not has_function_privilege('authenticated', 'public.poll_write_vote(uuid, uuid, int, boolean)', 'execute'),
   'poll_write_vote is internal');
 select ok(not has_function_privilege('authenticated', 'public.poll_tally(uuid)', 'execute'), 'poll_tally is internal');
+select ok(not has_function_privilege('anon', 'public.poll_options_ok(text, text[])', 'execute'), 'anon may not execute poll_options_ok');
 select is((select prosecdef from pg_proc where oid = 'public.cast_poll_vote(uuid, int)'::regprocedure), true, 'cast_poll_vote is security definer');
 select is((select proconfig from pg_proc where oid = 'public.cast_poll_vote(uuid, int)'::regprocedure), array['search_path=""'],
   'cast_poll_vote pins an empty search_path');
@@ -81,6 +82,8 @@ select throws_like($$select public.save_poll('ריק', '', 'yes_no', '{}', now()
   'selected', 'live', null, '{}')$$, 'poll:empty_scope%', 'a selected scope needs an apartment');
 select throws_ok($$select public.save_poll('אפשרות אחת', '', 'single_choice', array['רק אחת'], now(), now() + interval '1 day', 'simple',
   'building', 'all', 'live')$$, '23514', null, 'single choice needs 2–10 options');
+select throws_ok($$select public.save_poll('כפולות', '', 'single_choice', array['חברה א', ' חברה א '], now(), now() + interval '1 day', 'simple',
+  'building', 'all', 'live')$$, '23514', null, 'option labels must differ after trimming');
 select throws_ok($$select public.save_poll('הפוך', '', 'yes_no', '{}', now(), now() - interval '1 day', 'simple', 'building',
   'all', 'live')$$, '23514', null, 'closing must come after opening');
 
@@ -101,6 +104,10 @@ select public.open_poll(current_setting('t.q4')::uuid);
 select is((select (a.link, a.title) from public.announcements a join public.polls p on p.announcement_id = a.id
   where p.id = current_setting('t.q1')::uuid), ('/polls/' || current_setting('t.q1'), 'סקר חדש: תחזוקת מתקן החניה'::text),
   'opening posts an announcement linking to the poll');
+select ok((select body like '%ההצבעה תיפתח ב-%ותיסגר ב-%' from public.announcements a join public.polls p on p.announcement_id = a.id
+  where p.id = current_setting('t.q4')::uuid), 'a poll opening later announces its start time');
+select ok((select body like '%ההצבעה פתוחה עד %' from public.announcements a join public.polls p on p.announcement_id = a.id
+  where p.id = current_setting('t.q1')::uuid), 'a poll open now announces its end only');
 select ok((select body like '%הסקר מיועד לדירות: 2, 3%' from public.announcements a join public.polls p on p.announcement_id = a.id
   where p.id = current_setting('t.q2')::uuid), 'the announcement names a selected scope');
 select throws_like($$select public.open_poll(current_setting('t.q1')::uuid)$$, 'poll:state%', 'an open poll cannot be opened again');
@@ -162,6 +169,8 @@ reset role;
 update public.polls set opens_at = now() - interval '2 days', closes_at = now() - interval '1 second' where id = current_setting('t.q3')::uuid;
 set local role authenticated;
 select throws_like($$select public.cast_poll_vote(current_setting('t.q3')::uuid, 0)$$, 'poll:ended%', 'after closes_at: refused');
+select ok(not (public.poll_results(current_setting('t.q3')::uuid) ? 'counts'),
+  'after_close: ended but not closed, a resident still gets no counts');
 reset role;
 update public.polls set opens_at = now(), closes_at = now() + interval '7 days' where id = current_setting('t.q3')::uuid;
 set local role authenticated;
@@ -193,6 +202,11 @@ select is(public.poll_results(current_setting('t.q3')::uuid), '{"voted": 1, "eli
 select throws_ok($$select public.close_poll(current_setting('t.q1')::uuid)$$, '42501', null, 'a resident cannot close a poll');
 set local request.jwt.claims = '{"sub":"a3100000-0000-0000-0000-000000000001","role":"authenticated"}';
 select is(public.close_poll(current_setting('t.q1')::uuid) -> 'voted', '3'::jsonb, 'close_poll returns the frozen tally');
+select is((select final_result -> 'outcome' from public.polls where id = current_setting('t.q1')::uuid),
+  '{"reached": false, "required": 4, "base": 5, "top": 1, "next": 1, "leader": null, "tie": true}'::jsonb,
+  'the outcome is stored at closing (2/3 of 5 = 4, one for)');
+select is((select expires_at from public.announcements a join public.polls p on p.announcement_id = a.id
+  where p.id = current_setting('t.q1')::uuid), (now() at time zone 'Asia/Jerusalem')::date - 1, 'closing expires the announcement');
 select public.close_poll(current_setting('t.q3')::uuid);
 select throws_like($$select public.admin_record_vote(current_setting('t.q1')::uuid, 'b3100000-0000-0000-0000-000000000004', 0)$$,
   'poll:closed%', 'no votes recorded after closing');
@@ -202,7 +216,7 @@ select is(public.poll_results(current_setting('t.q3')::uuid) -> 'counts', '[1, 0
 reset role;
 update public.apartments set archived_at = now() where id = 'b3100000-0000-0000-0000-000000000002';
 set local role authenticated;
-select is(public.poll_results(current_setting('t.q1')::uuid), '{"counts": [1, 1, 1], "voted": 3, "eligible": 5, "building": 5}'::jsonb,
+select is(public.poll_results(current_setting('t.q1')::uuid) - 'outcome', '{"counts": [1, 1, 1], "voted": 3, "eligible": 5, "building": 5}'::jsonb,
   'the closed result stays frozen when an apartment is archived later');
 select is(public.poll_results(current_setting('t.q2')::uuid) -> 'voted', '0'::jsonb, 'an open poll drops a newly archived apartment');
 

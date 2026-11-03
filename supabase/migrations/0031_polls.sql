@@ -5,15 +5,18 @@
 --     base for that share ('building' = every active apartment, 'eligible' = the apartments in scope), the scope
 --     (all apartments or the ones in poll_apartments) and when residents see the counts (live / after_close).
 --   * Lifecycle draft → open → closed, only through admin RPCs: save_poll (drafts), open_poll (posts an announcement
---     linking to the poll, so the 0015 notifications toast it), close_poll (freezes the tally into final_result).
+--     linking to the poll, so the 0015 notifications toast it), close_poll (freezes the tally and its outcome, from
+--     poll_outcome(), into final_result; src/features/polls/majority.ts mirrors that math for the live view).
 --     Admins may delete drafts. There are no insert/update policies: every write is an RPC.
 --   * Votes (poll_votes): one row per (poll, apartment), replaced on revote, stamped with who voted and when (and
 --     whether an admin recorded it for the apartment, "נרשם ע"י הוועד"). cast_poll_vote votes for the caller's own
 --     apartment (my_apartment_id()); admin_record_vote for any apartment. Both check: open, inside the window,
 --     the apartment active and in scope, a valid choice.
 --   * Visibility (RLS): admins see everything. Users with 'polls' (on for the default group) see open and closed
---     polls, their scope, and their own apartment's vote only. Counts come from poll_results(): always for admins,
---     for residents live or once the window ended / the poll closed (participation only before that).
+--     polls, their scope, and their own apartment's vote only. Counts come from poll_results(): always for admins;
+--     for residents live, or for 'after_close' only once the poll is closed (status, not the clock: participation
+--     only until then, even after closes_at).
+--   * Single-choice option labels are distinct after trimming.
 --   * Archived apartments are excluded from the tally (and from scope) until the poll closes; the frozen result
 --     then stays as it was.
 
@@ -33,8 +36,10 @@ as $$
     when 'yes_no' then cardinality(p_options) = 0
     else cardinality(p_options) between 2 and 10
       and not exists (select 1 from unnest(p_options) o where o is null or char_length(trim(o)) not between 1 and 120)
+      and (select count(distinct trim(o)) from unnest(p_options) o) = cardinality(p_options)
   end;
 $$;
+revoke execute on function public.poll_options_ok(text, text[]) from public, anon;
 
 create table public.polls (
   id uuid primary key default gen_random_uuid(),
@@ -207,7 +212,8 @@ revoke execute on function public.admin_record_vote(uuid, uuid, int) from public
 grant execute on function public.admin_record_vote(uuid, uuid, int) to authenticated;
 
 -- The counts the caller may see: admins always; others for open or closed polls, the counts only when live or
--- once the window ended (participation only before that). A closed poll returns its frozen result.
+-- once the poll is closed ('after_close': participation only until then, even past closes_at). A closed poll returns
+-- its frozen result.
 create function public.poll_results(p_poll uuid) returns jsonb
 language plpgsql stable security definer set search_path = ''
 as $$
@@ -221,7 +227,7 @@ begin
   if p.status = 'closed' then
     return p.final_result;
   end if;
-  if not public.is_admin() and p.results_visibility = 'after_close' and now() < p.closes_at then
+  if not public.is_admin() and p.results_visibility = 'after_close' then
     return public.poll_tally(p_poll) - 'counts';
   end if;
   return public.poll_tally(p_poll);
@@ -274,14 +280,19 @@ revoke execute on function public.save_poll(text, text, text, text[], timestampt
 grant execute on function public.save_poll(text, text, text, text[], timestamptz, timestamptz, text, text, text, text, int, uuid[], uuid)
   to authenticated;
 
--- The announcement text: the question, the description, the window and the scope.
+create function public.poll_local(p_at timestamptz) returns text
+language sql stable set search_path = ''
+as $$ select to_char(p_at at time zone 'Asia/Jerusalem', 'DD/MM/YYYY') || ' בשעה ' || to_char(p_at at time zone 'Asia/Jerusalem', 'HH24:MI'); $$;
+revoke execute on function public.poll_local(timestamptz) from public, anon, authenticated;
+
+-- The announcement text: the description, the window (with the start when it is still ahead) and the scope.
 create function public.poll_announcement_body(p_poll uuid) returns text
 language sql stable set search_path = ''
 as $$
   select concat_ws(E'\n',
     nullif(trim(p.description), ''),
-    'ההצבעה פתוחה עד ' || to_char(p.closes_at at time zone 'Asia/Jerusalem', 'DD/MM/YYYY') || ' בשעה '
-      || to_char(p.closes_at at time zone 'Asia/Jerusalem', 'HH24:MI') || '. קול אחד לכל דירה.',
+    case when p.opens_at > now() then 'ההצבעה תיפתח ב-' || public.poll_local(p.opens_at) || ' ותיסגר ב-'
+      else 'ההצבעה פתוחה עד ' end || public.poll_local(p.closes_at) || '. קול אחד לכל דירה.',
     case when p.scope = 'selected' then 'הסקר מיועד לדירות: ' || (
       select string_agg(a.number::text, ', ' order by a.number)
       from public.poll_apartments s join public.apartments a on a.id = s.apartment_id where s.poll_id = p.id) end)
@@ -314,7 +325,46 @@ $$;
 revoke execute on function public.open_poll(uuid) from public, anon;
 grant execute on function public.open_poll(uuid) to authenticated;
 
--- Open → closed: the tally is frozen into final_result; no vote is accepted after this.
+-- The outcome of a tally under a rule, mirroring src/features/polls/majority.ts (evaluate): simple = yes/no more for
+-- than against, single choice the option strictly ahead; two_thirds / percent = the for votes (single choice: the
+-- untied leader) reach max(1, ceil(base × share)). leader is the 0-based choice index, null without a decision.
+-- supabase/tests/poll_outcome.test.sql holds the cases both implementations are tested against.
+create function public.poll_outcome(p_kind text, p_majority text, p_percent int, p_base text, p_tally jsonb) returns jsonb
+language plpgsql immutable set search_path = ''
+as $$
+declare
+  v_counts int[] := array(select e::int from jsonb_array_elements_text(coalesce(p_tally -> 'counts', '[]')) with ordinality t(e, n) order by n);
+  v_base int := coalesce((p_tally ->> case when p_base = 'eligible' then 'eligible' else 'building' end)::int, 0);
+  v_required int := case p_majority when 'simple' then null when 'two_thirds' then greatest(1, (2 * v_base + 2) / 3)
+    else greatest(1, (v_base * coalesce(p_percent, 100) + 99) / 100) end;
+  v_top int;
+  v_next int;
+  v_leader int;
+  v_tie boolean;
+  v_reached boolean;
+begin
+  if p_kind = 'yes_no' then
+    v_top := coalesce(v_counts[1], 0);
+    v_next := coalesce(v_counts[2], 0);
+    v_reached := case when v_required is null then v_top > v_next else v_top >= v_required end;
+    v_tie := v_top = v_next;
+    v_leader := case when v_reached then 0 end;
+  else
+    v_top := coalesce((select max(c) from unnest(v_counts) c), 0);
+    v_next := coalesce((select c from unnest(v_counts) c order by c desc offset 1 limit 1), 0);
+    v_tie := v_top > 0 and v_top = v_next;
+    v_leader := case when v_top > 0 and not v_tie then array_position(v_counts, v_top) - 1 end;
+    v_reached := v_leader is not null and (v_required is null or v_top >= v_required);
+    v_leader := case when v_reached then v_leader end;
+  end if;
+  return jsonb_build_object('reached', v_reached, 'required', v_required, 'base', v_base, 'top', v_top, 'next', v_next,
+    'leader', v_leader, 'tie', v_tie);
+end;
+$$;
+revoke execute on function public.poll_outcome(text, text, int, text, jsonb) from public, anon, authenticated;
+
+-- Open → closed: the tally and its outcome are frozen into final_result; no vote is accepted after this. The opening
+-- announcement expires (yesterday, as meetings do).
 create function public.close_poll(p_poll uuid) returns jsonb
 language plpgsql security definer set search_path = ''
 as $$
@@ -327,8 +377,10 @@ begin
   perform public.poll_require(p.id is not null, 'not_found');
   perform public.poll_require(p.status = 'open', 'state');
   v_result := public.poll_tally(p_poll);
+  v_result := v_result || jsonb_build_object('outcome',
+    public.poll_outcome(p.kind, p.majority, p.majority_percent, p.majority_base, v_result));
   update public.polls set status = 'closed', closed_at = now(), final_result = v_result where id = p_poll;
-  update public.announcements set expires_at = least(expires_at, (now() at time zone 'Asia/Jerusalem')::date)
+  update public.announcements set pinned = false, expires_at = (now() at time zone 'Asia/Jerusalem')::date - 1
   where id = p.announcement_id;
   return v_result;
 end;

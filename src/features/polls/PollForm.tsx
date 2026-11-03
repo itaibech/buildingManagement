@@ -62,8 +62,11 @@ function MajorityFields({ form, building }: { form: PollFormApi; building: numbe
           {...form.getInputProps('majority')} />
         {v.majority === 'percent' && <NumberInput label={F.percent} min={1} max={100} allowDecimal={false} suffix="%" {...form.getInputProps('percent')} />}
         {v.majority !== 'simple' && (
-          <SegmentedControl fullWidth aria-label={F.base} data={MAJORITY_BASES.map((b) => ({ value: b, label: he.polls.bases[b] }))}
-            {...form.getInputProps('base')} />
+          <>
+            <SegmentedControl fullWidth aria-label={F.base} data={MAJORITY_BASES.map((b) => ({ value: b, label: he.polls.bases[b] }))}
+              {...form.getInputProps('base')} />
+            <Text size="sm" c="dimmed">{F.baseHints[v.base]}</Text>
+          </>
         )}
         <Text size="sm" c="dimmed" className="bm-num" data-testid="majority-preview">
           {rulePreview(rule, baseCount(v.base, { building, eligible }))}

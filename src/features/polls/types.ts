@@ -1,5 +1,6 @@
 // Polls (0031): the shapes the feature works with, narrowed from the generated row types.
 import type { Database, Json } from '../../lib/db.types'
+import type { Outcome } from './majority'
 
 export const POLL_KINDS = ['yes_no', 'single_choice'] as const
 export type PollKind = (typeof POLL_KINDS)[number]
@@ -38,12 +39,16 @@ export interface Poll {
   apartmentIds: string[]
 }
 
-/** poll_results(): votes per choice (absent while hidden), how many apartments voted, and both majority bases. */
+/**
+ * poll_results(): votes per choice (absent while hidden), how many apartments voted, both majority bases, and for a
+ * closed poll the outcome stored at closing (poll_outcome() in SQL).
+ */
 export interface Tally {
   counts: number[] | null
   voted: number
   eligible: number
   building: number
+  outcome?: Outcome | null
 }
 
 export interface PollVote {
@@ -75,11 +80,21 @@ export function toPoll(r: PollRow & { poll_apartments?: { apartment_id: string }
 const isRecord = (v: Json): v is { [key: string]: Json | undefined } => typeof v === 'object' && v !== null && !Array.isArray(v)
 const int = (v: Json | undefined): number => (typeof v === 'number' ? v : 0)
 
+const intOrNull = (v: Json | undefined): number | null => (typeof v === 'number' ? v : null)
+
+function toOutcome(o: Json | undefined): Outcome | null {
+  if (o === undefined || !isRecord(o)) return null
+  return {
+    reached: o.reached === true, required: intOrNull(o.required), base: int(o.base), top: int(o.top), next: int(o.next),
+    leader: intOrNull(o.leader), tie: o.tie === true,
+  }
+}
+
 /** The RPC's JSON as a Tally; null when the caller may not see the poll. */
 export function toTally(j: Json | null): Tally | null {
   if (j === null || !isRecord(j)) return null
   const counts = Array.isArray(j.counts) ? j.counts.map((c) => int(c)) : null
-  return { counts, voted: int(j.voted), eligible: int(j.eligible), building: int(j.building) }
+  return { counts, voted: int(j.voted), eligible: int(j.eligible), building: int(j.building), outcome: toOutcome(j.outcome) }
 }
 
 /** The labels of a poll's choices, in choice order. */

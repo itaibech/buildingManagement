@@ -33,7 +33,8 @@ function Bars({ labels, counts, total, yesNo }: { labels: readonly string[]; cou
 function MajorityStatus({ poll, tally }: { poll: Poll; tally: Tally }) {
   const rule = ruleOf(poll)
   const labels = choiceLabels(poll, he.polls.yesNo)
-  const o = evaluate(rule, tally)
+  // A closed poll shows the outcome stored at closing; an open one is computed live.
+  const o = tally.outcome ?? evaluate(rule, tally)
   const closed = poll.status === 'closed'
   return (
     <Stack gap={4} data-testid="majority-status">
@@ -48,7 +49,10 @@ function MajorityStatus({ poll, tally }: { poll: Poll; tally: Tally }) {
   )
 }
 
-/** Counts per choice, participation (X of Y apartments) and whether the required majority is reached. */
+/**
+ * Counts per choice, participation (X of Y apartments) and whether the required majority is reached. Without counts
+ * (results only after closing, for residents until the poll is closed, even past its closing time) only participation.
+ */
 export function ResultsCard({ poll, tally, loading }: { poll: Poll; tally: Tally | null | undefined; loading: boolean }) {
   const labels = choiceLabels(poll, he.polls.yesNo)
   return (

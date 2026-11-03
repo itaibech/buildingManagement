@@ -49,8 +49,11 @@ const closesOk = (v: Values): boolean => {
 
 export const validate = {
   question: (v: string) => (v.trim() && v.trim().length <= 300 ? null : E.question),
-  options: (rows: OptionRow[], all: Values) =>
-    all.kind === 'yes_no' || (rows.length >= 2 && rows.length <= 10 && rows.every((r) => r.label.trim())) ? null : E.options,
+  options: (rows: OptionRow[], all: Values) => {
+    if (all.kind === 'yes_no') return null
+    if (rows.length < 2 || rows.length > 10 || !rows.every((r) => r.label.trim())) return E.options
+    return new Set(rows.map((r) => r.label.trim())).size === rows.length ? null : E.duplicateOptions
+  },
   opensDate: (v: string, all: Values) => (v && all.opensTime ? null : E.date),
   closesDate: (_v: string, all: Values) => (closesOk(all) ? null : E.closes),
   percent: (v: number | string, all: Values) => (all.majority !== 'percent' || (typeof v === 'number' && v >= 1 && v <= 100) ? null : E.percent),

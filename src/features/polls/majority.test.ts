@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { evaluate, requiredVotes, type Rule } from './majority'
+import { he } from '../../lib/he'
+import { initial, validate } from './formModel'
+import { evaluate, requiredVotes, type Outcome, type Rule } from './majority'
+import outcomeSql from '../../../supabase/tests/poll_outcome.test.sql?raw'
 import { decisionLabel, mathLine, protocolText, ruleName, rulePreview } from './text'
 import type { Poll, Tally } from './types'
 
@@ -113,5 +116,32 @@ describe('wording', () => {
     expect(text).toContain('בעד: 11 · נגד: 2 · נמנע: 1')
     expect(text).toContain('נדרשו 13 מתוך 19, הצביעו בעד 11')
     expect(text).toContain('תוצאה: ההצעה לא התקבלה')
+  })
+})
+
+interface SharedCase { name: string; kind: Rule['kind']; majority: Rule['majority']; percent: number | null; base: Rule['base']
+  tally: { counts: number[]; building: number; eligible: number }; expect: Outcome }
+
+/** The cases public.poll_outcome() is tested against (supabase/tests/poll_outcome.test.sql, the dollar-quoted array). */
+function sharedCases(): SharedCase[] {
+  const json = /\$cases\$([\s\S]*?)\$cases\$/.exec(outcomeSql)?.[1] ?? '[]'
+  return JSON.parse(json) as SharedCase[]
+}
+
+describe('agrees with poll_outcome() in SQL', () => {
+  const cases = sharedCases()
+  it('reads the shared cases', () => expect(cases.length).toBeGreaterThan(10))
+  it.each(cases.map((c) => [c.name, c] as const))('%s', (_name, c) => {
+    const t = { ...c.tally, voted: c.tally.counts.reduce((a, b) => a + b, 0) }
+    expect(evaluate({ kind: c.kind, majority: c.majority, percent: c.percent, base: c.base }, t)).toEqual(c.expect)
+  })
+})
+
+describe('form rules', () => {
+  const values = { ...initial(undefined), kind: 'single_choice' as const }
+  const rows = (...labels: string[]) => labels.map((label, i) => ({ key: String(i), label }))
+  it('rejects duplicate options after trimming', () => {
+    expect(validate.options(rows('חברה א', ' חברה א '), values)).toBe(he.polls.form.errors.duplicateOptions)
+    expect(validate.options(rows('חברה א', 'חברה ב'), values)).toBeNull()
   })
 })

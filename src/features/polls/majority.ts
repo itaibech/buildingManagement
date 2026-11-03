@@ -1,4 +1,6 @@
 // The majority math (pure): whether a poll's required majority is reached, with the numbers to show it.
+// Mirrors public.poll_outcome() (0031), which stores the outcome at closing; both are tested against the cases in
+// supabase/tests/poll_outcome.test.sql. This one serves the live view of open polls.
 //   * simple: yes/no passes with more for than against (abstentions and non-voters don't count, a tie fails);
 //     single choice picks the option strictly ahead of every other one.
 //   * two_thirds / percent: the for votes (single choice: the leading option, without a tie) reach

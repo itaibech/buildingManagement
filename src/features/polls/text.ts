@@ -53,7 +53,7 @@ const at = (iso: string): string => `${meetingDate(iso)} ${meetingTime(iso)}`
 export function protocolText(poll: Poll, tally: Tally, scopeNumbers: readonly number[]): string {
   const rule = ruleOf(poll)
   const labels = choiceLabels(poll, P.yesNo)
-  const o = evaluate(rule, tally)
+  const o = tally.outcome ?? evaluate(rule, tally)
   const counts = labels.map((l, i) => `${l}: ${tally.counts?.[i] ?? 0}`).join(' · ')
   return [
     P.protocol.heading,

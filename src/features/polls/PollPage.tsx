@@ -54,8 +54,8 @@ function Body({ poll }: { poll: Poll }) {
         <VotePanel poll={poll} phase={phase} apartmentId={mine.apartmentId} vote={mine.votes?.get(poll.id)} />
       )}
       {phase !== 'draft' && <ResultsCard poll={poll} tally={results.data} loading={results.isLoading} />}
-      {text && <ExportActions poll={poll} text={text} />}
-      {text && <PrintCopy text={text} />}
+      {isAdmin && text && <ExportActions poll={poll} text={text} />}
+      {isAdmin && text && <PrintCopy text={text} />}
       {isAdmin && phase !== 'draft' && <AdminVotes poll={poll} canRecord={phase === 'voting'} />}
     </Stack>
   )
