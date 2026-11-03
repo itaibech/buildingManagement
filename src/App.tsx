@@ -35,6 +35,7 @@ const PollsPage = lazy(() => import('./features/polls/PollsPage'))
 const PollPage = lazy(() => import('./features/polls/PollPage'))
 const SuppliersPage = lazy(() => import('./features/suppliers/SuppliersPage'))
 const CalendarPage = lazy(() => import('./features/calendar/CalendarPage'))
+const DocumentsPage = lazy(() => import('./features/documents/DocumentsPage'))
 
 // Pages load inside Shell's own Suspense (the chrome stays put); this only covers routes outside the shell.
 const fallback = (
@@ -96,6 +97,9 @@ export default function App() {
               </Route>
               <Route element={<RequirePermission need="calendar" />}>
                 <Route path="calendar" element={<CalendarPage />} />
+              </Route>
+              <Route element={<RequirePermission need="documents" />}>
+                <Route path="documents" element={<DocumentsPage />} />
               </Route>
               <Route element={<RequireAdmin />}>
                 <Route path="apartments" element={<ApartmentsPage />} />

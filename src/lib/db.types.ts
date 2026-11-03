@@ -299,6 +299,52 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"building_document_versions": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"document_id": string,"file_name": string,"file_path": string,"id": string,"size_bytes": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"document_id": string,"file_name": string,"file_path": string,"id"?: string,"size_bytes": number
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"document_id"?: string,"file_name"?: string,"file_path"?: string,"id"?: string,"size_bytes"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "building_document_versions_document_id_fkey"
+      columns: ["document_id"]
+isOneToOne: false
+      referencedRelation: "building_documents"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"building_documents": {
+                  Row: {
+                    "building_id": string,"category": string,"created_at": string,"created_by": string | null,"description": string,"document_date": string | null,"expires_on": string | null,"id": string,"title": string,"updated_at": string,"visibility": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "building_id"?: string,"category"?: string,"created_at"?: string,"created_by"?: string | null,"description"?: string,"document_date"?: string | null,"expires_on"?: string | null,"id"?: string,"title": string,"updated_at"?: string,"visibility"?: string
+                  }
+                  Update: {
+                    "building_id"?: string,"category"?: string,"created_at"?: string,"created_by"?: string | null,"description"?: string,"document_date"?: string | null,"expires_on"?: string | null,"id"?: string,"title"?: string,"updated_at"?: string,"visibility"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "building_documents_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "building_documents_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"buildings": {
                   Row: {
                     "address": string | null,"billing_start": string | null,"committee_contact": string | null,"created_at": string,"id": string,"name": string,"opening_cash": number,"opening_cash_date": string | null,"payment_instructions": string | null
@@ -1573,6 +1619,9 @@ isOneToOne: false
 "building_cash_balance":
 { Args: { "p_building_id": string }; Returns: number
                            },
+"building_doc_readable":
+{ Args: { "p_name": string }; Returns: boolean
+                           },
 "building_expense_report":
 { Args: { "p_year": number }; Returns: {
               "category": string,"category_id": string,"month": string,"sort_order": number,"total": number
@@ -1614,6 +1663,9 @@ isOneToOne: false
 { Args: Record<PropertyKey, never>; Returns: {
               "full_name": string,"user_id": string
             }[]
+                           },
+"create_building_document":
+{ Args: { "p_category": string,"p_description"?: string,"p_document_date"?: string,"p_expires_on"?: string,"p_file_name": string,"p_file_path": string,"p_id": string,"p_size_bytes": number,"p_title": string,"p_visibility": string }; Returns: string
                            },
 "current_month":
 { Args: Record<PropertyKey, never>; Returns: string
@@ -1742,6 +1794,12 @@ isOneToOne: false
                            },
 "is_approved":
 { Args: Record<PropertyKey, never>; Returns: boolean
+                           },
+"is_building_doc_file_path":
+{ Args: { "p_document": string,"p_name": string }; Returns: boolean
+                           },
+"is_building_doc_storage_path":
+{ Args: { "p_name": string }; Returns: boolean
                            },
 "is_meeting_file_path":
 { Args: { "p_meeting": string,"p_name": string }; Returns: boolean

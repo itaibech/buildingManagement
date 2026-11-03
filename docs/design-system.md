@@ -36,6 +36,7 @@ Status mapping (never deviate):
 - projects: בתכנון / בוטל = `stone`, איסוף הצעות = `signal`, אושר / בביצוע = `enamel`, הסתיים = `paid`
 - polls: טיוטה = `stone`, פתוח = `enamel`, ממתין לסגירה (the time is up, not closed yet) = `signal`, נסגר = `paid`
 - supplier contracts: פעיל = `paid`, מסתיים בקרוב = `signal`, פג תוקף = `debt`; a supplier draft (טיוטה) = `stone`
+- documents: פג תוקף = `debt`, פג תוקף בקרוב (30 days) = `signal`, הוועד בלבד (visibility) = `stone`
 - budget line source: קבוע (recurring yearly default) = `enamel`, חד פעמי = `stone`
 - apartment tags (`ApartmentTags`): נציג ועד = `stone`, הוראת קבע = `enamel`, עמדת טעינה = `stone` with a bolt icon
 - calendar categories (`CALENDAR_COLOR`): ניקיון = `paid`, הדברה = `signal`, הפסקת מים/חשמל = `debt`, ישיבה = `enamel`, תחזוקה / אחר = `stone`
