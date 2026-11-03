@@ -35,6 +35,7 @@ Status mapping (never deviate):
 - meetings: טיוטה = `stone`, זימון נשלח = `enamel`, מתקיימת / ממתינה לפרסום = `signal`, פורסם = `paid`
 - projects: בתכנון / בוטל = `stone`, איסוף הצעות = `signal`, אושר / בביצוע = `enamel`, הסתיים = `paid`
 - polls: טיוטה = `stone`, פתוח = `enamel`, ממתין לסגירה (the time is up, not closed yet) = `signal`, נסגר = `paid`
+- supplier contracts: פעיל = `paid`, מסתיים בקרוב = `signal`, פג תוקף = `debt`; a supplier draft (טיוטה) = `stone`
 - budget line source: קבוע (recurring yearly default) = `enamel`, חד פעמי = `stone`
 - apartment tags (`ApartmentTags`): נציג ועד = `stone`, הוראת קבע = `enamel`, עמדת טעינה = `stone` with a bolt icon
 - `paid` and `debt` may also be used for success progress (e.g. the collection bar) and for destructive actions / error alerts.

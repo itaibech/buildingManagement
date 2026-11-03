@@ -56,4 +56,10 @@ describe('searchAll', () => {
   it('an apartment number', () => {
     expect(searchAll('12', data).apartments.map((x) => x.id)).toEqual(['a12'])
   })
+  it('suppliers by name, category or phone', () => {
+    const withSuppliers: SearchData = { ...data, suppliers: [{ id: 's1', name: 'מעליות בע"מ', category: 'מעלית', contact: 'יוסי', phone: '03-1234567' }] }
+    expect(searchAll('מעלית', withSuppliers).suppliers.map((x) => x.id)).toEqual(['s1'])
+    expect(searchAll('031234', withSuppliers).suppliers.map((x) => x.id)).toEqual(['s1'])
+    expect(searchAll('מעלית', data).suppliers).toEqual([])
+  })
 })

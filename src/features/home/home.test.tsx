@@ -13,6 +13,8 @@ const m = vi.hoisted(() => ({
   granted: [] as string[],
   tickets: [] as unknown[],
   tasks: [] as unknown[],
+  contracts: [] as unknown[],
+  contractsFailed: false,
   loading: false,
   failed: false,
   refetch: vi.fn(),
@@ -88,6 +90,9 @@ vi.mock('../polls/api', () => ({
   useMyVotes: () => ({ apartmentId: 'a1', votes: m.pollVotes, isLoading: false, isError: false }),
 }))
 vi.mock('../maintenance/api', () => ({ useTasks: () => ({ data: m.tasks, isLoading: false, isError: false, refetch: vi.fn() }) }))
+vi.mock('../suppliers/api', () => ({
+  useContracts: () => ({ data: m.contractsFailed ? undefined : m.contracts, isLoading: false, isError: m.contractsFailed, refetch: vi.fn() }),
+}))
 
 /** Testing Library collapses whitespace (Intl puts a no-break space before ₪). */
 const norm = (text: string): string => text.replace(/\s+/g, ' ')
@@ -119,7 +124,9 @@ beforeEach(() => {
     { apartmentId: 'a1', number: 1, names: ['משלם'], balance: 0, scheduled: 0 },
   ]
   m.tickets = [ticket('t1', 'נזילה בחדר מדרגות', 'me'), ticket('t2', 'תקלה של שכן', 'other')]
-  m.tasks = [{ id: 'k1', title: 'בדיקת מעלית', vendor: '', frequency: 'yearly', next_due: '2020-01-01' }]
+  m.tasks = [{ id: 'k1', title: 'בדיקת מעלית', vendor: '', frequency: 'yearly', next_due: '2020-01-01', remind_days: 30 }]
+  m.contracts = []
+  m.contractsFailed = false
   m.projects = []
   m.polls = []
   m.pollVotes = new Map()
@@ -178,6 +185,27 @@ describe('HomePage', () => {
     const section = screen.getByRole('heading', { name: he.home.maintenanceDue }).closest('.mantine-Card-root') as HTMLElement
     expect(within(section).getByText('בדיקת מעלית')).toBeTruthy()
     expect(within(section).getByText(he.dueStatus.overdue)).toBeTruthy()
+  })
+
+  it('admin "דורש טיפול" shows the load error, not "nothing due", when contracts fail to load', () => {
+    m.isAdmin = true
+    m.tasks = []
+    m.contractsFailed = true
+    renderHome()
+    const section = screen.getByRole('heading', { name: he.home.maintenanceDue }).closest('.mantine-Card-root') as HTMLElement
+    expect(within(section).getByText(he.home.loadFailed)).toBeInTheDocument()
+    expect(within(section).queryByText(he.home.noMaintenanceDue)).toBeNull()
+  })
+
+  it('admin "דורש טיפול" lists an expiring contract with a link to its supplier and counts it in the inbox', () => {
+    m.isAdmin = true
+    const end = new Date(Date.now() + 10 * 86_400_000).toISOString().slice(0, 10)
+    m.contracts = [{ id: 'c1', supplier_id: 's1', title: 'ביטוח מבנה', ends_on: end, period: 'yearly', remind_days: 30, auto_renews: false, created_at: '2026-01-01T00:00:00Z' }]
+    renderHome()
+    const section = screen.getByRole('heading', { name: he.home.maintenanceDue }).closest('.mantine-Card-root') as HTMLElement
+    expect(within(section).getByRole('button', { name: he.home.openContract('ביטוח מבנה') })).toBeInTheDocument()
+    expect(within(section).getByText(he.contractStatus.ending)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: new RegExp(he.home.inbox.rows.contracts(1)) })).toHaveAttribute('href', '/suppliers')
   })
 
   it('resident sees "התקלות שלי" with only their tickets', () => {

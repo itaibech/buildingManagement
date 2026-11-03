@@ -71,7 +71,7 @@ insert into public.maintenance_log (task_id, done_on)
 select id, '2026-01-01' from public.maintenance_tasks limit 1;
 
 -- ---------------------------------------------------------------- catalog and default group
-select is((select count(*)::int from public.permissions), 12, 'catalog: 12 permission keys (meetings in 0021, contact_committee in 0029, projects in 0030, polls in 0031)');
+select is((select count(*)::int from public.permissions), 13, 'catalog: 13 permission keys (meetings in 0021, contact_committee in 0029, projects in 0030, polls in 0031, suppliers in 0032)');
 select is(
   (select count(*)::int from public.user_groups g join public.buildings b on b.id = g.building_id where g.is_default),
   (select count(*)::int from public.buildings), 'exactly one default group per building'
@@ -151,7 +151,7 @@ select g.id, p.key from public.user_groups g cross join public.permissions p
 where g.is_default and g.building_id = current_setting('pm.b1')::uuid and p.key <> 'home' on conflict do nothing;
 set local request.jwt.claims = '{"sub":"a8000000-0000-0000-0000-000000000002","role":"authenticated"}';
 select is(array(select public.my_permissions()),
-  array['home', 'announcements', 'tickets', 'maintenance', 'directory', 'finance_own', 'finance_reports', 'ev_own', 'meetings', 'contact_committee', 'projects', 'polls'],
+  array['home', 'announcements', 'tickets', 'maintenance', 'directory', 'finance_own', 'finance_reports', 'ev_own', 'meetings', 'contact_committee', 'projects', 'polls', 'suppliers'],
   'all toggles on: every key');
 select is((select count(*)::int from public.charges where apartment_id = 'b8000000-0000-0000-0000-00000000000b'), 0,
   'all toggles: no other apartment''s charges');

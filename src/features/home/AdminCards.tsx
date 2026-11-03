@@ -11,7 +11,8 @@ import { useBalances, useBuildingCash, useCollectionSummary, useFeeSchedule } fr
 import { Row } from '../finance/fields'
 import { monthOf, sortBalances } from '../finance/ledger'
 import { useTasks } from '../maintenance/api'
-import { dueBucket } from '../maintenance/nextDue'
+import { useContracts } from '../suppliers/api'
+import { attentionItems, type AttentionItem } from '../suppliers/logic'
 import { useTickets } from '../tickets/api'
 import { TicketRow } from '../tickets/TicketsPage'
 import { LoadError, Section } from './parts'
@@ -101,23 +102,26 @@ export function OpenTickets() {
   )
 }
 
-/** Admin: overdue and soon-due maintenance; a row opens the task's detail. */
+/** Admin "דורש טיפול": inspections due within their reminder window or overdue, and contracts ending or expired. */
 export function MaintenanceDue() {
   const navigate = useNavigate()
-  const { data, isLoading, isError, refetch } = useTasks()
-  const today = todayISO()
-  const due = (data ?? [])
-    .map((task) => ({ task, bucket: dueBucket(task.next_due, today) }))
-    .filter((x) => x.bucket === 'overdue' || x.bucket === 'soon')
-    .slice(0, MAX_DUE)
+  const tasks = useTasks()
+  const contracts = useContracts()
+  const isLoading = tasks.isLoading || contracts.isLoading
+  const isError = tasks.isError || contracts.isError
+  const ready = !!tasks.data && !!contracts.data
+  const items = attentionItems(contracts.data ?? [], tasks.data ?? [], todayISO()).slice(0, MAX_DUE)
+  const retry = () => { void tasks.refetch(); void contracts.refetch() }
+  const open = (i: AttentionItem) => void navigate(i.kind === 'contract' ? `/suppliers?supplier=${i.supplierId}` : `/maintenance?task=${i.id}`)
   return (
     <Section title={he.home.maintenanceDue} to="/maintenance" linkLabel={he.home.allTasks} flush>
       {isLoading && <ListSkeleton rows={2} />}
-      {isError && <LoadError onRetry={() => void refetch()} />}
-      {data && due.length === 0 && <EmptyState title={he.home.noMaintenanceDue} />}
-      {due.map(({ task, bucket }) => (
-        <Row key={task.id} title={task.title} meta={task.next_due ? formatDate(task.next_due) : undefined} end={<StatusBadge kind="due" value={bucket} />}
-          onClick={() => void navigate(`/maintenance?task=${task.id}`)} label={he.home.openTask(task.title)} />
+      {isError && <LoadError onRetry={retry} />}
+      {ready && items.length === 0 && <EmptyState title={he.home.noMaintenanceDue} />}
+      {items.map((i) => (
+        <Row key={`${i.kind}-${i.id}`} title={i.kind === 'contract' ? he.home.contractRow(i.title) : i.title} meta={formatDate(i.date)}
+          end={i.kind === 'contract' ? <StatusBadge kind="contract" value={i.status} /> : <StatusBadge kind="due" value={i.status} />}
+          onClick={() => open(i)} label={i.kind === 'contract' ? he.home.openContract(i.title) : he.home.openTask(i.title)} />
       ))}
     </Section>
   )

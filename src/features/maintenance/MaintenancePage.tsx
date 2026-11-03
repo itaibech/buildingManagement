@@ -10,7 +10,7 @@ import { tasksRows } from '../export/buildWorkbook'
 import { useExportAction } from '../export/useExport'
 import { fetchLastDone, useDeleteTask, useTasks, type Task } from './api'
 import { DoneForm } from './DoneForm'
-import { dueBucket, type DueBucket } from './nextDue'
+import { taskBucket, type DueBucket } from './nextDue'
 import { TaskDetail } from './TaskDetail'
 import { TaskForm } from './TaskForm'
 import { TaskRow, type TaskActions } from './TaskRow'
@@ -42,7 +42,7 @@ function Dialogs({ dialog, close }: { dialog: Dialog; close: () => void }) {
 function Groups({ tasks, onOpen, actions }: { tasks: Task[]; onOpen: (t: Task) => void; actions?: TaskActions }) {
   const groups = useMemo(() => {
     const today = todayISO()
-    return ORDER.map((bucket) => ({ bucket, items: tasks.filter((t) => dueBucket(t.next_due, today) === bucket) })).filter((g) => g.items.length)
+    return ORDER.map((bucket) => ({ bucket, items: tasks.filter((t) => taskBucket(t, today) === bucket) })).filter((g) => g.items.length)
   }, [tasks])
   return (
     <>

@@ -1,12 +1,14 @@
 /** The admin "לטיפולך" inbox (Task 26): what needs a decision, as counts with deep links. Pure. */
 import { daysSince, type LastReminder } from '../email/reminders'
 
-export type InboxKey = 'users' | 'tickets' | 'maintenance' | 'publish' | 'invited' | 'debtors'
+export type InboxKey = 'users' | 'tickets' | 'maintenance' | 'contracts' | 'publish' | 'invited' | 'debtors'
 export interface InboxItem { key: InboxKey; count: number; to: string }
 export interface InboxInput {
   pendingUsers: number
   unseenTickets: number
   overdueTasks: number
+  /** Suppliers' current contracts that end within their reminder window or have expired. */
+  contracts?: number
   /** Closed meetings waiting to be published. */
   toPublish: number
   /** Invited meetings within the next 7 days (and the soonest one's id). */
@@ -24,6 +26,7 @@ export function inboxItems(i: InboxInput): InboxItem[] {
     { key: 'users', count: i.pendingUsers, to: '/users' },
     { key: 'tickets', count: i.unseenTickets, to: '/tickets' },
     { key: 'maintenance', count: i.overdueTasks, to: '/maintenance' },
+    { key: 'contracts', count: i.contracts ?? 0, to: '/suppliers' },
     { key: 'publish', count: i.toPublish, to: '/meetings?tab=pending' },
     { key: 'invited', count: i.invited.count, to: i.invited.count === 1 && i.invited.firstId ? `/meetings/${i.invited.firstId}` : '/meetings' },
     { key: 'debtors', count: i.staleDebtors, to: '/finance?tab=balances' },

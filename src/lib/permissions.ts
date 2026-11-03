@@ -17,6 +17,7 @@ export const PERMISSION_KEYS = [
   'contact_committee',
   'projects',
   'polls',
+  'suppliers',
 ] as const
 
 export type PermissionKey = (typeof PERMISSION_KEYS)[number]

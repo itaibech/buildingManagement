@@ -9,6 +9,7 @@ import { useAnnouncements } from '../announcements/api'
 import { useDirectory, useApartments } from '../tenants/api'
 import { useDesktop } from '../finance/hooks'
 import { useProjects } from '../projects/api'
+import { useSupplierDirectory } from '../suppliers/api'
 import { useTickets } from '../tickets/api'
 import { usePolls } from '../polls/api'
 import { searchAll, type SearchData, type SearchResults } from './match'
@@ -25,6 +26,7 @@ function useSearchData(): SearchData {
   const tickets = useTickets()
   const projects = useProjects()
   const polls = usePolls(can('polls'))
+  const suppliers = useSupplierDirectory(can('suppliers'))
   return useMemo(() => ({
     apartments: people ? (apartments.data ?? []).map((a) => ({
       id: a.id, number: a.number, names: (directory.data ?? []).filter((r) => r.apartment_id === a.id).map((r) => r.full_name),
@@ -36,7 +38,8 @@ function useSearchData(): SearchData {
     tickets: can('tickets') ? (tickets.data ?? []).map((t) => ({ id: t.id, title: t.title })) : [],
     projects: can('projects') ? (projects.data ?? []).map((p) => ({ id: p.id, title: p.title })) : [],
     polls: can('polls') ? (polls.data ?? []).map((p) => ({ id: p.id, title: p.question })) : [],
-  }), [people, can, apartments.data, directory.data, announcements.data, tickets.data, projects.data, polls.data])
+    suppliers: can('suppliers') ? (suppliers.data ?? []).map((x) => ({ id: x.id, name: x.name, category: x.category, contact: x.contact_name, phone: x.phone })) : [],
+  }), [people, can, apartments.data, directory.data, announcements.data, tickets.data, projects.data, polls.data, suppliers.data])
 }
 
 interface Hit { key: string; to: string; label: ReactNode; plate?: number }
@@ -52,6 +55,8 @@ function hitsOf(r: SearchResults, admin: boolean): [keyof SearchResults, Hit[]][
     ['tickets', r.tickets.map((t) => ({ key: t.id, label: t.title, to: `/tickets/${t.id}` }))],
     ['projects', r.projects.map((p) => ({ key: p.id, label: p.title, to: `/projects/${p.id}` }))],
     ['polls', r.polls.map((p) => ({ key: p.id, label: p.title, to: `/polls/${p.id}` }))],
+    ['suppliers', r.suppliers.map((x) => ({ key: x.id, label: x.category ? `${x.name} · ${x.category}` : x.name,
+      to: admin ? `/suppliers?supplier=${x.id}` : '/suppliers' }))],
   ]
 }
 
