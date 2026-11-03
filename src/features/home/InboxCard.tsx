@@ -1,5 +1,5 @@
 import { Alert, Anchor, Badge, Card, Group, Stack, Text, Title, UnstyledButton } from '@mantine/core'
-import { IconCalendarCheck, IconChevronLeft, IconCoin, IconGavel, IconTool, IconUserPlus, type Icon } from '@tabler/icons-react'
+import { IconBriefcase, IconCalendarCheck, IconChevronLeft, IconCoin, IconGavel, IconTool, IconUserPlus, type Icon } from '@tabler/icons-react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { todayISO } from '../../lib/dates'
@@ -12,12 +12,14 @@ import { dueBucket } from '../maintenance/nextDue'
 import { useMeetings } from '../meetings/api'
 import { useUnseenTicketCount } from '../notifications/api'
 import { useGroups } from '../permissions/api'
+import { useContracts } from '../suppliers/api'
+import { attentionItems } from '../suppliers/logic'
 import { usePendingProfiles } from '../tenants/api'
 import { inboxItems, staleDebtors, upcomingInvited, type InboxItem, type InboxKey } from './inbox'
 
 const I = he.home.inbox
 const ICONS: Record<InboxKey, Icon> = {
-  users: IconUserPlus, tickets: IconTool, maintenance: IconCalendarCheck, publish: IconGavel, invited: IconGavel, debtors: IconCoin,
+  users: IconUserPlus, tickets: IconTool, maintenance: IconCalendarCheck, contracts: IconBriefcase, publish: IconGavel, invited: IconGavel, debtors: IconCoin,
 }
 // Maintenance overdue is `debt` by the status mapping; everything else waiting on the admin is `signal`.
 const TONE: Partial<Record<InboxKey, string>> = { maintenance: 'debt' }
@@ -40,6 +42,7 @@ function useInbox() {
   const pending = usePendingProfiles()
   const unseen = useUnseenTicketCount()
   const tasks = useTasks()
+  const contracts = useContracts()
   const meetings = useMeetings()
   const balances = useBalances()
   const last = useLastReminders()
@@ -50,11 +53,12 @@ function useInbox() {
       pendingUsers: pending.data?.length ?? 0,
       unseenTickets: unseen,
       overdueTasks: (tasks.data ?? []).filter((t) => dueBucket(t.next_due, today) === 'overdue').length,
+      contracts: attentionItems(contracts.data ?? [], [], today).length,
       toPublish: (meetings.data ?? []).filter((m) => m.status === 'closed').length,
       invited: upcomingInvited(meetings.data ?? [], now),
       staleDebtors: staleDebtors(balances.data ?? [], last, today),
     })
-  }, [pending.data, unseen, tasks.data, meetings.data, balances.data, last, now])
+  }, [pending.data, unseen, tasks.data, contracts.data, meetings.data, balances.data, last, now])
   return { items, isLoading: pending.isLoading || tasks.isLoading || meetings.isLoading }
 }
 

@@ -673,14 +673,14 @@ isOneToOne: false
                   ]
                 },"maintenance_log": {
                   Row: {
-                    "building_id": string,"cost": number | null,"created_at": string,"done_on": string,"expense_id": string | null,"id": string,"note": string,"task_id": string
+                    "building_id": string,"cost": number | null,"created_at": string,"done_on": string,"expense_id": string | null,"id": string,"note": string,"report_name": string | null,"report_path": string | null,"task_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "building_id"?: string,"cost"?: number | null,"created_at"?: string,"done_on"?: string,"expense_id"?: string | null,"id"?: string,"note"?: string,"task_id": string
+                    "building_id"?: string,"cost"?: number | null,"created_at"?: string,"done_on"?: string,"expense_id"?: string | null,"id"?: string,"note"?: string,"report_name"?: string | null,"report_path"?: string | null,"task_id": string
                   }
                   Update: {
-                    "building_id"?: string,"cost"?: number | null,"created_at"?: string,"done_on"?: string,"expense_id"?: string | null,"id"?: string,"note"?: string,"task_id"?: string
+                    "building_id"?: string,"cost"?: number | null,"created_at"?: string,"done_on"?: string,"expense_id"?: string | null,"id"?: string,"note"?: string,"report_name"?: string | null,"report_path"?: string | null,"task_id"?: string
                   }
                   Relationships: [
                     {
@@ -711,14 +711,14 @@ isOneToOne: false
                   ]
                 },"maintenance_tasks": {
                   Row: {
-                    "building_id": string,"created_at": string,"frequency": string,"id": string,"next_due": string | null,"title": string,"vendor": string
+                    "building_id": string,"created_at": string,"frequency": string,"id": string,"next_due": string | null,"remind_days": number,"supplier_id": string | null,"title": string,"vendor": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "building_id"?: string,"created_at"?: string,"frequency": string,"id"?: string,"next_due"?: string | null,"title": string,"vendor"?: string
+                    "building_id"?: string,"created_at"?: string,"frequency": string,"id"?: string,"next_due"?: string | null,"remind_days"?: number,"supplier_id"?: string | null,"title": string,"vendor"?: string
                   }
                   Update: {
-                    "building_id"?: string,"created_at"?: string,"frequency"?: string,"id"?: string,"next_due"?: string | null,"title"?: string,"vendor"?: string
+                    "building_id"?: string,"created_at"?: string,"frequency"?: string,"id"?: string,"next_due"?: string | null,"remind_days"?: number,"supplier_id"?: string | null,"title"?: string,"vendor"?: string
                   }
                   Relationships: [
                     {
@@ -732,6 +732,12 @@ isOneToOne: false
       columns: ["building_id"]
 isOneToOne: false
       referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "maintenance_tasks_supplier_id_fkey"
+      columns: ["supplier_id"]
+isOneToOne: false
+      referencedRelation: "suppliers"
       referencedColumns: ["id"]
     }
                   ]
@@ -1231,6 +1237,78 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"supplier_contract_files": {
+                  Row: {
+                    "contract_id": string,"created_at": string,"file_name": string,"file_path": string,"id": string,"size_bytes": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "contract_id": string,"created_at"?: string,"file_name": string,"file_path": string,"id"?: string,"size_bytes": number
+                  }
+                  Update: {
+                    "contract_id"?: string,"created_at"?: string,"file_name"?: string,"file_path"?: string,"id"?: string,"size_bytes"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "supplier_contract_files_contract_id_fkey"
+      columns: ["contract_id"]
+isOneToOne: false
+      referencedRelation: "supplier_contracts"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"supplier_contracts": {
+                  Row: {
+                    "amount": number | null,"auto_renews": boolean,"created_at": string,"ends_on": string | null,"id": string,"notes": string,"period": string,"remind_days": number,"starts_on": string | null,"supplier_id": string,"title": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount"?: number | null,"auto_renews"?: boolean,"created_at"?: string,"ends_on"?: string | null,"id"?: string,"notes"?: string,"period"?: string,"remind_days"?: number,"starts_on"?: string | null,"supplier_id": string,"title": string
+                  }
+                  Update: {
+                    "amount"?: number | null,"auto_renews"?: boolean,"created_at"?: string,"ends_on"?: string | null,"id"?: string,"notes"?: string,"period"?: string,"remind_days"?: number,"starts_on"?: string | null,"supplier_id"?: string,"title"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "supplier_contracts_supplier_id_fkey"
+      columns: ["supplier_id"]
+isOneToOne: false
+      referencedRelation: "suppliers"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"suppliers": {
+                  Row: {
+                    "building_id": string,"category": string,"contact_name": string,"created_at": string,"email": string,"expense_category_id": string | null,"id": string,"is_draft": boolean,"name": string,"notes": string,"phone": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "building_id"?: string,"category"?: string,"contact_name"?: string,"created_at"?: string,"email"?: string,"expense_category_id"?: string | null,"id"?: string,"is_draft"?: boolean,"name": string,"notes"?: string,"phone"?: string
+                  }
+                  Update: {
+                    "building_id"?: string,"category"?: string,"contact_name"?: string,"created_at"?: string,"email"?: string,"expense_category_id"?: string | null,"id"?: string,"is_draft"?: boolean,"name"?: string,"notes"?: string,"phone"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "suppliers_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "suppliers_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "suppliers_expense_category_id_fkey"
+      columns: ["expense_category_id"]
+isOneToOne: false
+      referencedRelation: "expense_categories"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"ticket_comments": {
                   Row: {
                     "author_id": string | null,"body": string,"building_id": string,"created_at": string,"id": string,"ticket_id": string
@@ -1651,8 +1729,14 @@ isOneToOne: false
 "is_receipt_path":
 { Args: { "p_name": string }; Returns: boolean
                            },
+"is_supplier_file_path":
+{ Args: { "p_folder": string,"p_name": string }; Returns: boolean
+                           },
+"is_supplier_storage_path":
+{ Args: { "p_name": string }; Returns: boolean
+                           },
 "mark_task_done":
-{ Args: { "p_category_id"?: string,"p_cost"?: number,"p_done_on": string,"p_note": string,"p_task_id": string }; Returns: string
+{ Args: { "p_category_id"?: string,"p_cost"?: number,"p_done_on": string,"p_note": string,"p_report_name"?: string,"p_report_path"?: string,"p_task_id": string }; Returns: string
                            },
 "mark_tickets_seen":
 { Args: { "p_ids"?: (string)[] }; Returns: undefined
@@ -1822,6 +1906,9 @@ isOneToOne: false
 "save_poll":
 { Args: { "p_apartments"?: (string)[],"p_closes_at": string,"p_description": string,"p_kind": string,"p_majority": string,"p_majority_base": string,"p_majority_percent"?: number,"p_opens_at": string,"p_options": (string)[],"p_poll"?: string,"p_question": string,"p_results_visibility": string,"p_scope": string }; Returns: string
                            },
+"seed_common_suppliers":
+{ Args: Record<PropertyKey, never>; Returns: number
+                           },
 "set_apartment_fee":
 { Args: { "p_amount"?: number,"p_apartment_id": string,"p_effective_from": string,"p_mode": string }; Returns: boolean
                            },
@@ -1849,6 +1936,11 @@ isOneToOne: false
                            },
 "store_committee_message":
 { Args: { "p_apartment_number": number,"p_body": string,"p_building": string,"p_recipient": string,"p_sender": string,"p_sender_email": string,"p_sender_name": string,"p_subject": string }; Returns: string
+                           },
+"supplier_directory":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "category": string,"contact_name": string,"email": string,"id": string,"name": string,"phone": string
+            }[]
                            },
 "undo_settlement":
 { Args: { "p_settlement_id": string }; Returns: Json

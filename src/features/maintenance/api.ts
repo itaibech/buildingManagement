@@ -3,6 +3,7 @@ import type { Database } from '../../lib/db.types'
 import { he } from '../../lib/he'
 import { supabase } from '../../lib/supabase'
 import { notifyError } from '../../ui/notify'
+import { removeSupplierFiles, uploadSupplierFile } from '../suppliers/files'
 import type { Frequency } from './nextDue'
 
 export type Task = Omit<Database['public']['Tables']['maintenance_tasks']['Row'], 'frequency'> & { frequency: Frequency }
@@ -13,6 +14,10 @@ export interface TaskInput {
   vendor: string
   frequency: Frequency
   next_due: string | null
+  supplier_id: string | null
+  remind_days: number
+  /** New tasks only: an earlier completion, recorded in the log (next_due is already computed from it). */
+  lastDone?: string | null
 }
 
 export interface MarkDoneInput {
@@ -22,6 +27,21 @@ export interface MarkDoneInput {
   /** Posted as a building expense in `categoryId` when > 0. */
   cost: number | null
   categoryId: string | null
+  /** The inspection report, stored privately (admin only) and linked to the log entry. */
+  report?: File | null
+}
+
+/**
+ * The supplier and vendor a task saves. Until the suppliers list loads (or if it failed) the picked id is kept as is;
+ * a draft supplier's placeholder name never becomes the vendor.
+ */
+export function supplierFields(
+  v: { supplier_id: string | null; vendor: string },
+  suppliers: readonly { id: string; name: string; is_draft: boolean }[] | undefined,
+): { supplier_id: string | null; vendor: string } {
+  const supplier = suppliers?.find((s) => s.id === v.supplier_id)
+  const vendor = supplier && !supplier.is_draft ? supplier.name : v.vendor.trim()
+  return { supplier_id: suppliers ? supplier?.id ?? null : v.supplier_id, vendor }
 }
 
 export type ExpenseCategory = Pick<Database['public']['Tables']['expense_categories']['Row'], 'id' | 'name'>
@@ -65,16 +85,26 @@ export function useTaskLog(taskId: string | undefined) {
   })
 }
 
+/**
+ * Uploads the report (if any), then logs the completion with it in one RPC: either both are recorded or neither is
+ * (a failed call removes the upload), so retrying never duplicates a log entry.
+ */
+async function markDone({ task, doneOn, note, cost, categoryId, report }: MarkDoneInput): Promise<void> {
+  const path = report ? await uploadSupplierFile(task.id, report) : null
+  const { error } = await supabase.rpc('mark_task_done', {
+    p_task_id: task.id, p_done_on: doneOn, p_note: note, p_cost: cost ?? undefined, p_category_id: categoryId ?? undefined,
+    p_report_path: path ?? undefined, p_report_name: path && report ? report.name.slice(0, 200) : undefined,
+  })
+  if (!error) return
+  if (path) await removeSupplierFiles([path]).catch(() => undefined)
+  throw new Error(error.message)
+}
+
 /** Logs a completion atomically (RPC); the server moves `next_due` from the latest done date. */
 export function useMarkDone() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: async ({ task, doneOn, note, cost, categoryId }: MarkDoneInput) => {
-      const { error } = await supabase.rpc('mark_task_done', {
-        p_task_id: task.id, p_done_on: doneOn, p_note: note, p_cost: cost ?? undefined, p_category_id: categoryId ?? undefined,
-      })
-      if (error) throw new Error(error.message)
-    },
+    mutationFn: markDone,
     onSettled: () => client.invalidateQueries({ queryKey: KEY }),
     onError: () => notifyError(he.toast.failed),
   })
@@ -95,10 +125,19 @@ export function useExpenseCategories() {
 export function useSaveTask() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, ...values }: TaskInput & { id?: string }) => {
+    mutationFn: async ({ id, lastDone, ...values }: TaskInput & { id?: string }) => {
       const table = supabase.from('maintenance_tasks')
-      const { error } = await (id ? table.update(values).eq('id', id) : table.insert(values))
+      if (id) {
+        const { error } = await table.update(values).eq('id', id)
+        if (error) throw new Error(error.message)
+        return
+      }
+      const { data, error } = await table.insert(values).select('id').single()
       if (error) throw new Error(error.message)
+      // The task exists now: a failed history entry only warns (throwing would invite a retry that duplicates the task).
+      if (!lastDone) return
+      const logged = await supabase.from('maintenance_log').insert({ task_id: data.id, done_on: lastDone })
+      if (logged.error) notifyError(he.maintenance.lastDoneFailed)
     },
     onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
   })
@@ -108,8 +147,13 @@ export function useDeleteTask() {
   const client = useQueryClient()
   return useMutation({
     mutationFn: async (id: string) => {
+      // The row first (its log cascades), then the inspection reports: storage doesn't cascade, and a failed cleanup
+      // only leaves an unreachable file in the admin-only bucket, never a task pointing at a missing report.
+      const reports = await supabase.from('maintenance_log').select('report_path').eq('task_id', id).not('report_path', 'is', null)
+      if (reports.error) throw new Error(reports.error.message)
       const { error } = await supabase.from('maintenance_tasks').delete().eq('id', id)
       if (error) throw new Error(error.message)
+      await removeSupplierFiles((reports.data ?? []).flatMap((r) => (r.report_path ? [r.report_path] : []))).catch(() => undefined)
     },
     onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
   })

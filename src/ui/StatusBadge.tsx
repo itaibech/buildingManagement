@@ -12,6 +12,7 @@ export type StatusBadgeProps =
   | { kind: 'budget'; value: 'default' | 'one_off' }
   | { kind: 'project'; value: 'planning' | 'quotes' | 'approved' | 'in_progress' | 'done' | 'cancelled' }
   | { kind: 'poll'; value: 'draft' | 'open' | 'ended' | 'closed' }
+  | { kind: 'contract'; value: 'active' | 'ending' | 'expired' }
 
 // The only place the status colour mapping lives (docs/design-system.md); fee sources are in feeBadge.ts.
 const TICKET_COLOR = { open: 'signal', in_progress: 'enamel', closed: 'stone' } as const
@@ -27,6 +28,8 @@ const BUDGET_COLOR = { default: 'enamel', one_off: 'stone' } as const
 const PROJECT_COLOR = { planning: 'stone', quotes: 'signal', approved: 'enamel', in_progress: 'enamel', done: 'paid', cancelled: 'stone' } as const
 // Polls, like meetings: draft = stone, open = enamel, past its closing time but not closed (needs action) = signal, closed = paid.
 const POLL_COLOR = { draft: 'stone', open: 'enamel', ended: 'signal', closed: 'paid' } as const
+// Supplier contracts: active = paid, ending within its reminder window = signal, expired = debt (like overdue).
+const CONTRACT_COLOR = { active: 'paid', ending: 'signal', expired: 'debt' } as const
 
 function resolve(props: StatusBadgeProps): { color: string; label: string } {
   if (props.kind === 'ticket') return { color: TICKET_COLOR[props.value], label: he.ticketStatus[props.value] }
@@ -35,6 +38,7 @@ function resolve(props: StatusBadgeProps): { color: string; label: string } {
   if (props.kind === 'project') return { color: PROJECT_COLOR[props.value], label: he.projects.statuses[props.value] }
   if (props.kind === 'poll') return { color: POLL_COLOR[props.value], label: he.polls.statuses[props.value] }
   if (props.kind === 'budget') return { color: BUDGET_COLOR[props.value], label: he.finance.budget.sources[props.value] }
+  if (props.kind === 'contract') return { color: CONTRACT_COLOR[props.value], label: he.contractStatus[props.value] }
   if (props.kind === 'reading') return { color: READING_COLOR[props.value], label: he.readingStatus[props.value] }
   return { color: DUE_COLOR[props.value], label: he.dueStatus[props.value] }
 }

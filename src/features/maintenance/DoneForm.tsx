@@ -1,4 +1,4 @@
-import { Button, Select, Stack, Text, Textarea } from '@mantine/core'
+import { Button, FileInput, Select, Stack, Text, Textarea } from '@mantine/core'
 import { useForm, type UseFormReturnType } from '@mantine/form'
 import { he } from '../../lib/he'
 import { DateInput, focusFirstError, notifySuccess } from '../../ui'
@@ -7,13 +7,17 @@ import { formatDate } from '../../lib/format'
 import { useExpenseCategories, useMarkDone, type Task } from './api'
 import { nextDue } from './nextDue'
 import { MoneyInput } from '../finance/fields'
+import { ACCEPT, fileProblem } from '../suppliers/files'
 
 interface DoneValues {
   doneOn: string
   note: string
   cost: number | string
   categoryId: string | null
+  report: File | null
 }
+
+const REPORT_PROBLEMS = { type: he.maintenance.reportType, empty: he.maintenance.reportEmpty, size: he.maintenance.reportTooBig } as const
 
 const costOf = (v: DoneValues): number | null => (typeof v.cost === 'number' && v.cost > 0 ? v.cost : null)
 
@@ -34,17 +38,18 @@ function CostFields({ form }: { form: UseFormReturnType<DoneValues> }) {
 export function DoneForm({ task, onDone }: { task: Task; onDone: () => void }) {
   const markDone = useMarkDone()
   const form = useForm<DoneValues>({
-    initialValues: { doneOn: todayISO(), note: '', cost: '', categoryId: null },
+    initialValues: { doneOn: todayISO(), note: '', cost: '', categoryId: null, report: null },
     validate: {
       doneOn: (v) => (v ? null : he.maintenance.errors.doneOn),
       cost: (v) => (typeof v === 'number' && v < 0 ? he.maintenance.errors.cost : null),
       categoryId: (v, values) => (costOf(values) !== null && !v ? he.maintenance.errors.category : null),
+      report: (v) => { const problem = v ? fileProblem(v) : null; return problem ? REPORT_PROBLEMS[problem] : null },
     },
   })
   const preview = form.values.doneOn ? nextDue(form.values.doneOn, task.frequency) : null
   const submit = form.onSubmit((v) => {
     const cost = costOf(v)
-    markDone.mutate({ task, doneOn: v.doneOn, note: v.note.trim(), cost, categoryId: cost === null ? null : v.categoryId }, {
+    markDone.mutate({ task, doneOn: v.doneOn, note: v.note.trim(), cost, categoryId: cost === null ? null : v.categoryId, report: v.report }, {
       onSuccess: () => {
         notifySuccess(he.maintenance.markedDone)
         onDone()
@@ -58,6 +63,8 @@ export function DoneForm({ task, onDone }: { task: Task; onDone: () => void }) {
         {preview && <Text size="sm" c="dimmed" className="bm-num">{he.maintenance.nextDuePreview(formatDate(preview))}</Text>}
         <Textarea label={he.maintenance.note} autosize minRows={2} maxRows={6} {...form.getInputProps('note')} />
         <CostFields form={form} />
+        <FileInput label={he.maintenance.report} description={he.maintenance.reportHint} placeholder={he.maintenance.reportPick}
+          accept={ACCEPT} clearable {...form.getInputProps('report')} />
         <Button type="submit" fullWidth loading={markDone.isPending}>{he.maintenance.markDone}</Button>
       </Stack>
     </form>
