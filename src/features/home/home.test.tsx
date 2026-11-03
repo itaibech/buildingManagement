@@ -26,6 +26,8 @@ const m = vi.hoisted(() => ({
   charger: null as unknown,
   meetings: [] as unknown[],
   projects: [] as unknown[],
+  polls: [] as unknown[],
+  pollVotes: new Map<string, unknown>(),
   unseen: 0,
   groups: [] as unknown[],
   pending: [] as unknown[],
@@ -81,6 +83,10 @@ vi.mock('../settings/api', async (orig) => ({
   useBuilding: () => ({ data: m.building, isLoading: false, isError: false }),
 }))
 vi.mock('../projects/api', () => ({ useProjects: () => ({ data: m.projects }), useProjectProgress: () => ({ data: new Map() }) }))
+vi.mock('../polls/api', () => ({
+  usePolls: () => ({ data: m.polls }),
+  useMyVotes: () => ({ apartmentId: 'a1', votes: m.pollVotes, isLoading: false, isError: false }),
+}))
 vi.mock('../maintenance/api', () => ({ useTasks: () => ({ data: m.tasks, isLoading: false, isError: false, refetch: vi.fn() }) }))
 
 /** Testing Library collapses whitespace (Intl puts a no-break space before ₪). */
@@ -115,6 +121,38 @@ beforeEach(() => {
   m.tickets = [ticket('t1', 'נזילה בחדר מדרגות', 'me'), ticket('t2', 'תקלה של שכן', 'other')]
   m.tasks = [{ id: 'k1', title: 'בדיקת מעלית', vendor: '', frequency: 'yearly', next_due: '2020-01-01' }]
   m.projects = []
+  m.polls = []
+  m.pollVotes = new Map()
+})
+
+const openPoll = (id: string, question: string, scope: 'all' | 'selected' = 'all') => ({
+  id, question, description: '', kind: 'yes_no', options: [], opens_at: new Date(Date.now() - 3_600_000).toISOString(),
+  closes_at: new Date(Date.now() + 86_400_000).toISOString(), majority: 'two_thirds', majority_percent: null, majority_base: 'building',
+  scope, results_visibility: 'live', status: 'open', opened_at: null, closed_at: null, apartmentIds: [],
+})
+
+describe('HomePage polls card', () => {
+  it('lists open polls the apartment may vote in and has not, linking to each', () => {
+    m.granted = ['home', 'polls']
+    m.polls = [openPoll('p1', 'תחזוקת מתקן החניה'), openPoll('p2', 'הצבעתי כבר'), openPoll('p3', 'לבעלי החניות', 'selected')]
+    m.pollVotes = new Map([['p2', { choice: 0 }]])
+    renderHome()
+    const card = screen.getByRole('heading', { name: he.polls.home.title }).closest('.mantine-Card-root') as HTMLElement
+    expect(within(card).getByRole('link', { name: /תחזוקת מתקן החניה/ }).getAttribute('href')).toBe('/polls/p1')
+    expect(within(card).queryByText('הצבעתי כבר')).toBeNull()
+    expect(within(card).queryByText('לבעלי החניות')).toBeNull()
+  })
+
+  it('is hidden without the polls permission or when nothing waits', () => {
+    m.polls = [openPoll('p1', 'תחזוקת מתקן החניה')]
+    renderHome()
+    expect(screen.queryByRole('heading', { name: he.polls.home.title })).toBeNull()
+    m.granted = ['home', 'polls']
+    m.pollVotes = new Map([['p1', { choice: 1 }]])
+    cleanup()
+    renderHome()
+    expect(screen.queryByRole('heading', { name: he.polls.home.title })).toBeNull()
+  })
 })
 
 describe('HomePage', () => {

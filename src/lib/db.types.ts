@@ -969,6 +969,114 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"poll_apartments": {
+                  Row: {
+                    "apartment_id": string,"poll_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "apartment_id": string,"poll_id": string
+                  }
+                  Update: {
+                    "apartment_id"?: string,"poll_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "poll_apartments_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: false
+      referencedRelation: "apartment_balances"
+      referencedColumns: ["apartment_id"]
+    },{
+      foreignKeyName: "poll_apartments_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: false
+      referencedRelation: "apartments"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "poll_apartments_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: false
+      referencedRelation: "monthly_fees"
+      referencedColumns: ["apartment_id"]
+    },{
+      foreignKeyName: "poll_apartments_poll_id_fkey"
+      columns: ["poll_id"]
+isOneToOne: false
+      referencedRelation: "polls"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"poll_votes": {
+                  Row: {
+                    "apartment_id": string,"by_admin": boolean,"choice": number,"poll_id": string,"voted_at": string,"voted_by": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "apartment_id": string,"by_admin"?: boolean,"choice": number,"poll_id": string,"voted_at"?: string,"voted_by"?: string | null
+                  }
+                  Update: {
+                    "apartment_id"?: string,"by_admin"?: boolean,"choice"?: number,"poll_id"?: string,"voted_at"?: string,"voted_by"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "poll_votes_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: false
+      referencedRelation: "apartment_balances"
+      referencedColumns: ["apartment_id"]
+    },{
+      foreignKeyName: "poll_votes_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: false
+      referencedRelation: "apartments"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "poll_votes_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: false
+      referencedRelation: "monthly_fees"
+      referencedColumns: ["apartment_id"]
+    },{
+      foreignKeyName: "poll_votes_poll_id_fkey"
+      columns: ["poll_id"]
+isOneToOne: false
+      referencedRelation: "polls"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"polls": {
+                  Row: {
+                    "announcement_id": string | null,"building_id": string,"closed_at": string | null,"closes_at": string,"created_at": string,"created_by": string | null,"description": string,"final_result": Json | null,"id": string,"kind": string,"majority": string,"majority_base": string,"majority_percent": number | null,"opened_at": string | null,"opens_at": string,"options": (string)[],"question": string,"results_visibility": string,"scope": string,"status": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "announcement_id"?: string | null,"building_id"?: string,"closed_at"?: string | null,"closes_at": string,"created_at"?: string,"created_by"?: string | null,"description"?: string,"final_result"?: Json | null,"id"?: string,"kind"?: string,"majority"?: string,"majority_base"?: string,"majority_percent"?: number | null,"opened_at"?: string | null,"opens_at"?: string,"options"?: (string)[],"question": string,"results_visibility"?: string,"scope"?: string,"status"?: string
+                  }
+                  Update: {
+                    "announcement_id"?: string | null,"building_id"?: string,"closed_at"?: string | null,"closes_at"?: string,"created_at"?: string,"created_by"?: string | null,"description"?: string,"final_result"?: Json | null,"id"?: string,"kind"?: string,"majority"?: string,"majority_base"?: string,"majority_percent"?: number | null,"opened_at"?: string | null,"opens_at"?: string,"options"?: (string)[],"question"?: string,"results_visibility"?: string,"scope"?: string,"status"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "polls_announcement_id_fkey"
+      columns: ["announcement_id"]
+isOneToOne: false
+      referencedRelation: "announcements"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "polls_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "polls_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"profiles": {
                   Row: {
                     "approved_at": string | null,"building_id": string,"created_at": string,"email": string | null,"full_name": string,"group_id": string | null,"is_super_admin": boolean,"resident_id": string | null,"role": string,"status": string,"user_id": string
@@ -1309,6 +1417,9 @@ isOneToOne: false
 "add_special_charge":
 { Args: { "p_amount": number,"p_apartment_id": string,"p_category_id"?: string,"p_date_mode"?: string,"p_expense"?: boolean,"p_label": string,"p_method"?: string,"p_month": string,"p_note"?: string,"p_paid"?: boolean }; Returns: Json
                            },
+"admin_record_vote":
+{ Args: { "p_apartment": string,"p_choice": number,"p_poll": string }; Returns: undefined
+                           },
 "apartment_fee_at":
 { Args: { "p_apartment_id": string,"p_month": string }; Returns: {
               "amount": number,"fee_mode": string
@@ -1378,11 +1489,17 @@ isOneToOne: false
 "cancel_postponement":
 { Args: { "p_meeting": string }; Returns: undefined
                            },
+"cast_poll_vote":
+{ Args: { "p_choice": number,"p_poll": string }; Returns: undefined
+                           },
 "choose_project_quote":
 { Args: { "p_meeting"?: string,"p_note"?: string,"p_project": string,"p_quote"?: string }; Returns: undefined
                            },
 "close_meeting":
 { Args: { "p_closed_at"?: string,"p_meeting": string }; Returns: undefined
+                           },
+"close_poll":
+{ Args: { "p_poll": string }; Returns: Json
                            },
 "collection_summary":
 { Args: { "p_month": string }; Returns: {
@@ -1620,6 +1737,39 @@ isOneToOne: false
 "open_meeting":
 { Args: { "p_chair"?: string,"p_meeting": string,"p_opened_at"?: string,"p_override_quorum"?: boolean,"p_secretary"?: string }; Returns: undefined
                            },
+"open_poll":
+{ Args: { "p_poll": string }; Returns: string
+                           },
+"poll_announcement_body":
+{ Args: { "p_poll": string }; Returns: string
+                           },
+"poll_choice_count":
+{ Args: { "p_kind": string,"p_options": (string)[] }; Returns: number
+                           },
+"poll_local":
+{ Args: { "p_at": string }; Returns: string
+                           },
+"poll_options_ok":
+{ Args: { "p_kind": string,"p_options": (string)[] }; Returns: boolean
+                           },
+"poll_outcome":
+{ Args: { "p_base": string,"p_kind": string,"p_majority": string,"p_percent": number,"p_tally": Json }; Returns: Json
+                           },
+"poll_require":
+{ Args: { "p_ok": boolean,"p_reason": string }; Returns: undefined
+                           },
+"poll_require_admin":
+{ Args: Record<PropertyKey, never>; Returns: undefined
+                           },
+"poll_results":
+{ Args: { "p_poll": string }; Returns: Json
+                           },
+"poll_tally":
+{ Args: { "p_poll": string }; Returns: Json
+                           },
+"poll_write_vote":
+{ Args: { "p_apartment": string,"p_by_admin": boolean,"p_choice": number,"p_poll": string }; Returns: undefined
+                           },
 "postpone_meeting":
 { Args: { "p_meeting": string }; Returns: string
                            },
@@ -1668,6 +1818,9 @@ isOneToOne: false
                            },
 "save_ev_rate":
 { Args: { "p_effective_from": string,"p_rate": number }; Returns: number
+                           },
+"save_poll":
+{ Args: { "p_apartments"?: (string)[],"p_closes_at": string,"p_description": string,"p_kind": string,"p_majority": string,"p_majority_base": string,"p_majority_percent"?: number,"p_opens_at": string,"p_options": (string)[],"p_poll"?: string,"p_question": string,"p_results_visibility": string,"p_scope": string }; Returns: string
                            },
 "set_apartment_fee":
 { Args: { "p_amount"?: number,"p_apartment_id": string,"p_effective_from": string,"p_mode": string }; Returns: boolean
