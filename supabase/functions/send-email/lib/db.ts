@@ -1,8 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { DuplicateLogError } from './plan.ts'
 import type {
-  Admin, Balance, Caller, CommitteeMessage, Context, DataSource, EmailKind, LedgerRow, LogRow, MeetingInfo, NewTicket, Reservation,
-  Resident, TicketInfo,
+  Admin, Balance, Caller, CommitteeMessage, Context, DataSource, EmailKind, FollowupDue, LedgerRow, LogRow, MeetingInfo, NewTicket,
+  Reservation, Resident, TicketInfo,
 } from './types.ts'
 
 /** The slice of a supabase-js client (built with the caller's JWT) used to identify the caller. */
@@ -139,6 +139,15 @@ async function storeMessage(db: SupabaseClient, m: CommitteeMessage): Promise<st
   return must<string>(r)
 }
 
+/** debt_followups_ready (0035): the pending follow-up emails with today's balance (steps 1-2 only). */
+async function followupsReady(db: SupabaseClient, buildingId: string, claim: boolean): Promise<FollowupDue[]> {
+  const rows = must<{ id: string; apartment_id: string; step: number; balance: number | string; days_overdue: number }[]>(
+    await db.rpc('debt_followups_ready', { p_building: buildingId, p_claim: claim }))
+  return rows.flatMap((r) => (r.step === 1 || r.step === 2
+    ? [{ id: r.id, apartmentId: r.apartment_id, step: r.step, balance: Number(r.balance), days: r.days_overdue }]
+    : []))
+}
+
 /** Reads and the audit insert, with the service-role client (server only; never exposed to the browser). */
 export function dataSource(db: SupabaseClient): DataSource {
   return {
@@ -161,5 +170,9 @@ export function dataSource(db: SupabaseClient): DataSource {
     logged: (kind, refId) => hasLog(db, kind, refId),
     countSince: (userId, kind, since) => countSince(db, userId, kind, since),
     storeMessage: (m) => storeMessage(db, m),
+    followupsReady: (b, claim) => followupsReady(db, b, claim),
+    finishFollowups: async (b, claimed, sent, logId) => {
+      maybe(await db.rpc('finish_debt_followups', { p_building: b, p_claimed: claimed, p_sent: sent, p_log: logId }))
+    },
   }
 }

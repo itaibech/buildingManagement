@@ -540,6 +540,42 @@ body {
   background: #2c8a5a;
 }
 
+/* Debt follow-up "מכתב התראה" (screen card and the print copy). */
+.bm-letter {
+  line-height: 1.6;
+}
+.bm-letter p {
+  margin: 0 0 10px;
+}
+.bm-letter-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  border-bottom: 2px solid currentColor;
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+}
+.bm-letter-table {
+  border-collapse: collapse;
+  margin: 0 0 12px;
+  min-width: 260px;
+}
+.bm-letter-table th,
+.bm-letter-table td {
+  text-align: start;
+  padding: 4px 12px 4px 0;
+  border-bottom: 1px solid #bbb;
+}
+.bm-letter-table td.bm-num,
+.bm-letter-table th.bm-num {
+  text-align: end;
+}
+.bm-letter-sign {
+  margin-top: 32px;
+  break-inside: avoid;
+}
+
 /* Directory print view (portalled to <body>): hidden on screen, the only thing printed. */
 .bm-print {
   display: none;

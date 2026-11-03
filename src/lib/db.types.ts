@@ -461,6 +461,82 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"debt_followup_settings": {
+                  Row: {
+                    "building_id": string,"enabled": boolean,"firm_days": number,"firm_on": boolean,"friendly_days": number,"friendly_on": boolean,"letter_days": number,"letter_on": boolean,"min_amount": number,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "building_id": string,"enabled"?: boolean,"firm_days"?: number,"firm_on"?: boolean,"friendly_days"?: number,"friendly_on"?: boolean,"letter_days"?: number,"letter_on"?: boolean,"min_amount"?: number,"updated_at"?: string
+                  }
+                  Update: {
+                    "building_id"?: string,"enabled"?: boolean,"firm_days"?: number,"firm_on"?: boolean,"friendly_days"?: number,"friendly_on"?: boolean,"letter_days"?: number,"letter_on"?: boolean,"min_amount"?: number,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "debt_followup_settings_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: true
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "debt_followup_settings_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: true
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"debt_followups": {
+                  Row: {
+                    "apartment_id": string,"building_id": string,"claimed_at": string | null,"created_at": string,"days_overdue": number,"debt_amount": number,"done_at": string | null,"done_by": string | null,"email_log_id": string | null,"episode_closed_at": string | null,"id": string,"oldest_month": string,"recipients": number | null,"sent_at": string | null,"skip_reason": string | null,"status": string,"step": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "apartment_id": string,"building_id": string,"claimed_at"?: string | null,"created_at"?: string,"days_overdue": number,"debt_amount": number,"done_at"?: string | null,"done_by"?: string | null,"email_log_id"?: string | null,"episode_closed_at"?: string | null,"id"?: string,"oldest_month": string,"recipients"?: number | null,"sent_at"?: string | null,"skip_reason"?: string | null,"status": string,"step": number
+                  }
+                  Update: {
+                    "apartment_id"?: string,"building_id"?: string,"claimed_at"?: string | null,"created_at"?: string,"days_overdue"?: number,"debt_amount"?: number,"done_at"?: string | null,"done_by"?: string | null,"email_log_id"?: string | null,"episode_closed_at"?: string | null,"id"?: string,"oldest_month"?: string,"recipients"?: number | null,"sent_at"?: string | null,"skip_reason"?: string | null,"status"?: string,"step"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "debt_followups_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: false
+      referencedRelation: "apartment_balances"
+      referencedColumns: ["apartment_id"]
+    },{
+      foreignKeyName: "debt_followups_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: false
+      referencedRelation: "apartments"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "debt_followups_apartment_id_fkey"
+      columns: ["apartment_id"]
+isOneToOne: false
+      referencedRelation: "monthly_fees"
+      referencedColumns: ["apartment_id"]
+    },{
+      foreignKeyName: "debt_followups_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "debt_followups_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "debt_followups_email_log_id_fkey"
+      columns: ["email_log_id"]
+isOneToOne: false
+      referencedRelation: "email_log"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"email_log": {
                   Row: {
                     "apartment_ids": (string)[] | null,"building_id": string,"created_at": string,"dry_run": boolean,"error": string | null,"failed": number,"id": string,"kind": string,"recipients": number,"ref_id": string | null,"sent": number,"sent_by": string | null,"skipped": number,"status": string
@@ -1664,11 +1740,47 @@ isOneToOne: false
               "full_name": string,"user_id": string
             }[]
                            },
+"complete_debt_followup_task":
+{ Args: { "p_id": string }; Returns: boolean
+                           },
 "create_building_document":
 { Args: { "p_category": string,"p_description"?: string,"p_document_date"?: string,"p_expires_on"?: string,"p_file_name": string,"p_file_path": string,"p_id": string,"p_size_bytes": number,"p_title": string,"p_visibility": string }; Returns: string
                            },
 "current_month":
 { Args: Record<PropertyKey, never>; Returns: string
+                           },
+"debt_followup_candidates":
+{ Args: { "p_building": string,"p_now"?: string }; Returns: {
+              "apartment_id": string,"balance": number,"days_overdue": number,"oldest_month": string,"skip": string
+            }[]
+                           },
+"debt_followup_cron":
+{ Args: { "p_now"?: string }; Returns: number
+                           },
+"debt_followup_due_hour":
+{ Args: { "p_now": string }; Returns: boolean
+                           },
+"debt_followup_run":
+{ Args: { "p_building": string,"p_now"?: string }; Returns: Json
+                           },
+"debt_followup_sendable":
+{ Args: { "p_building": string }; Returns: {
+              "apartment_id": string,"balance": number,"days_overdue": number,"id": string,"step": number
+            }[]
+                           },
+"debt_followup_step":
+{ Args: { "days": number,"s": Omit<Database["public"]['Tables']["debt_followup_settings"]['Row'], Database["public"]['Tables']["debt_followup_settings"]['ComputedFields']> }; Returns: number
+                           },
+"debt_followup_step_due":
+{ Args: { "days": number,"s": Omit<Database["public"]['Tables']["debt_followup_settings"]['Row'], Database["public"]['Tables']["debt_followup_settings"]['ComputedFields']>,"step": number }; Returns: boolean
+                           },
+"debt_followup_sweep":
+{ Args: { "p_building": string,"p_now"?: string }; Returns: number
+                           },
+"debt_followups_ready":
+{ Args: { "p_building": string,"p_claim"?: boolean }; Returns: {
+              "apartment_id": string,"balance": number,"days_overdue": number,"id": string,"step": number
+            }[]
                            },
 "default_building_id":
 { Args: Record<PropertyKey, never>; Returns: string
@@ -1722,6 +1834,9 @@ isOneToOne: false
                            },
 "ev_validate":
 { Args: { "p": Json }; Returns: undefined
+                           },
+"finish_debt_followups":
+{ Args: { "p_building": string,"p_claimed": (string)[],"p_log": string,"p_sent": Json }; Returns: number
                            },
 "has_permission":
 { Args: { "p_key": string }; Returns: boolean
@@ -1963,11 +2078,17 @@ isOneToOne: false
 "record_ev_reading":
 { Args: { "p_charger_id": string,"p_month": string,"p_note"?: string,"p_read_on"?: string,"p_reading": number }; Returns: Json
                            },
+"refresh_debt_followups":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
 "reopen_meeting":
 { Args: { "p_meeting": string }; Returns: undefined
                            },
 "reserve_email_quota":
 { Args: { "p_apartment_ids"?: (string)[],"p_building": string,"p_cap": number,"p_count": number,"p_kind": string,"p_ref_id"?: string,"p_sent_by": string }; Returns: string
+                           },
+"resolve_debt_followup":
+{ Args: { "p_id": string,"p_sent": boolean }; Returns: boolean
                            },
 "restore_apartment":
 { Args: { "p_id": string }; Returns: undefined

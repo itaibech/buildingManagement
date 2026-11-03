@@ -58,7 +58,8 @@ async function errorMessage(error: unknown): Promise<string> {
   return he.mail.failed
 }
 
-async function invoke(body: Json): Promise<Json> {
+/** One send-email call: its JSON reply, or an Error with the function's Hebrew message. */
+export async function invoke(body: Json): Promise<Json> {
   const { data, error } = await supabase.functions.invoke<unknown>('send-email', { body })
   if (error) throw new Error(await errorMessage(error))
   if (!isJson(data)) throw new Error(he.mail.failed)
@@ -175,14 +176,14 @@ export function useEmailStatus(): EmailStatus {
   return q.data ?? 'unavailable'
 }
 
-/** The debt reminders sent (email_log; RLS: admins only), for "נשלחה תזכורת לפני X ימים". */
+/** The debt reminders sent, by hand or by the follow-up (email_log; RLS: admins only), for "נשלחה תזכורת לפני X ימים". */
 export function useDebtReminderLog(enabled = true) {
   return useQuery({
     queryKey: ['email', 'debt-log'],
     enabled,
     queryFn: async (): Promise<DebtLogRow[]> => {
       const { data, error } = await supabase.from('email_log').select('created_at, apartment_ids, dry_run')
-        .eq('kind', 'debt').order('created_at', { ascending: false }).limit(500)
+        .in('kind', ['debt', 'debt_followup']).order('created_at', { ascending: false }).limit(500)
       if (error) throw new Error(error.message)
       return data
     },

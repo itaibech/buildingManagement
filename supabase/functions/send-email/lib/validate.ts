@@ -62,7 +62,8 @@ export function parseRequest(body: unknown): Parsed {
   if (needsId ? !isUuid(body.id) : body.id !== undefined) return { ok: false, error: 'id' }
   if (kind === 'meeting' ? !isVariant(body.variant) : body.variant !== undefined) return { ok: false, error: 'variant' }
   const apartmentIds = parseApartments(body.apartmentIds)
-  if (apartmentIds === null || (kind === 'test' && apartmentIds !== undefined)) return { ok: false, error: 'apartmentIds' }
+  // test: the admin's own address; debt_followup: the server picks the apartments (debt_followups_ready).
+  if (apartmentIds === null || ((kind === 'test' || kind === 'debt_followup') && apartmentIds !== undefined)) return { ok: false, error: 'apartmentIds' }
   if (body.note !== undefined && (typeof body.note !== 'string' || body.note.length > MAX_NOTE)) return { ok: false, error: 'note' }
   if (body.details !== undefined && (typeof body.details !== 'boolean' || kind !== 'meeting' || body.variant === 'published')) {
     return { ok: false, error: 'details' }

@@ -14,6 +14,7 @@ vi.mock('../finance/hooks', () => ({ useDesktop: () => state.desktop }))
 vi.mock('../ev/api', () => ({ useChargers: () => ({ data: state.chargers }) }))
 vi.mock('../finance/api', () => ({ useBalances: () => ({ data: [] }) }))
 vi.mock('../finance/ApartmentLedger', () => ({ ApartmentYear: () => <p>ledger-body</p> }))
+vi.mock('../followup/FollowupTimeline', () => ({ FollowupTimeline: () => null }))
 vi.mock('./AptOverview', () => ({ AptOverview: ({ onLedger }: { onLedger: () => void }) => <button onClick={onLedger}>overview-body</button> }))
 vi.mock('./AptSections', () => ({
   PaymentsSection: () => <p>payments-body</p>, FeesSection: () => <p>fees-body</p>, EvSection: () => <p>ev-body</p>,

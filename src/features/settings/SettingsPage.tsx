@@ -7,6 +7,7 @@ import { focusFirstError, ListSkeleton, notifySuccess, PageHeader } from '../../
 import { EmailSettings } from '../email/EmailSettings'
 import { LoadFailed } from '../finance/cards'
 import { OnlinePaySettingsCard } from '../finance/OnlinePay'
+import { FollowupSettingsCard } from '../followup/FollowupSettingsCard'
 import { useBuilding, useSaveBuilding, type Building } from './api'
 
 const MAX_INSTRUCTIONS = 1000
@@ -77,7 +78,7 @@ const permissionsLink = (
   </Button>
 )
 
-/** Admin "הגדרות בניין": building name and address, the "how to pay" text residents see, and email (test + history). */
+/** Admin "הגדרות בניין": building name and address, the "how to pay" text residents see, email (test + history) and the automatic debt follow-up. */
 export default function SettingsPage() {
   const q = useBuilding()
   return (
@@ -89,6 +90,7 @@ export default function SettingsPage() {
         {q.data && <SettingsForm key={q.data.id} building={q.data} />}
         <EmailSettings />
         <OnlinePaySettingsCard />
+        <FollowupSettingsCard />
       </Stack>
     </>
   )

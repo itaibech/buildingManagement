@@ -1,7 +1,7 @@
 /** Shared types of the send-email function (pure: no Deno or network imports, so Vitest can load them). */
 
-export type EmailKind = 'announcement' | 'ticket' | 'debt' | 'test' | 'meeting' | 'ticket_new' | 'contact'
-export const EMAIL_KINDS: readonly EmailKind[] = ['announcement', 'ticket', 'debt', 'test', 'meeting', 'ticket_new', 'contact']
+export type EmailKind = 'announcement' | 'ticket' | 'debt' | 'test' | 'meeting' | 'ticket_new' | 'contact' | 'debt_followup'
+export const EMAIL_KINDS: readonly EmailKind[] = ['announcement', 'ticket', 'debt', 'test', 'meeting', 'ticket_new', 'contact', 'debt_followup']
 /** Kinds any approved user may send (each checks its own rules); every other kind is admin only. */
 export const RESIDENT_KINDS: readonly EmailKind[] = ['ticket_new', 'contact']
 /** kind 'meeting': the invitation, its update, or the published protocol. */
@@ -84,6 +84,8 @@ export interface MeetingInfo {
 }
 
 export interface Balance { apartmentId: string; balance: number }
+/** kind 'debt_followup': a pending step-1 (friendly) or step-2 (firm) email (debt_followups_ready, 0035), current balance. */
+export interface FollowupDue { id: string; apartmentId: string; step: 1 | 2; balance: number; days: number }
 export interface LedgerRow { month: string; charged: number; paid: number }
 
 export interface LogRow {
@@ -130,6 +132,13 @@ export interface DataSource {
   countSince(userId: string, kind: EmailKind, since: string): Promise<number>
   /** Stores a committee message (store_committee_message, 0029): its id, or null over the sender's 24-hour limit. */
   storeMessage(m: CommitteeMessage): Promise<string | null>
+  /**
+   * kind 'debt_followup': the follow-up emails that may be sent now (rechecked against today's balances and steps;
+   * nothing while off). claim: a real send claims them atomically (a concurrent send gets none); else read only.
+   */
+  followupsReady(buildingId: string, claim: boolean): Promise<FollowupDue[]>
+  /** After a real send, for every claimed row: id → emails sent (status 'sent', linked to the log row); the rest back to pending. */
+  finishFollowups(buildingId: string, claimed: string[], sent: Record<string, number>, logId: string | null): Promise<void>
 }
 
 export interface Reservation {
