@@ -87,8 +87,8 @@ export function useApartments() {
 }
 
 /** Every apartment, archived included: the apartment page and the exports of past periods. */
-export function useAllApartments() {
-  return useQuery(apartmentsQuery)
+export function useAllApartments(enabled = true) {
+  return useQuery({ ...apartmentsQuery, enabled })
 }
 
 /** Archived apartments only ("ארכיון" on the apartments page). */

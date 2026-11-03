@@ -1,4 +1,6 @@
-import { Card, Progress, Stack, Text, Title } from '@mantine/core'
+import { Button, Card, Progress, Stack, Text, Title } from '@mantine/core'
+import { IconReportAnalytics } from '@tabler/icons-react'
+import { Link } from 'react-router'
 import { useAuth } from '../../auth/AuthProvider'
 import { todayISO } from '../../lib/dates'
 import { formatILS } from '../../lib/format'
@@ -79,6 +81,8 @@ export function ResidentFinance() {
         {can('finance_reports') && (
           <Stack gap="lg">
             <SectionTitle title={he.finance.buildingReports} hint={he.finance.buildingReportsHint} />
+            <Button component={Link} to="/finance/annual-report" variant="light" mih={44} style={{ alignSelf: 'flex-start' }}
+              leftSection={<IconReportAnalytics size={20} stroke={1.75} aria-hidden="true" />}>{he.nav.annualReport}</Button>
             <CollectionCard />
             <BuildingBudget />
             <ExpenseMonthReport />

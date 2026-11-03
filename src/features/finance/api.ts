@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { he } from '../../lib/he'
+import { fetchAll } from '../../lib/fetchAll'
 import { supabase } from '../../lib/supabase'
 import { isFeeMode, type FeeMode } from '../../ui/feeBadge'
 import { notifyError } from '../../ui/notify'
@@ -174,6 +175,27 @@ export function useLedger(year: number, apartmentId?: string) {
   })
 }
 
+const LEDGER_COLUMNS = 'apartment_id, month, charged, paid, adjusted'
+
+/**
+ * Admin, "דוח שנתי": every apartment's ledger rows of `year`, paged (no 1000-row cap). `fromStart`: also the earlier
+ * years (the per-apartment appendix carries them into the year-end balance).
+ */
+export function useReportLedger(year: number, fromStart: boolean, enabled: boolean) {
+  return useQuery({
+    queryKey: [...KEY, 'report-ledger', year, fromStart],
+    enabled,
+    queryFn: async (): Promise<LedgerRow[]> => {
+      const rows = await fetchAll((from, to) => {
+        const q = supabase.from('apartment_ledger').select(LEDGER_COLUMNS).lte('month', `${year}-12-01`)
+        return (fromStart ? q : q.gte('month', `${year}-01-01`)).order('month').order('apartment_id').range(from, to)
+      })
+      return rows.flatMap((r) =>
+        r.apartment_id && r.month ? [{ apartment_id: r.apartment_id, month: r.month, charged: num(r.charged), paid: num(r.paid), adjusted: num(r.adjusted) }] : [])
+    },
+  })
+}
+
 /** Admin home: how many apartments are paid up as of the end of `month`. */
 export function useCollectionSummary(month: string, enabled = true) {
   return useQuery({
@@ -198,10 +220,51 @@ export function useExpenseReport(year: number) {
 }
 
 /** Money actually in the building's account today. */
-export function useBuildingCash() {
+export function useBuildingCash(enabled = true) {
   return useQuery({
     queryKey: [...KEY, 'cash'],
+    enabled,
     queryFn: async () => num(must(await supabase.from('building_cash').select('balance'))[0]?.balance),
+  })
+}
+
+export interface CashFlow { date: string; amount: number }
+
+/**
+ * Admin: the payments and expenses that moved the building's cash from `from` through today (Israel), the same rows
+ * building_cash_balance sums (payments by paid_on, expenses by spent_on), so the cash can be rolled back to a date.
+ * Paged: a year of payments can pass the 1000-row cap.
+ */
+export function useCashFlows(from: string, today: string, enabled = true) {
+  return useQuery({
+    queryKey: [...KEY, 'cash-flows', from, today],
+    enabled,
+    queryFn: async (): Promise<{ payments: CashFlow[]; expenses: CashFlow[] }> => {
+      const [p, e] = await Promise.all([
+        fetchAll((f, t) => supabase.from('payments').select('paid_on, amount').gte('paid_on', from).lte('paid_on', today).order('paid_on').order('id').range(f, t)),
+        fetchAll((f, t) => supabase.from('expenses').select('spent_on, amount').gte('spent_on', from).lte('spent_on', today).order('spent_on').order('id').range(f, t)),
+      ])
+      return {
+        payments: p.map((r) => ({ date: r.paid_on, amount: num(r.amount) })),
+        expenses: e.map((r) => ({ date: r.spent_on, amount: num(r.amount) })),
+      }
+    },
+  })
+}
+
+/** Admin: the date of the building's first payment or expense (null when there are none): where cash data begins. */
+export function useFirstCashDate(enabled = true) {
+  return useQuery({
+    queryKey: [...KEY, 'first-cash-date'],
+    enabled,
+    queryFn: async (): Promise<string | null> => {
+      const [p, e] = await Promise.all([
+        supabase.from('payments').select('paid_on').order('paid_on', { ascending: true }).limit(1),
+        supabase.from('expenses').select('spent_on').order('spent_on', { ascending: true }).limit(1),
+      ])
+      const dates = [must(p)[0]?.paid_on, must(e)[0]?.spent_on].filter((d): d is string => !!d).sort()
+      return dates[0] ?? null
+    },
   })
 }
 
@@ -247,9 +310,10 @@ export function useDeletePayment() {
 // ---------------------------------------------------------------- charges, building fees, apartment fee timeline
 
 /** Levies, extras and openings for `year`, newest month first. */
-export function useCharges(year: number) {
+export function useCharges(year: number, enabled = true) {
   return useQuery({
     queryKey: [...KEY, 'charges', year],
+    enabled,
     queryFn: async (): Promise<Charge[]> =>
       must(await supabase.from('charges').select('id, apartment_id, month, amount, kind, label, ev_reading_id, special_id')
         .gte('month', `${year}-01-01`).lt('month', `${year + 1}-01-01`).order('month', { ascending: false }))
@@ -258,7 +322,7 @@ export function useCharges(year: number) {
 }
 
 /** EV charging: from a meter reading, or an imported/manual extra under the EV label (Excel imports have no reading). */
-const isEvCharge = (c: { ev_reading_id: string | null; kind: string; label: string }): boolean =>
+export const isEvCharge = (c: { ev_reading_id: string | null; kind: string; label: string }): boolean =>
   c.ev_reading_id !== null || (c.kind === 'extra' && c.label === he.import.evLabel)
 
 /** Every charge of one apartment, oldest first, with the EV reading's kWh (null when the reading isn't readable). */
