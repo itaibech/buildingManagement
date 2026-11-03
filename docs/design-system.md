@@ -38,6 +38,7 @@ Status mapping (never deviate):
 - supplier contracts: פעיל = `paid`, מסתיים בקרוב = `signal`, פג תוקף = `debt`; a supplier draft (טיוטה) = `stone`
 - budget line source: קבוע (recurring yearly default) = `enamel`, חד פעמי = `stone`
 - apartment tags (`ApartmentTags`): נציג ועד = `stone`, הוראת קבע = `enamel`, עמדת טעינה = `stone` with a bolt icon
+- calendar categories (`CALENDAR_COLOR`): ניקיון = `paid`, הדברה = `signal`, הפסקת מים/חשמל = `debt`, ישיבה = `enamel`, תחזוקה / אחר = `stone`
 - `paid` and `debt` may also be used for success progress (e.g. the collection bar) and for destructive actions / error alerts.
 
 ## Type

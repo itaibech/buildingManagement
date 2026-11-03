@@ -1,6 +1,6 @@
 // Navigation config shared by the shell (tab bar, side nav) and the "עוד" page.
 import {
-  IconAddressBook, IconBriefcase, IconBuilding, IconCheckbox, IconGavel, IconCalendarCheck, IconChargingPile, IconCoin, IconDots, IconFileImport, IconHammer, IconHome2,
+  IconAddressBook, IconBriefcase, IconBuilding, IconCheckbox, IconGavel, IconCalendarCheck, IconCalendarEvent, IconChargingPile, IconCoin, IconDots, IconFileImport, IconHammer, IconHome2,
   IconMessages, IconSettings, IconShieldLock, IconSpeakerphone, IconTool, IconUsers, type Icon,
 } from '@tabler/icons-react'
 import { he } from '../lib/he'
@@ -28,6 +28,7 @@ export const GENERAL_NAV: NavItem[] = [
   { to: '/meetings', label: he.nav.meetings, icon: IconGavel, need: 'meetings' },
   { to: '/projects', label: he.nav.projects, icon: IconHammer, need: 'projects' },
   { to: '/polls', label: he.nav.polls, icon: IconCheckbox, need: 'polls' },
+  { to: '/calendar', label: he.nav.calendar, icon: IconCalendarEvent, need: 'calendar' },
   { to: '/suppliers', label: he.nav.suppliers, icon: IconBriefcase, need: 'suppliers', hint: he.nav.hints.suppliers },
 ]
 

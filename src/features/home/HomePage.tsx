@@ -15,6 +15,7 @@ import { AdminInbox } from './InboxCard'
 import { LoadError, Section } from './parts'
 import { LatestAnnouncement, ResidentHero } from './ResidentHero'
 import { HomePollsCard } from '../polls/HomePollsCard'
+import { WeekCard } from '../calendar/WeekCard'
 
 /** Resident: the calls this user opened that are still active. */
 function MyTickets({ onReport }: { onReport: () => void }) {
@@ -37,14 +38,16 @@ function ResidentHome({ onReport }: { onReport: () => void }) {
   const { can } = useAuth()
   const news = can('announcements')
   const calls = can('tickets')
+  const calendar = can('calendar')
   return (
     <Stack gap="lg">
       <ResidentHero />
       <HomePollsCard />
       {news && <LatestAnnouncement showUnread />}
+      {calendar && <WeekCard />}
       {calls && <MyTickets onReport={onReport} />}
       {can('projects') && <ActiveProjects />}
-      {!news && !calls && !can('finance_own') && !can('projects') && <Card><EmptyState title={he.permissions.homeEmpty} body={he.permissions.homeEmptyBody} /></Card>}
+      {!news && !calls && !calendar && !can('finance_own') && !can('projects') && <Card><EmptyState title={he.permissions.homeEmpty} body={he.permissions.homeEmptyBody} /></Card>}
     </Stack>
   )
 }
@@ -60,7 +63,7 @@ function AdminHome() {
       <CashMini />
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg" verticalSpacing="lg">
         <Stack gap="lg"><Debtors /><OpenTickets /></Stack>
-        <Stack gap="lg"><MaintenanceDue /><ActiveProjects /><LatestAnnouncement showUnread={false} /></Stack>
+        <Stack gap="lg"><WeekCard /><MaintenanceDue /><ActiveProjects /><LatestAnnouncement showUnread={false} /></Stack>
       </SimpleGrid>
     </Stack>
   )

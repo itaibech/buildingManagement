@@ -27,6 +27,7 @@ const m = vi.hoisted(() => ({
   debtLog: [] as unknown[],
   charger: null as unknown,
   meetings: [] as unknown[],
+  events: [] as unknown[],
   projects: [] as unknown[],
   polls: [] as unknown[],
   pollVotes: new Map<string, unknown>(),
@@ -71,6 +72,7 @@ vi.mock('../email/api', () => ({
 }))
 vi.mock('../ev/api', () => ({ useMyCharger: () => ({ data: m.charger, isLoading: false, isError: false }) }))
 vi.mock('../meetings/api', () => ({ useMeetings: () => ({ data: m.meetings, isLoading: false }) }))
+vi.mock('../calendar/api', () => ({ useCalendarEvents: () => ({ data: m.events, isLoading: false, isError: false, refetch: vi.fn() }) }))
 vi.mock('../notifications/api', () => ({ useUnseenTicketCount: () => m.unseen }))
 vi.mock('../permissions/api', () => ({ useGroups: () => ({ data: m.groups }) }))
 vi.mock('../tenants/api', async (orig) => ({
@@ -128,6 +130,7 @@ beforeEach(() => {
   m.contracts = []
   m.contractsFailed = false
   m.projects = []
+  m.events = []
   m.polls = []
   m.pollVotes = new Map()
 })
@@ -206,6 +209,21 @@ describe('HomePage', () => {
     expect(within(section).getByRole('button', { name: he.home.openContract('ביטוח מבנה') })).toBeInTheDocument()
     expect(within(section).getByText(he.contractStatus.ending)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: new RegExp(he.home.inbox.rows.contracts(1)) })).toHaveAttribute('href', '/suppliers')
+  })
+
+  it('resident with the calendar sees "השבוע בבניין" with the next events', () => {
+    m.granted = [...m.granted, 'calendar']
+    m.events = [{
+      id: 'e1', source: 'event', title: 'הדברה בחדר האשפה', description: '', location: '', category: 'pest_control', allDay: false,
+      startsAt: new Date(Date.now() + 86_400_000).toISOString(), endsAt: null, recurrence: 'none', until: null, committee: false,
+    }]
+    renderHome()
+    const section = screen.getByRole('heading', { name: he.home.week }).closest('.mantine-Card-root') as HTMLElement
+    expect(within(section).getByText('הדברה בחדר האשפה')).toBeTruthy()
+    cleanup()
+    m.granted = ['home', 'tickets']
+    renderHome()
+    expect(screen.queryByRole('heading', { name: he.home.week })).toBeNull()
   })
 
   it('resident sees "התקלות שלי" with only their tickets', () => {
