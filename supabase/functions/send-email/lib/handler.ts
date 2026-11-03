@@ -3,7 +3,7 @@ import { planContact, planTicketNew } from './committee.ts'
 import { announcementContent, debtContent, meetingContent, testContent, ticketContent } from './content.ts'
 import { openMonths, splitDebtors } from './debt.ts'
 import { buildRecipients } from './recipients.ts'
-import { fail, reply, type Plan, type Reply } from './plan.ts'
+import { DuplicateLogError, fail, reply, type Plan, type Reply } from './plan.ts'
 import { render, type Brand, type EmailContent } from './template.ts'
 import type { MailMessage, Transport } from './transport.ts'
 import { RESIDENT_KINDS, type Apartment, type Caller, type Context, type DataSource, type EmailRequest, type Env, type Recipient } from './types.ts'
@@ -160,7 +160,7 @@ async function sendReal(job: Job, deps: Deps, cap: number): Promise<Reply> {
   const { caller, req, ctx, plan } = job
   const base = { building_id: ctx.building.id, sent_by: caller.userId, kind: req.kind, ref_id: plan.refId ?? req.id ?? null, apartment_ids: plan.apartmentIds }
   const count = plan.messages.length
-  const id = count ? await deps.data.reserve({ ...base, count, cap }) : null
+  const id = count && cap > 0 ? await deps.data.reserve({ ...base, count, cap }) : null
   if (count && !id) {
     // A message is already stored: log the attempt (it counts toward the sender's limit) and report it as kept in the app.
     if (req.kind === 'contact') {
@@ -190,6 +190,13 @@ async function sendDry(job: Job, deps: Deps): Promise<Reply> {
     dryRun: true, reason: deps.transport.reason, samples })
 }
 
+/**
+ * A resident's own sends (ticket_new, contact) reserve under cap − MAX_PER_CALL (at least 0), so a full committee send
+ * always still fits in what they leave.
+ */
+export const capFor = (caller: Caller, req: EmailRequest, cap: number): number =>
+  !caller.isAdmin && RESIDENT_KINDS.includes(req.kind) ? Math.max(0, cap - MAX_PER_CALL) : cap
+
 /** POST body → reply. Admin only (but ticket_new / contact, see authorize); preview counts without sending; at most MAX_PER_CALL emails per call. */
 export async function handle(body: unknown, deps: Deps): Promise<Reply> {
   const auth = await authorize(body, deps)
@@ -211,5 +218,10 @@ export async function handle(body: unknown, deps: Deps): Promise<Reply> {
   }
   if (count > MAX_PER_CALL) return fail(413, `עד ${MAX_PER_CALL} נמענים בכל שליחה (נדרשים ${count})`)
   const job = { caller, req, ctx, plan }
-  return dryRun ? sendDry(job, deps) : sendReal(job, deps, cap)
+  try {
+    return dryRun ? await sendDry(job, deps) : await sendReal(job, deps, capFor(caller, req, cap))
+  } catch (e) {
+    if (e instanceof DuplicateLogError && req.kind === 'ticket_new') return fail(409, 'הוועד כבר עודכן על התקלה הזו')
+    throw e
+  }
 }

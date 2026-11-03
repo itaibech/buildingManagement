@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { MAX_CONTACTS_PER_DAY } from './committee.ts'
-import { handle, type Deps } from './handler.ts'
+import { MAX_CONTACTS_PER_DAY, MAX_TICKET_NEW_PER_DAY } from './committee.ts'
+import { handle, MAX_PER_CALL, type Deps } from './handler.ts'
+import { DuplicateLogError } from './plan.ts'
 import { createTransport, type FetchFn, type MailMessage, type Transport } from './transport.ts'
 import type { Admin, Caller, CommitteeMessage, DataSource, LogRow, NewTicket, Reservation } from './types.ts'
 import { parseRequest } from './validate.ts'
@@ -22,7 +23,10 @@ const ticket = (o: Partial<NewTicket> = {}): NewTicket => ({
   createdAt: new Date(NOW - 5 * 60_000).toISOString(), ...o,
 })
 
-interface Over { ticket?: NewTicket | null; logged?: boolean; used?: number; email?: string | null; caller?: Caller; transport?: Transport }
+interface Over {
+  ticket?: NewTicket | null; logged?: boolean; used?: number; limited?: boolean; email?: string | null; caller?: Caller; transport?: Transport
+  env?: Record<string, string>
+}
 
 function setup(o: Over = {}) {
   const logs: LogRow[] = []
@@ -37,7 +41,11 @@ function setup(o: Over = {}) {
     apartmentNumber: async () => 7,
     logged: async () => o.logged ?? false,
     countSince: async () => o.used ?? 0,
-    storeMessage: async (m: CommitteeMessage) => { stored.push(m); return 'msg-1' },
+    storeMessage: async (m: CommitteeMessage) => {
+      if (o.limited) return null
+      stored.push(m)
+      return 'msg-1'
+    },
     reserve: async (r: Reservation) => { reserved.push(r); return 'log-1' },
     finish: async () => undefined,
     sentToday: async () => 0,
@@ -46,7 +54,7 @@ function setup(o: Over = {}) {
   const transport: Transport = o.transport
     ?? { provider: 'appsscript', dryRun: true, reason: 'not_configured', send: async (m) => { sent.push(m); return { ok: true } } }
   const deps: Deps = { caller: async () => o.caller ?? { userId: RES, isAdmin: false, permissions: ['home', 'tickets', 'contact_committee'] },
-    data, transport, env: {}, sleep: async () => undefined, now: () => NOW }
+    data, transport, env: o.env ?? {}, sleep: async () => undefined, now: () => NOW }
   return { deps, logs, stored, reserved, sent }
 }
 
@@ -60,7 +68,7 @@ describe('ticket_new: authorization', () => {
     expect(s.sent.map((m) => m.to)).toEqual(['avi@example.test', 'batya@example.test'])
     expect(s.sent[0].subject).toBe('תקלה חדשה: נזילה <b>בלובי</b>')
     expect(s.sent[0].text).toContain('דירה: 7')
-    expect(s.sent[0].text).toContain('מדווח/ת: דנה "הדיירת"')
+    expect(s.sent[0].text).toContain('מדווח/ת: דנה "הדיירת" (דייר/ת)')
     expect(s.sent[0].text).toContain(`#/tickets/${T1}`)
     expect(s.logs).toMatchObject([{ kind: 'ticket_new', ref_id: T1, sent_by: RES, recipients: 2, dry_run: true }])
     expect(r.body.samples).toEqual([])
@@ -92,6 +100,21 @@ describe('ticket_new: authorization', () => {
     const s = setup({ ticket: ticket({ openedBy: ADMIN_A }), caller: { userId: ADMIN_A, isAdmin: true, permissions: ['home'] } })
     await handle({ kind: 'ticket_new', id: T1 }, s.deps)
     expect(s.sent.map((m) => m.to)).toEqual(['batya@example.test'])
+    expect(s.sent[0].text).not.toContain('(דייר/ת)')
+  })
+  it(`at most ${MAX_TICKET_NEW_PER_DAY} ticket_new per user in 24 hours → 429`, async () => {
+    const s = setup({ used: MAX_TICKET_NEW_PER_DAY })
+    expect((await handle({ kind: 'ticket_new', id: T1 }, s.deps)).status).toBe(429)
+    expect(s.sent).toEqual([])
+    expect((await handle({ kind: 'ticket_new', id: T1 }, setup({ used: MAX_TICKET_NEW_PER_DAY - 1 }).deps)).status).toBe(200)
+  })
+  it('a concurrent call that wins the unique index → 409, not 500', async () => {
+    const s = setup()
+    s.deps.data.log = async () => { throw new DuplicateLogError('duplicate key') }
+    expect((await handle({ kind: 'ticket_new', id: T1 }, s.deps)).status).toBe(409)
+    const live = setup({ transport: { provider: 'appsscript', dryRun: false, reason: null, send: async () => ({ ok: true }) } })
+    live.deps.data.reserve = async () => { throw new DuplicateLogError('duplicate key') }
+    expect((await handle({ kind: 'ticket_new', id: T1 }, live.deps)).status).toBe(409)
   })
   it('residents still cannot send the admin kinds', async () => {
     const s = setup()
@@ -104,6 +127,26 @@ describe('ticket_new: authorization', () => {
     const r = await handle({ kind: 'ticket_new', id: T1 }, s.deps)
     expect(r.body).toMatchObject({ sent: 2, dryRun: false })
     expect(s.reserved).toMatchObject([{ kind: 'ticket_new', ref_id: T1, count: 2 }])
+  })
+})
+
+describe('resident sends: a sub-cap of the daily quota', () => {
+  const live = (): Transport => ({ provider: 'appsscript', dryRun: false, reason: null, send: async () => ({ ok: true }) })
+  it(`a resident reserves under cap − ${MAX_PER_CALL}; an admin under the full cap`, async () => {
+    const s = setup({ transport: live(), env: { EMAIL_DAILY_CAP: '90' } })
+    await handle({ kind: 'ticket_new', id: T1 }, s.deps)
+    await handle(contact(), s.deps)
+    expect(s.reserved.map((r) => r.cap)).toEqual([90 - MAX_PER_CALL, 90 - MAX_PER_CALL])
+    const a = setup({ transport: live(), env: { EMAIL_DAILY_CAP: '90' }, ticket: ticket({ openedBy: ADMIN_A }),
+      caller: { userId: ADMIN_A, isAdmin: true, permissions: ['home'] } })
+    await handle({ kind: 'ticket_new', id: T1 }, a.deps)
+    expect(a.reserved.map((r) => r.cap)).toEqual([90])
+  })
+  it('a cap at or below MAX_PER_CALL leaves residents nothing: no reservation, contact kept in the app, ticket_new 429', async () => {
+    const s = setup({ transport: live(), env: { EMAIL_DAILY_CAP: String(MAX_PER_CALL) } })
+    expect((await handle(contact(), s.deps))).toMatchObject({ status: 200, body: { sent: 0, quotaFull: true } })
+    expect((await handle({ kind: 'ticket_new', id: T1 }, s.deps)).status).toBe(429)
+    expect(s.reserved).toEqual([])
   })
 })
 
@@ -150,13 +193,26 @@ describe('contact: sending', () => {
     expect((await handle(contact(), s.deps)).status).toBe(403)
     expect(s.stored).toEqual([])
   })
-  it(`rate limit: the ${MAX_CONTACTS_PER_DAY + 1}th message in 24 hours → 429 in Hebrew, nothing stored`, async () => {
-    const s = setup({ used: MAX_CONTACTS_PER_DAY })
+  it(`rate limit: store_committee_message refuses the ${MAX_CONTACTS_PER_DAY + 1}th in 24 hours → 429 in Hebrew, nothing sent`, async () => {
+    const s = setup({ limited: true })
     const r = await handle(contact(), s.deps)
     expect(r.status).toBe(429)
     expect(String(r.body.error)).toContain('עד 5 פניות')
-    expect(s.stored).toEqual([])
-    expect((await handle(contact(), setup({ used: MAX_CONTACTS_PER_DAY - 1 }).deps)).status).toBe(200)
+    expect(s.sent).toEqual([])
+    expect(s.logs).toEqual([])
+  })
+  it('the email names the sender as a resident', async () => {
+    const s = setup()
+    await handle(contact(), s.deps)
+    expect(s.sent[0].text).toContain('מאת: דנה "הדיירת" (דייר/ת)')
+  })
+  it('a sender address with , ; < > or " gets no Reply-To (and is not stored as one)', async () => {
+    for (const email of ['a@b.test,c@d.test', 'a;b@c.test', '"x"@y.test', '<a@b.test>']) {
+      const s = setup({ email })
+      await handle(contact(), s.deps)
+      expect(s.sent[0].replyTo).toBeUndefined()
+      expect(s.stored[0].sender_email).toBeNull()
+    }
   })
   it('no sender email: no Reply-To, the email says so', async () => {
     const s = setup({ email: null })

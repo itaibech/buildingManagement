@@ -1,8 +1,10 @@
 /**
  * The two kinds any approved user may send, both to the committee (the building's approved admins):
  *   * ticket_new: the caller's own ticket, at most 15 minutes old, announced once (email_log, plus a unique index).
- *   * contact: a message to the whole committee or one member, stored in committee_messages first, at most
- *     MAX_CONTACTS_PER_DAY per user in 24 hours, with Reply-To set to the sender.
+ *     At most MAX_TICKET_NEW_PER_DAY per user in 24 hours.
+ *   * contact: a message to the whole committee or one member, stored first through store_committee_message (which
+ *     enforces MAX_CONTACTS_PER_DAY per sender in 24 hours atomically), with Reply-To set to the sender.
+ * Both reserve against a sub-cap of the daily quota (handler.ts), so residents can't use up the committee's sends.
  */
 import { contactContent, ticketNewContent, type Sender } from './content.ts'
 import { fail, type Plan, type Reply } from './plan.ts'
@@ -14,8 +16,10 @@ export const TICKET_FRESH_MS = 15 * 60_000
 /** Clock skew allowed for a created_at slightly ahead of the function's clock. */
 const SKEW_MS = 60_000
 export const MAX_CONTACTS_PER_DAY = 5
+export const MAX_TICKET_NEW_PER_DAY = 10
 const DAY_MS = 24 * 60 * 60_000
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+/** Also safe as a header value: no whitespace and none of , ; < > " (no second address, no display-name tricks). */
+const EMAIL = /^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>"]+$/
 
 export const validEmail = (v: string | null | undefined): string | null => {
   const e = (v ?? '').trim().toLowerCase()
@@ -46,28 +50,29 @@ export async function planTicketNew({ req, caller, ctx, data, brand, now }: Scop
   const age = now - Date.parse(t.createdAt)
   if (!(age >= -SKEW_MS && age <= TICKET_FRESH_MS)) return fail(409, 'התקלה כבר אינה חדשה')
   if (await data.logged('ticket_new', t.id)) return fail(409, 'הוועד כבר עודכן על התקלה הזו')
+  const sent = await data.countSince(caller.userId, 'ticket_new', new Date(now - DAY_MS).toISOString())
+  if (sent >= MAX_TICKET_NEW_PER_DAY) return fail(429, `אפשר לעדכן את הוועד במייל על עד ${MAX_TICKET_NEW_PER_DAY} תקלות ביממה`)
   const [admins, apartment] = await Promise.all([data.admins(ctx.building.id), data.apartmentNumber(caller.userId)])
-  const reporter: Sender = { name: ctx.name, apartment }
+  const reporter: Sender = { name: ctx.name, apartment, resident: !caller.isAdmin }
   const messages = adminTargets(admins, caller.userId)
     .map((r) => ({ to: r.email, ...render(brand, ticketNewContent(t, reporter, r.name, brand.appUrl)) }))
   return plan(messages)
 }
 
-/** contact: rate limit, recipient check, store the message, then one email per recipient with Reply-To the sender. */
-export async function planContact({ req, caller, ctx, data, brand, now }: Scope): Promise<Plan | Reply> {
+/** contact: recipient check, store the message (the RPC enforces the limit), then one email per recipient, Reply-To the sender. */
+export async function planContact({ req, caller, ctx, data, brand }: Scope): Promise<Plan | Reply> {
   const c = req.contact
   if (!c) return fail(400, 'בקשה לא תקינה (contact)')
-  const used = await data.countSince(caller.userId, 'contact', new Date(now - DAY_MS).toISOString())
-  if (used >= MAX_CONTACTS_PER_DAY) return fail(429, `אפשר לשלוח עד ${MAX_CONTACTS_PER_DAY} פניות לוועד ביממה. נסו שוב מחר.`)
   const admins = await data.admins(ctx.building.id)
   const toAll = c.to === 'committee'
   if (!toAll && !admins.some((a) => a.userId === c.to)) return fail(404, 'חבר הוועד שבחרתם לא נמצא')
   const replyTo = validEmail(ctx.email)
-  const sender: Sender = { name: ctx.name, apartment: await data.apartmentNumber(caller.userId), email: replyTo }
+  const sender: Sender = { name: ctx.name, apartment: await data.apartmentNumber(caller.userId), email: replyTo, resident: !caller.isAdmin }
   const refId = await data.storeMessage({
     building_id: ctx.building.id, sender_id: caller.userId, recipient_id: toAll ? null : c.to, sender_name: ctx.name.slice(0, 200),
     sender_email: replyTo, apartment_number: sender.apartment, subject: c.subject, body: c.body,
   })
+  if (!refId) return fail(429, `אפשר לשלוח עד ${MAX_CONTACTS_PER_DAY} פניות לוועד ביממה. נסו שוב מחר.`)
   const messages = adminTargets(admins.filter((a) => toAll || a.userId === c.to), caller.userId).map((r) => ({
     to: r.email, ...render(brand, contactContent(c, sender, toAll, r.name, brand.appUrl)), ...(replyTo ? { replyTo } : {}),
   }))

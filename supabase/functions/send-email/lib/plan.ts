@@ -11,3 +11,6 @@ export interface Plan { messages: MailMessage[]; apartmentIds: string[] | null; 
 
 export const reply = (status: number, body: Record<string, unknown>): Reply => ({ status, body })
 export const fail = (status: number, error: string): Reply => reply(status, { error })
+
+/** An email_log insert hit a unique index (a ticket_new already announced by a concurrent call). */
+export class DuplicateLogError extends Error {}

@@ -53,9 +53,12 @@ export function useSendContact() {
   return useMutation({ mutationFn: sendContact, onSettled: () => client.invalidateQueries({ queryKey: KEY }) })
 }
 
-/** mailto: with the subject prefilled; the address is the sender's own (stored by the function at send time). */
+/**
+ * mailto: with the subject prefilled. The address is the sender's own, validated by the function at send time (no
+ * whitespace or , ; < > "), so it goes in as is: encoding it would turn "@" into %40, which some mail apps keep.
+ */
 export const replyHref = (m: Pick<CommitteeMessage, 'sender_email' | 'subject'>): string | null =>
-  m.sender_email ? `mailto:${encodeURIComponent(m.sender_email)}?subject=${encodeURIComponent(he.committee.inbox.replySubject(m.subject))}` : null
+  m.sender_email ? `mailto:${m.sender_email}?subject=${encodeURIComponent(he.committee.inbox.replySubject(m.subject))}` : null
 
 /** Admin inbox: the messages to the whole committee or to this admin (RLS), newest first. */
 export function useCommitteeMessages() {

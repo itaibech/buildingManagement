@@ -28,7 +28,7 @@ vi.mock('../../lib/supabase', () => ({
     from: () => ({ select: () => ({ order: () => ({ limit: () => Promise.resolve({ data: m.messages, error: null }) }) }) }),
   },
 }))
-vi.mock('../../auth/AuthProvider', () => ({ useAuth: () => ({ profile: { email: m.email } }) }))
+vi.mock('../../auth/AuthProvider', () => ({ useAuth: () => ({ profile: { email: m.email }, session: { user: { id: 'me' } } }) }))
 vi.mock('../../ui', async (orig) => ({
   ...(await orig<typeof import('../../ui')>()),
   notifySuccess: (s: string) => m.toasts.push(`ok:${s}`),
@@ -146,8 +146,15 @@ describe('CommitteeMessagesPage', () => {
     expect(screen.getByText(C.inbox.toAll)).toBeInTheDocument()
     expect(screen.getByText(C.inbox.toMe)).toBeInTheDocument()
     const reply = screen.getByRole('link', { name: C.inbox.replyLabel('דנה') })
-    expect(reply).toHaveAttribute('href', `mailto:dana%40example.test?subject=${encodeURIComponent(C.inbox.replySubject('רעש בלילה'))}`)
+    expect(reply).toHaveAttribute('href', `mailto:dana@example.test?subject=${encodeURIComponent(C.inbox.replySubject('רעש בלילה'))}`)
     expect(screen.getByText(C.inbox.noEmail)).toBeInTheDocument()
+    expect(screen.getAllByText(new RegExp(`דנה \\(${C.inbox.resident}\\)`))).toHaveLength(2)
+  })
+  it("hides the admin's own sent messages", async () => {
+    m.messages = [msg({ id: 'mine', sender_id: 'me', subject: 'שלחתי' }), msg({ id: 'theirs', subject: 'מדייר' })]
+    wrap(<CommitteeMessagesPage />)
+    expect(await screen.findByText('מדייר')).toBeInTheDocument()
+    expect(screen.queryByText('שלחתי')).toBeNull()
   })
   it('empty state', async () => {
     wrap(<CommitteeMessagesPage />)

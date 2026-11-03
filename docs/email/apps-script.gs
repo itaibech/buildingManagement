@@ -25,6 +25,8 @@ var MAX_BODY = 200000;
 var MAX_NAME = 100;
 var MAX_EMAIL = 320;
 var EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Reply-To is a header: also none of , ; < > " (a second address or a display name can't be smuggled in).
+var REPLY_TO = /^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>"]+$/;
 
 /** Compares two strings in time that does not depend on where they differ. */
 function safeEqual(a, b) {
@@ -53,7 +55,7 @@ function invalid(m) {
   if (!isText(m.html, MAX_BODY, false)) return 'html';
   if (!isText(m.text, MAX_BODY, false)) return 'text';
   if (m.fromName !== undefined && (!isText(m.fromName, MAX_NAME, true) || /[\r\n]/.test(m.fromName))) return 'fromName';
-  if (m.replyTo !== undefined && (typeof m.replyTo !== 'string' || m.replyTo.length > MAX_EMAIL || !EMAIL.test(m.replyTo.trim()))) {
+  if (m.replyTo !== undefined && (typeof m.replyTo !== 'string' || m.replyTo.length > MAX_EMAIL || !REPLY_TO.test(m.replyTo.trim()))) {
     return 'replyTo';
   }
   return null;

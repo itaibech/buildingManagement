@@ -1,8 +1,9 @@
 -- 0029 committee messages: residents write to the committee ("פנייה לוועד"), and the committee hears about new tickets.
 --   * Permission 'contact_committee' (on for the default "דייר" group): send a message to the whole committee or to
 --     one committee member (an approved admin of the building).
---   * committee_messages: every message, stored by the send-email Edge Function (service role) before it emails the
---     committee, so a message survives a dry run or a full daily quota. RLS: the sender reads their own; an admin
+--   * committee_messages: every message, stored by the send-email Edge Function (service role) through
+--     store_committee_message() before it emails the committee, so a message survives a dry run or a full daily quota.
+--     That RPC serializes per sender and refuses a 6th message in 24 hours (token 'committee_message:rate_limit'). RLS: the sender reads their own; an admin
 --     reads the ones sent to the whole committee (recipient_id null) or to them. No API writes at all: no insert,
 --     update or delete for anon / authenticated. The sender's name, email and apartment are a snapshot at send time.
 --   * committee_members(): the approved admins of the caller's building by name (the dialog's recipient list), for
@@ -31,8 +32,8 @@ create table public.committee_messages (
   id uuid primary key default gen_random_uuid(),
   building_id uuid not null references public.buildings on delete cascade,
   sender_id uuid references auth.users on delete set null,
-  -- null = the whole committee. A message to one member goes with that member's account.
-  recipient_id uuid references auth.users on delete cascade,
+  -- null = the whole committee. If that member's account is deleted the message is kept and becomes the committee's.
+  recipient_id uuid references auth.users on delete set null,
   sender_name text not null default '' check (char_length(sender_name) <= 200),
   sender_email text check (char_length(sender_email) <= 320),
   apartment_number int,
@@ -54,6 +55,33 @@ create policy committee_messages_select on public.committee_messages for select 
       and building_id = (select p.building_id from public.profiles p where p.user_id = (select auth.uid()))
       and (recipient_id is null or recipient_id = (select auth.uid())))
   );
+
+-- ---------------------------------------------------------------- store_committee_message()
+-- The only way rows get in (service role): one sender at a time (advisory lock), at most 5 in any 24 hours, so
+-- parallel requests can't pass the limit. Returns the new id; over the limit raises 'committee_message:rate_limit'.
+create function public.store_committee_message(p_building uuid, p_sender uuid, p_recipient uuid, p_sender_name text,
+  p_sender_email text, p_apartment_number int, p_subject text, p_body text) returns uuid
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_id uuid;
+begin
+  if p_sender is null then
+    raise exception 'p_sender is required' using errcode = '22023';
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended('committee_message:' || p_sender::text, 0));
+  if (select count(*) from public.committee_messages
+      where sender_id = p_sender and created_at > now() - interval '24 hours') >= 5 then
+    raise exception 'committee_message:rate_limit' using errcode = 'P0001';
+  end if;
+  insert into public.committee_messages (building_id, sender_id, recipient_id, sender_name, sender_email, apartment_number, subject, body)
+  values (p_building, p_sender, p_recipient, coalesce(p_sender_name, ''), p_sender_email, p_apartment_number, p_subject, p_body)
+  returning id into v_id;
+  return v_id;
+end;
+$$;
+revoke execute on function public.store_committee_message(uuid, uuid, uuid, text, text, int, text, text) from public, anon, authenticated;
+grant execute on function public.store_committee_message(uuid, uuid, uuid, text, text, int, text, text) to service_role;
 
 -- ---------------------------------------------------------------- committee_members()
 create function public.committee_members() returns table (user_id uuid, full_name text)

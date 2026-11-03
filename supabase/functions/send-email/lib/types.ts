@@ -128,8 +128,8 @@ export interface DataSource {
   logged(kind: EmailKind, refId: string): Promise<boolean>
   /** email_log rows of this kind by this user since `since` (ISO). */
   countSince(userId: string, kind: EmailKind, since: string): Promise<number>
-  /** Stores a committee message; its id. */
-  storeMessage(m: CommitteeMessage): Promise<string>
+  /** Stores a committee message (store_committee_message, 0029): its id, or null over the sender's 24-hour limit. */
+  storeMessage(m: CommitteeMessage): Promise<string | null>
 }
 
 export interface Reservation {

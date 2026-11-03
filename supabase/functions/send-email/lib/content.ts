@@ -30,10 +30,13 @@ export function ticketContent(t: TicketInfo, note: string | undefined, name: str
 }
 
 /** Who wrote or reported: the name, their apartment (when linked) and, for a message, their email. */
-export interface Sender { name: string; apartment: number | null; email?: string | null }
+export interface Sender { name: string; apartment: number | null; email?: string | null; /** Not an admin: labelled דייר/ת. */ resident: boolean }
+
+/** The role shown beside a resident's name, so the committee tells a resident's email from the committee's own. */
+export const RESIDENT_LABEL = 'דייר/ת'
 
 const senderLines = (s: Sender, label: string): { label: string; value: string }[] => [
-  { label, value: s.name || '—' },
+  { label, value: s.resident ? `${s.name || '—'} (${RESIDENT_LABEL})` : s.name || '—' },
   { label: 'דירה', value: s.apartment === null ? '—' : String(s.apartment) },
 ]
 

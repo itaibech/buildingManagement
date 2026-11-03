@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { DuplicateLogError } from './plan.ts'
 import type {
   Admin, Balance, Caller, CommitteeMessage, Context, DataSource, EmailKind, LedgerRow, LogRow, MeetingInfo, NewTicket, Reservation,
   Resident, TicketInfo,
@@ -80,9 +81,15 @@ async function ledger(db: SupabaseClient, ids: string[]): Promise<(LedgerRow & {
   return rows.map((r) => ({ apartmentId: r.apartment_id, month: r.month, charged: Number(r.charged), paid: Number(r.paid) }))
 }
 
+/** email_log writes: a unique violation (ticket_new announced twice) becomes DuplicateLogError. */
+function logged<T>(r: Result<T> & { error: { message: string; code?: string } | null }): T | null {
+  if (r.error?.code === '23505') throw new DuplicateLogError(r.error.message)
+  return maybe(r)
+}
+
 /** reserve_email_quota (0020): a pending row id, or null when the cap has no room. */
 async function reserve(db: SupabaseClient, r: Reservation): Promise<string | null> {
-  const id = maybe<string>(await db.rpc('reserve_email_quota', {
+  const id = logged<string>(await db.rpc('reserve_email_quota', {
     p_building: r.building_id, p_count: r.count, p_cap: r.cap, p_kind: r.kind, p_sent_by: r.sent_by,
     p_ref_id: r.ref_id, p_apartment_ids: r.apartment_ids,
   }))
@@ -115,13 +122,21 @@ async function countSince(db: SupabaseClient, userId: string, kind: EmailKind, s
   return count ?? 0
 }
 
-async function logged(db: SupabaseClient, kind: EmailKind, refId: string): Promise<boolean> {
+async function hasLog(db: SupabaseClient, kind: EmailKind, refId: string): Promise<boolean> {
   const rows = must<{ id: string }[]>(await db.from('email_log').select('id').eq('kind', kind).eq('ref_id', refId).limit(1))
   return rows.length > 0
 }
 
-async function storeMessage(db: SupabaseClient, m: CommitteeMessage): Promise<string> {
-  return must<{ id: string }>(await db.from('committee_messages').insert(m).select('id').single()).id
+const RATE_LIMIT = 'committee_message:rate_limit'
+
+/** store_committee_message (0029): serialized per sender; null when the sender is over the 24-hour limit. */
+async function storeMessage(db: SupabaseClient, m: CommitteeMessage): Promise<string | null> {
+  const r = await db.rpc('store_committee_message', {
+    p_building: m.building_id, p_sender: m.sender_id, p_recipient: m.recipient_id, p_sender_name: m.sender_name,
+    p_sender_email: m.sender_email, p_apartment_number: m.apartment_number, p_subject: m.subject, p_body: m.body,
+  })
+  if (r.error?.message.includes(RATE_LIMIT)) return null
+  return must<string>(r)
 }
 
 /** Reads and the audit insert, with the service-role client (server only; never exposed to the browser). */
@@ -139,11 +154,11 @@ export function dataSource(db: SupabaseClient): DataSource {
     sentToday: async (b) => Number(must<number>(await db.rpc('email_sent_today', { p_building: b }))),
     reserve: (r) => reserve(db, r),
     finish: async (id, o) => { maybe(await db.from('email_log').update({ ...o, status: 'done' }).eq('id', id)) },
-    log: async (row: LogRow) => { maybe(await db.from('email_log').insert(row)) },
+    log: async (row: LogRow) => { logged(await db.from('email_log').insert(row)) },
     newTicket: (id, b) => newTicket(db, id, b),
     admins: (b) => admins(db, b),
     apartmentNumber: (userId) => apartmentNumber(db, userId),
-    logged: (kind, refId) => logged(db, kind, refId),
+    logged: (kind, refId) => hasLog(db, kind, refId),
     countSince: (userId, kind, since) => countSince(db, userId, kind, since),
     storeMessage: (m) => storeMessage(db, m),
   }

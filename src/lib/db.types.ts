@@ -1597,6 +1597,9 @@ isOneToOne: false
               "amount": number,"apartment_id": string,"building_id": string,"month": string
             }[]
                            },
+"store_committee_message":
+{ Args: { "p_apartment_number": number,"p_body": string,"p_building": string,"p_recipient": string,"p_sender": string,"p_sender_email": string,"p_sender_name": string,"p_subject": string }; Returns: string
+                           },
 "undo_settlement":
 { Args: { "p_settlement_id": string }; Returns: Json
                            },

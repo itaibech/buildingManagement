@@ -1,5 +1,6 @@
 import { Badge, Button, Card, Group, Stack, Text, Title } from '@mantine/core'
 import { IconMailForward } from '@tabler/icons-react'
+import { useAuth } from '../../auth/AuthProvider'
 import { formatDate } from '../../lib/format'
 import { he } from '../../lib/he'
 import { AptPlate, EmptyState, ListSkeleton, PageHeader } from '../../ui'
@@ -17,7 +18,7 @@ function MessageCard({ m }: { m: CommitteeMessage }) {
         {m.apartment_number !== null && <AptPlate number={m.apartment_number} size="sm" />}
         <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
           <Title order={2} size="h5">{m.subject}</Title>
-          <Text size="sm" c="dimmed" className="bm-num">{`${name} · ${formatDate(m.created_at)}`}</Text>
+          <Text size="sm" c="dimmed" className="bm-num">{`${name} (${I.resident}) · ${formatDate(m.created_at)}`}</Text>
         </Stack>
         <Badge color={m.recipient_id ? 'enamel' : 'stone'} variant="light">{m.recipient_id ? I.toMe : I.toAll}</Badge>
       </Group>
@@ -30,9 +31,15 @@ function MessageCard({ m }: { m: CommitteeMessage }) {
   )
 }
 
-/** Admin "פניות דיירים": the messages residents sent to the whole committee or to this admin, newest first. */
+/**
+ * Admin "פניות דיירים": the messages residents sent to the whole committee or to this admin, newest first. The admin's
+ * own sent messages (RLS lets a sender read them) are not part of the inbox.
+ */
 export default function CommitteeMessagesPage() {
-  const { data, isLoading, isError, refetch } = useCommitteeMessages()
+  const me = useAuth().session?.user.id
+  const q = useCommitteeMessages()
+  const { isLoading, isError, refetch } = q
+  const data = q.data?.filter((m) => m.sender_id !== me)
   return (
     <Stack gap="md">
       <PageHeader title={I.title} />

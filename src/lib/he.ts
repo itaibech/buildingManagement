@@ -1672,6 +1672,7 @@ export const he = {
       noEmail: 'לפונה אין כתובת מייל',
       replySubject: (subject: string) => `בנושא: ${subject}`,
       unknownSender: 'דייר',
+      resident: 'דייר/ת',
     },
   },
   mail: {

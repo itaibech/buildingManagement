@@ -232,7 +232,11 @@ Two kinds go to the committee (the building's approved admins) and may be sent b
 - `contact` (**פנייה לוועד**, on the resident home and under **עוד**, permission `contact_committee`): a message to the
   whole committee or one member. The function stores it in `committee_messages` first (admins read it under
   **עוד → פניות דיירים**, and get an in-app notice), then emails it with **Reply-To** set to the sender, at most 5
-  per user in 24 hours. In dry run the message is still stored and shown to the committee in the app.
+  per user in 24 hours (enforced atomically by `store_committee_message()`). In dry run, or when the quota is full,
+  the message is still stored and shown to the committee in the app.
+
+Residents' sends (`ticket_new` at most 10 per user in 24 hours, `contact`) reserve under `EMAIL_DAILY_CAP − 40`, so a
+full committee send (40 emails) always still fits in what they leave.
 
 Reply-To through Apps Script needs the current [`docs/email/apps-script.gs`](docs/email/apps-script.gs): after
 updating the script, redeploy it (**Deploy → Manage deployments → edit → Version: New version**). An older

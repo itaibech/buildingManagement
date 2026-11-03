@@ -4,7 +4,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(34);
+select plan(44);
 
 insert into auth.users (id, email, aud, role) values
   ('a9100000-0000-0000-0000-00000000000a', 'cm-admin-a@test.local', 'authenticated', 'authenticated'),
@@ -127,6 +127,34 @@ set local role anon;
 set local request.jwt.claims = '{"role":"anon"}';
 select throws_ok($$select count(*) from public.committee_messages$$, '42501', null, 'anon: no access to committee_messages');
 select throws_ok($$select * from public.committee_members()$$, '42501', null, 'anon: cannot call committee_members');
+select throws_ok($$select public.store_committee_message(public.default_building_id(), 'a9100000-0000-0000-0000-000000000001',
+  null, 'x', null, null, 'x', 'y')$$, '42501', null, 'anon: cannot call store_committee_message');
+
+-- ---------------------------------------------------------------- store_committee_message(): grants and the limit
+reset role;
+select ok(has_function_privilege('service_role', 'public.store_committee_message(uuid, uuid, uuid, text, text, int, text, text)', 'execute'),
+  'store_committee_message: service_role may call it');
+select ok(not has_function_privilege('authenticated', 'public.store_committee_message(uuid, uuid, uuid, text, text, int, text, text)', 'execute'),
+  'store_committee_message: authenticated may not');
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"a9100000-0000-0000-0000-000000000001","role":"authenticated"}';
+select throws_ok($$select public.store_committee_message(public.default_building_id(), 'a9100000-0000-0000-0000-000000000001',
+  null, 'x', null, null, 'x', 'y')$$, '42501', null, 'resident: cannot call store_committee_message');
+reset role;
+-- Resident 1 already sent 2 in the last 24 hours: 3 more fit, the 6th is refused.
+select isnt(public.store_committee_message(public.default_building_id(), 'a9100000-0000-0000-0000-000000000001', null, 'דנה',
+  'dana@test.local', 7, 'שלישית', 'גוף'), null, 'store: the 3rd message in 24 hours is stored');
+select is((select row(sender_name, sender_email, apartment_number, recipient_id is null)::text from public.committee_messages
+  where subject = 'שלישית'), '(דנה,dana@test.local,7,t)', 'store: every column is written');
+select lives_ok($$select public.store_committee_message(public.default_building_id(), 'a9100000-0000-0000-0000-000000000001',
+  'a9100000-0000-0000-0000-00000000000a', 'דנה', null, null, 'רביעית', 'גוף')$$, 'store: the 4th');
+select lives_ok($$select public.store_committee_message(public.default_building_id(), 'a9100000-0000-0000-0000-000000000001',
+  null, 'דנה', null, null, 'חמישית', 'גוף')$$, 'store: the 5th');
+select throws_ok($$select public.store_committee_message(public.default_building_id(), 'a9100000-0000-0000-0000-000000000001',
+  null, 'דנה', null, null, 'שישית', 'גוף')$$, 'P0001', 'committee_message:rate_limit', 'store: the 6th in 24 hours is refused');
+update public.committee_messages set created_at = now() - interval '25 hours' where id = 'c9100000-0000-0000-0000-000000000001';
+select lives_ok($$select public.store_committee_message(public.default_building_id(), 'a9100000-0000-0000-0000-000000000001',
+  null, 'דנה', null, null, 'שישית', 'גוף')$$, 'store: a message older than 24 hours no longer counts');
 
 select * from finish();
 rollback;
