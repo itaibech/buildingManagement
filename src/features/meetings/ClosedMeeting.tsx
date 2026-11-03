@@ -12,6 +12,7 @@ import { printProtocol } from './print'
 import { ProtocolView } from './ProtocolView'
 import { SignPanel } from './SignPanel'
 import type { MeetingDetail } from './types'
+import { ShareButton } from '../share/ShareButton'
 
 type Dialog = 'publish' | 'addendum' | 'email' | 'reopen' | null
 const A = he.meetings.actions
@@ -41,6 +42,7 @@ export function ClosedMeeting({ meeting, isAdmin }: { meeting: MeetingDetail; is
         <Button variant={closed ? 'default' : 'filled'} leftSection={<IconPrinter {...ICON} />} onClick={() => printProtocol(meeting)}>{A.print}</Button>
         {closed && isAdmin && <ReopenButton block={block} onOpen={() => setDialog('reopen')} />}
         {isAdmin && <Button variant="default" leftSection={<IconFilePlus {...ICON} />} onClick={() => setDialog('addendum')}>{A.addendum}</Button>}
+        {meeting.status === 'published' && <ShareButton kind="protocol" item={meeting} />}
       </Group>
       {closed && isAdmin && block && <Text id="bm-reopen-block" size="sm" c="dimmed">{he.meetings.errors[block]}</Text>}
       {closed && isAdmin && !isSigned(meeting) && <Text size="sm" c="dimmed">{he.meetings.publish.needsSignatures}</Text>}

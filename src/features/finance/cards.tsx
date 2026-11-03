@@ -7,6 +7,7 @@ import { telHref, useBuilding } from '../settings/api'
 import { billingOf, useApartmentBilling } from '../tenants/api'
 import { useBuildingCash, useMyBalance, type ApartmentBalance } from './api'
 import { hasBadges, heroState } from './ledger'
+import { OnlinePaySoon } from './OnlinePay'
 
 /** Dimmed failure line with a retry button. */
 export function LoadFailed({ onRetry }: { onRetry: () => void }) {
@@ -127,6 +128,7 @@ export function HowToPay({ whenOwed = false }: { whenOwed?: boolean }) {
             <span>{he.pay.call(phone)}</span>
           </Anchor>
         )}
+        <OnlinePaySoon />
       </Stack>
     </Card>
   )

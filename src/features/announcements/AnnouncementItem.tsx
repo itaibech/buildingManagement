@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { formatDate } from '../../lib/format'
 import { he } from '../../lib/he'
 import { UnreadDot } from '../../ui/UnreadDot'
+import { ShareButton } from '../share/ShareButton'
 import type { AnnouncementItem as Item } from './api'
 
 function Meta({ a, expired }: { a: Item; expired: boolean }) {
@@ -100,7 +101,10 @@ export function AnnouncementItem({ item, expired = false, onOpen, actions, focus
       <Collapse expanded={opened}>
         <Text px="md" pb="md" ps={44} style={{ whiteSpace: 'pre-wrap' }}>{item.body}</Text>
         {/* An in-app page the notice points to (a meeting's invitation or protocol); HashRouter paths. */}
-        {item.link && <Button component="a" href={`#${item.link}`} variant="light" ms={44} mb="md">{he.announcements.openLink}</Button>}
+        <Group gap="sm" ms={44} me="md" mb="md" wrap="wrap">
+          {item.link && <Button component="a" href={`#${item.link}`} variant="light">{he.announcements.openLink}</Button>}
+          {!expired && <ShareButton kind="announcement" item={item} />}
+        </Group>
       </Collapse>
     </Card>
   )

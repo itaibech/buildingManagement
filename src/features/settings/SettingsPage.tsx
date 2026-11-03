@@ -6,6 +6,7 @@ import { he } from '../../lib/he'
 import { focusFirstError, ListSkeleton, notifySuccess, PageHeader } from '../../ui'
 import { EmailSettings } from '../email/EmailSettings'
 import { LoadFailed } from '../finance/cards'
+import { OnlinePaySettingsCard } from '../finance/OnlinePay'
 import { useBuilding, useSaveBuilding, type Building } from './api'
 
 const MAX_INSTRUCTIONS = 1000
@@ -87,6 +88,7 @@ export default function SettingsPage() {
       <Stack gap="lg">
         {q.data && <SettingsForm key={q.data.id} building={q.data} />}
         <EmailSettings />
+        <OnlinePaySettingsCard />
       </Stack>
     </>
   )
