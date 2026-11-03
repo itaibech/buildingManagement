@@ -31,6 +31,15 @@ describe('recurrence expansion', () => {
     expect(expandItem(weekly, '2027-03-21', '2027-03-28').map((o) => o.start)).toEqual(['2027-03-21T18:00:00.000Z', '2027-03-28T17:00:00.000Z'])
   })
 
+  it('a series that started decades ago still expands in a far window (no step cap from the start)', () => {
+    const weekly = item({ startsAt: '1990-01-04T07:00:00.000Z', recurrence: 'weekly' }) // Thursday 09:00
+    expect(expandItem(weekly, '2026-11-01', '2026-11-14').map((o) => o.day)).toEqual(['2026-11-05', '2026-11-12'])
+    const monthly = item({ startsAt: '1990-01-31T07:00:00.000Z', recurrence: 'monthly' })
+    expect(expandItem(monthly, '2027-02-01', '2027-03-31').map((o) => o.day)).toEqual(['2027-02-28', '2027-03-31'])
+    const shutoff = item({ allDay: true, startsAt: '2000-01-02T22:00:00.000Z', endsAt: '2000-01-04T22:00:00.000Z', recurrence: 'weekly' })
+    expect(expandItem(shutoff, '2026-11-10', '2026-11-10').map((o) => [o.day, o.lastDay])).toEqual([['2026-11-09', '2026-11-11']])
+  })
+
   it('weekly stops at the end date (inclusive)', () => {
     const weekly = item({ recurrence: 'weekly', until: '2026-11-19' })
     expect(expandItem(weekly, '2026-11-01', '2026-12-31').map((o) => o.day)).toEqual(['2026-11-05', '2026-11-12', '2026-11-19'])

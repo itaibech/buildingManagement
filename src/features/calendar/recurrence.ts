@@ -4,8 +4,8 @@ import { fromInputs, meetingISODate, meetingTime } from '../meetings/fmt'
 import type { CalendarItem, Occurrence } from './types'
 
 const DAY_MS = 86_400_000
-/** Guards a broken rule from looping forever (weekly for ~100 years). */
-const MAX_STEPS = 5300
+/** Guards a broken rule from looping forever: a window this long holds at most ~1,600 weekly occurrences. */
+const MAX_STEPS = 2000
 
 const utc = (date: string): number => Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10)))
 const isoOf = (ms: number): string => new Date(ms).toISOString().slice(0, 10)
@@ -41,6 +41,17 @@ function nthDate(item: CalendarItem, first: string, k: number): string {
   return first
 }
 
+/**
+ * The index of the first occurrence that may overlap `from` (a lower bound: earlier ones end before it), so a long-running
+ * series is not walked from its start.
+ */
+export function firstIndex(item: CalendarItem, first: string, span: number, from: string): number {
+  if (item.recurrence === 'none' || from <= first) return 0
+  if (item.recurrence === 'weekly') return Math.max(0, Math.floor((daysBetween(first, from) - span) / 7))
+  const months = (Number(from.slice(0, 4)) - Number(first.slice(0, 4))) * 12 + Number(from.slice(5, 7)) - Number(first.slice(5, 7))
+  return Math.max(0, months - 1 - Math.ceil(span / 28))
+}
+
 /** The item's first day, how many extra days it spans, its start time and its timed duration. */
 function shapeOf(item: CalendarItem) {
   const first = meetingISODate(item.startsAt)
@@ -54,7 +65,8 @@ export function expandItem(item: CalendarItem, from: string, to: string): Occurr
   const { first, span, time, durationMs } = shapeOf(item)
   const last = item.recurrence === 'none' ? first : item.until ?? to
   const out: Occurrence[] = []
-  for (let k = 0; k < MAX_STEPS; k++) {
+  const k0 = firstIndex(item, first, span, from)
+  for (let k = k0; k < k0 + MAX_STEPS; k++) {
     const day = nthDate(item, first, k)
     if (day > to || day > last) break
     const lastDay = addDays(day, span)
