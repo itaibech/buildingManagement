@@ -38,6 +38,12 @@ function fakeData(over: Partial<DataSource> = {}, used = 0): Fake {
     },
     finish: async (id, o) => { finished.push([id, o]) },
     log: async (row) => { logs.push(row) },
+    newTicket: async () => null,
+    admins: async () => [],
+    apartmentNumber: async () => null,
+    logged: async () => false,
+    countSince: async () => 0,
+    storeMessage: async () => 'm1',
     ...over,
   }
 }
@@ -56,7 +62,7 @@ function deps(over: Partial<Deps> = {}): Deps & { data: Fake; transport: ReturnT
 function authClient(isAdmin: boolean, user: { id: string } | null = { id: 'u2' }): AuthClient {
   return {
     auth: { getUser: async () => ({ data: { user }, error: null }) },
-    rpc: async () => ({ data: isAdmin, error: null }),
+    rpc: async (fn) => ({ data: fn === 'is_admin' ? isAdmin : ['home'], error: null }),
   }
 }
 
@@ -73,7 +79,7 @@ describe('handle: auth', () => {
     expect((await handle({ kind: 'test' }, deps({ caller: () => callerFrom(authClient(true, null)) }))).status).toBe(401)
   })
   it('an admin passes callerFrom', async () => {
-    expect(await callerFrom(authClient(true))).toEqual({ userId: 'u2', isAdmin: true })
+    expect(await callerFrom(authClient(true))).toEqual({ userId: 'u2', isAdmin: true, permissions: ['home'] })
   })
   it('a bad request gets 400', async () => {
     expect((await handle({ kind: 'nope' }, deps())).status).toBe(400)

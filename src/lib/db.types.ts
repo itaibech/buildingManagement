@@ -363,6 +363,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"committee_messages": {
+                  Row: {
+                    "apartment_number": number | null,"body": string,"building_id": string,"created_at": string,"id": string,"recipient_id": string | null,"sender_email": string | null,"sender_id": string | null,"sender_name": string,"subject": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "apartment_number"?: number | null,"body": string,"building_id": string,"created_at"?: string,"id"?: string,"recipient_id"?: string | null,"sender_email"?: string | null,"sender_id"?: string | null,"sender_name"?: string,"subject": string
+                  }
+                  Update: {
+                    "apartment_number"?: number | null,"body"?: string,"building_id"?: string,"created_at"?: string,"id"?: string,"recipient_id"?: string | null,"sender_email"?: string | null,"sender_id"?: string | null,"sender_name"?: string,"subject"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "committee_messages_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "committee_messages_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"email_log": {
                   Row: {
                     "apartment_ids": (string)[] | null,"building_id": string,"created_at": string,"dry_run": boolean,"error": string | null,"failed": number,"id": string,"kind": string,"recipients": number,"ref_id": string | null,"sent": number,"sent_by": string | null,"skipped": number,"status": string
@@ -1282,6 +1308,11 @@ isOneToOne: false
               "amount_due_total": number,"apartments_paid_up": number,"apartments_total": number
             }[]
                            },
+"committee_members":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "full_name": string,"user_id": string
+            }[]
+                           },
 "current_month":
 { Args: Record<PropertyKey, never>; Returns: string
                            },
@@ -1565,6 +1596,9 @@ isOneToOne: false
 { Args: { "p_apartment_id": string }; Returns: {
               "amount": number,"apartment_id": string,"building_id": string,"month": string
             }[]
+                           },
+"store_committee_message":
+{ Args: { "p_apartment_number": number,"p_body": string,"p_building": string,"p_recipient": string,"p_sender": string,"p_sender_email": string,"p_sender_name": string,"p_subject": string }; Returns: string
                            },
 "undo_settlement":
 { Args: { "p_settlement_id": string }; Returns: Json

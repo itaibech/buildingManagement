@@ -2,8 +2,12 @@
  * Building-management email relay (Google Apps Script web app).
  *
  * The app's Supabase Edge Function `send-email` POSTs one message at a time as JSON:
- *   { token, to, subject, html, text, fromName }
+ *   { token, to, subject, html, text, fromName, replyTo? }
  * and this script sends it from the Gmail account that owns the script. Reply: {"ok":true} or {"ok":false,"error":"..."}.
+ * replyTo (optional): where replies go, e.g. the resident who wrote to the committee ("פנייה לוועד").
+ *
+ * Updating: after changing this file, redeploy it (Deploy → Manage deployments → edit → Version: New version) so the
+ * Web app URL serves the new code. An older deployment ignores replyTo: replies then go to the sending account.
  *
  * Setup (README → "Email setup", option A):
  *   1. Paste this file into a new project at https://script.google.com (signed in as the sending Gmail account).
@@ -19,7 +23,10 @@ var TOKEN = 'CHANGE_ME';
 var MAX_SUBJECT = 250;
 var MAX_BODY = 200000;
 var MAX_NAME = 100;
+var MAX_EMAIL = 320;
 var EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Reply-To is a header: also none of , ; < > " (a second address or a display name can't be smuggled in).
+var REPLY_TO = /^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>"]+$/;
 
 /** Compares two strings in time that does not depend on where they differ. */
 function safeEqual(a, b) {
@@ -48,6 +55,9 @@ function invalid(m) {
   if (!isText(m.html, MAX_BODY, false)) return 'html';
   if (!isText(m.text, MAX_BODY, false)) return 'text';
   if (m.fromName !== undefined && (!isText(m.fromName, MAX_NAME, true) || /[\r\n]/.test(m.fromName))) return 'fromName';
+  if (m.replyTo !== undefined && (typeof m.replyTo !== 'string' || m.replyTo.length > MAX_EMAIL || !REPLY_TO.test(m.replyTo.trim()))) {
+    return 'replyTo';
+  }
   return null;
 }
 
@@ -66,7 +76,9 @@ function doPost(e) {
   if (MailApp.getRemainingDailyQuota() < 1) return reply({ ok: false, error: 'daily quota exhausted' });
   try {
     // GmailApp, not MailApp: MailApp folds a long Hebrew sender name mid-character, so one letter shows as "��".
-    GmailApp.sendEmail(m.to.trim(), m.subject, m.text, { htmlBody: m.html, name: m.fromName || 'ועד הבית' });
+    var options = { htmlBody: m.html, name: m.fromName || 'ועד הבית' };
+    if (m.replyTo) options.replyTo = m.replyTo.trim();
+    GmailApp.sendEmail(m.to.trim(), m.subject, m.text, options);
     return reply({ ok: true });
   } catch (err) {
     return reply({ ok: false, error: String(err && err.message ? err.message : err).slice(0, 300) });

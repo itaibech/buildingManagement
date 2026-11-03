@@ -1,5 +1,5 @@
 import type { EmailContent } from './template.ts'
-import type { MeetingInfo, MeetingVariant, TicketInfo } from './types.ts'
+import type { ContactInput, MeetingInfo, MeetingVariant, NewTicket, TicketInfo } from './types.ts'
 
 const MONTHS = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר']
 const STATUS: Record<string, string> = { open: 'פתוחה', in_progress: 'בטיפול', closed: 'סגורה' }
@@ -26,6 +26,40 @@ export function ticketContent(t: TicketInfo, note: string | undefined, name: str
   return {
     subject: `עדכון בקריאת שירות: ${t.title}`, greeting: greeting(name), heading: t.title, paragraphs, lines,
     link: { href: `${appUrl}#/tickets/${t.id}`, label: 'לקריאת השירות באפליקציה' },
+  }
+}
+
+/** Who wrote or reported: the name, their apartment (when linked) and, for a message, their email. */
+export interface Sender { name: string; apartment: number | null; email?: string | null; /** Not an admin: labelled דייר/ת. */ resident: boolean }
+
+/** The role shown beside a resident's name, so the committee tells a resident's email from the committee's own. */
+export const RESIDENT_LABEL = 'דייר/ת'
+
+const senderLines = (s: Sender, label: string): { label: string; value: string }[] => [
+  { label, value: s.resident ? `${s.name || '—'} (${RESIDENT_LABEL})` : s.name || '—' },
+  { label: 'דירה', value: s.apartment === null ? '—' : String(s.apartment) },
+]
+
+/** kind 'ticket_new', to each committee member: the new ticket, who reported it, and a link to it. */
+export function ticketNewContent(t: NewTicket, reporter: Sender, name: string, appUrl: string): EmailContent {
+  return {
+    subject: `תקלה חדשה: ${t.title}`, greeting: greeting(name), heading: t.title,
+    paragraphs: ['דייר פתח תקלה חדשה באפליקציה.'],
+    lines: [...senderLines(reporter, 'מדווח/ת'), { label: 'מיקום', value: t.location || '—' }],
+    after: t.description.trim() ? [`תיאור:\n${t.description.trim()}`] : [],
+    link: { href: `${appUrl}#/tickets/${t.id}`, label: 'לתקלה באפליקציה' },
+  }
+}
+
+/** kind 'contact', to each recipient: the resident's message; replying to the email answers the resident. */
+export function contactContent(c: ContactInput, sender: Sender, toAll: boolean, name: string, appUrl: string): EmailContent {
+  const lines = senderLines(sender, 'מאת')
+  if (sender.email) lines.push({ label: 'אימייל', value: sender.email })
+  return {
+    subject: `פנייה לוועד: ${c.subject}`, greeting: greeting(name), heading: c.subject,
+    paragraphs: [toAll ? 'התקבלה פנייה לכל חברי הוועד.' : 'התקבלה פנייה אליך כחבר/ת ועד.'], lines,
+    after: [c.body, sender.email ? `להשבה: השיבו למייל הזה, והתשובה תגיע אל ${sender.email}.` : 'לפונה אין כתובת מייל באפליקציה.'],
+    link: { href: `${appUrl}#/committee-messages`, label: 'לפניות הדיירים באפליקציה' },
   }
 }
 

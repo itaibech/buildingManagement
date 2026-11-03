@@ -10,6 +10,8 @@ const db = vi.hoisted(() => ({
   photoRows: [] as unknown[],
   failUpload: new Set<string>(),
   listed: [] as { name: string }[],
+  invoked: [] as unknown[],
+  invokeFails: false,
 }))
 
 vi.mock('../../lib/supabase', () => ({
@@ -28,6 +30,12 @@ vi.mock('../../lib/supabase', () => ({
         },
       }),
     }),
+    functions: {
+      invoke: (name: string, opts: { body: unknown }) => {
+        db.invoked.push([name, opts.body])
+        return db.invokeFails ? Promise.reject(new Error('network')) : Promise.resolve({ data: {}, error: null })
+      },
+    },
     storage: {
       from: () => ({
         upload: (_path: string, f: File) => Promise.resolve({ error: db.failUpload.has(f.name) ? { message: 'boom' } : null }),
@@ -54,6 +62,8 @@ beforeEach(() => {
   db.photoRows.length = 0
   db.failUpload.clear()
   db.listed = []
+  db.invoked.length = 0
+  db.invokeFails = false
 })
 
 describe('useCreateTicket', () => {
@@ -67,6 +77,25 @@ describe('useCreateTicket', () => {
     expect(out).toEqual({ id: 't1', failedPhotos: 1 })
     expect(db.photoRows).toHaveLength(1)
     expect((db.photoRows[0] as { path: string }[])).toHaveLength(1)
+  })
+})
+
+describe('useCreateTicket: committee email', () => {
+  it('asks send-email to tell the committee about the new ticket (kind ticket_new)', async () => {
+    const { result } = renderHook(() => useCreateTicket(), { wrapper })
+    await act(async () => {
+      await result.current.mutateAsync({ values: { title: 'x', description: '', location: '' }, files: [] })
+    })
+    expect(db.invoked).toEqual([['send-email', { kind: 'ticket_new', id: 't1' }]])
+  })
+  it('a failing email never fails the ticket', async () => {
+    db.invokeFails = true
+    const { result } = renderHook(() => useCreateTicket(), { wrapper })
+    let out: { id: string; failedPhotos: number } | undefined
+    await act(async () => {
+      out = await result.current.mutateAsync({ values: { title: 'x', description: '', location: '' }, files: [] })
+    })
+    expect(out).toEqual({ id: 't1', failedPhotos: 0 })
   })
 })
 

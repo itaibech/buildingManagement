@@ -1,12 +1,13 @@
 import { Button, Card, NavLink, Stack, Title } from '@mantine/core'
-import { IconChevronLeft, IconLogout } from '@tabler/icons-react'
-import type { ReactNode } from 'react'
+import { IconChevronLeft, IconLogout, IconMessageCircle } from '@tabler/icons-react'
+import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { useAuth } from '../../auth/AuthProvider'
 import { useExit } from '../../auth/useExit'
 import { ADMIN_NAV, GENERAL_NAV, permitted, type NavItem } from '../../layout/nav'
 import { he } from '../../lib/he'
 import { PageHeader } from '../../ui'
+import { ContactDialog } from '../committee/ContactDialog'
 import { YearExport } from '../export/YearExport'
 
 const ICON = { size: 22, stroke: 1.75 } as const
@@ -25,15 +26,30 @@ function NavCard({ title, items, children }: { title: string; items: NavItem[]; 
   )
 }
 
+/** "פנייה לוועד" as a row of the "כללי" card: it opens the dialog instead of a page. */
+function ContactRow({ onOpen }: { onOpen: () => void }) {
+  return (
+    <NavLink component="button" type="button" label={he.committee.contact} description={he.committee.contactHint} onClick={onOpen}
+      leftSection={<IconMessageCircle {...ICON} aria-hidden="true" />} rightSection={CHEVRON} fw={600} style={{ borderRadius: 10 }} />
+  )
+}
+
 /** "עוד": the secondary pages the user may open, grouped, with the exit at the bottom on mobile (desktop has it in the side nav). */
 export default function MorePage() {
   const { isAdmin, can } = useAuth()
   const exit = useExit()
   const general = permitted(GENERAL_NAV, can)
+  const contact = can('contact_committee')
+  const [writing, setWriting] = useState(false)
   return (
     <Stack gap="md">
       <PageHeader title={he.nav.more} />
-      {general.length > 0 && <NavCard title={he.nav.general} items={general} />}
+      {(general.length > 0 || contact) && (
+        <NavCard title={he.nav.general} items={general}>
+          {contact && <ContactRow onOpen={() => setWriting(true)} />}
+        </NavCard>
+      )}
+      <ContactDialog opened={writing} onClose={() => setWriting(false)} />
       {isAdmin && (
         <NavCard title={he.nav.admin} items={ADMIN_NAV}>
           <YearExport />

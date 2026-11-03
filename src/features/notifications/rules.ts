@@ -8,12 +8,14 @@ type Tables = Database['public']['Tables']
 export type AnnouncementRowLite = Pick<Tables['announcements']['Row'], 'id' | 'title' | 'author_id' | 'expires_at'>
 export type TicketRowLite = Pick<Tables['tickets']['Row'], 'id' | 'title' | 'status' | 'opened_by' | 'last_activity_by' | 'last_activity_kind'>
 export type CommentRowLite = Pick<Tables['ticket_comments']['Row'], 'id' | 'ticket_id' | 'author_id'>
+export type MessageRowLite = Pick<Tables['committee_messages']['Row'], 'id' | 'subject' | 'sender_id' | 'apartment_number'>
 
 /** One Realtime change, as delivered by the subscription (only the columns the rules read). */
 export type ChangeEvent =
   | { table: 'announcements'; row: AnnouncementRowLite }
   | { table: 'tickets'; type: 'INSERT' | 'UPDATE'; row: TicketRowLite }
   | { table: 'ticket_comments'; row: CommentRowLite }
+  | { table: 'committee_messages'; row: MessageRowLite }
 
 export interface Viewer {
   userId: string
@@ -23,7 +25,8 @@ export interface Viewer {
 }
 
 /** The page an event belongs to: no notice for an area the viewer's group can't open. */
-const areaOf = (event: ChangeEvent): PermissionKey => (event.table === 'announcements' ? 'announcements' : 'tickets')
+const areaOf = (event: Exclude<ChangeEvent, { table: 'committee_messages' }>): PermissionKey =>
+  (event.table === 'announcements' ? 'announcements' : 'tickets')
 
 /** What the viewer may know about the call an event is about (from my_ticket_activity). */
 export interface TicketRef {
@@ -32,7 +35,7 @@ export interface TicketRef {
   apartment_number: number | null
 }
 
-export type NoticeKind = 'announcement' | 'ticketNew' | 'ticketEdited' | 'ticketStatus' | 'ticketComment'
+export type NoticeKind = 'announcement' | 'ticketNew' | 'ticketEdited' | 'ticketStatus' | 'ticketComment' | 'committeeMessage'
 
 export interface Notice {
   kind: NoticeKind
@@ -75,11 +78,18 @@ function forComment(row: CommentRowLite, viewer: Viewer, ticket: TicketRef | nul
   return { kind: 'ticketComment', text: he.notifications.newComment(ticket.title), path: ticketPath(row.ticket_id) }
 }
 
+/** Admins: a resident's message to the committee ("פניות דיירים"); RLS only delivers the ones addressed to them. */
+function forMessage(row: MessageRowLite, viewer: Viewer): Notice | null {
+  if (!viewer.isAdmin || row.sender_id === viewer.userId) return null
+  return { kind: 'committeeMessage', text: he.notifications.newMessage(row.subject, row.apartment_number), path: '/committee-messages' }
+}
+
 /**
  * The notice a change should raise for this viewer, or null. The viewer's own actions never notify them.
  * `ticket` is the call the event is about (needed for comments and the apartment number), when the viewer can see it.
  */
 export function qualify(event: ChangeEvent, viewer: Viewer, ticket: TicketRef | null, today: string): Notice | null {
+  if (event.table === 'committee_messages') return forMessage(event.row, viewer)
   if (!viewer.can(areaOf(event))) return null
   switch (event.table) {
     case 'announcements':

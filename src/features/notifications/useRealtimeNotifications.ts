@@ -29,6 +29,10 @@ async function lookupTicket(ticketId: string): Promise<TicketRef | null> {
   }
 }
 
+/** The queries a change affects. */
+const queryKeyOf = (event: ChangeEvent, ticketId: string | null): string[] =>
+  event.table === 'committee_messages' ? ['committee-messages'] : ticketId === null ? ['announcements'] : ['tickets']
+
 /**
  * One Realtime change: refresh what it affects, then toast (and maybe a system notification) if it qualifies.
  * Never rejects: a notification that can't be shown must not surface as an unhandled rejection.
@@ -36,7 +40,7 @@ async function lookupTicket(ticketId: string): Promise<TicketRef | null> {
 export async function handleChange(event: ChangeEvent, ctx: HandlerContext): Promise<void> {
   try {
     const ticketId = ticketIdOf(event)
-    void ctx.client.invalidateQueries({ queryKey: ticketId === null ? ['announcements'] : ['tickets'] })
+    void ctx.client.invalidateQueries({ queryKey: queryKeyOf(event, ticketId) })
     const ticket = ticketId !== null && needsTicketRef(event, ctx.viewer) ? await lookupTicket(ticketId) : null
     const notice = qualify(event, ctx.viewer, ticket, todayISO())
     if (!notice || notice.path === ctx.pathname) return
@@ -64,6 +68,7 @@ export function useRealtimeNotifications(): void {
     const resync = () => {
       void client.invalidateQueries({ queryKey: ['tickets'] })
       void client.invalidateQueries({ queryKey: ['announcements'] })
+      void client.invalidateQueries({ queryKey: ['committee-messages'] })
     }
     return subscribeToChanges(userId, (event) => {
       if (ctx.current) void handleChange(event, ctx.current)

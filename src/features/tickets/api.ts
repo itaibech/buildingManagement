@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Database } from '../../lib/db.types'
 import { supabase } from '../../lib/supabase'
+import { notifyCommitteeOfTicket } from '../committee/api'
 import { PHOTO_BUCKET, photoMime, photoPath } from './photos'
 
 type Row = Database['public']['Tables']['tickets']['Row']
@@ -112,7 +113,10 @@ async function uploadPhotos(ticketId: string, files: readonly File[]): Promise<n
   return error ? files.length : files.length - uploaded.length
 }
 
-/** Opens a ticket, then uploads its photos. `failedPhotos` counts photos that could not be saved. */
+/**
+ * Opens a ticket, emails the committee about it (fire and forget), then uploads its photos. `failedPhotos` counts
+ * photos that could not be saved.
+ */
 export function useCreateTicket() {
   const client = useQueryClient()
   return useMutation({
@@ -120,6 +124,7 @@ export function useCreateTicket() {
       const { data, error } = await supabase.from('tickets').insert(values).select('id').single()
       fail(error)
       if (!data) throw new Error('Ticket was not created')
+      notifyCommitteeOfTicket(data.id)
       const failedPhotos = files.length === 0 ? 0 : await uploadPhotos(data.id, files).catch(() => files.length)
       return { id: data.id, failedPhotos }
     },

@@ -224,6 +224,24 @@ on **עוד → הגדרות בניין** (with the **"היסטוריית מיי
 (no one sees other residents' addresses) from the Supabase Edge Function `supabase/functions/send-email`. The
 browser never holds mail credentials, and the function checks that the caller is an admin.
 
+Two kinds go to the committee (the building's approved admins) and may be sent by any approved user:
+- `ticket_new`: when anyone opens a ticket, the app asks the function to email the committee ("תקלה חדשה: <title>",
+  with the apartment, reporter, location, description and a link). The function only accepts the ticket's own
+  opener, within 15 minutes of its creation, once per ticket (`email_log`), and never emails the reporter. It is fire
+  and forget: the ticket is saved whatever happens to the email.
+- `contact` (**פנייה לוועד**, on the resident home and under **עוד**, permission `contact_committee`): a message to the
+  whole committee or one member. The function stores it in `committee_messages` first (admins read it under
+  **עוד → פניות דיירים**, and get an in-app notice), then emails it with **Reply-To** set to the sender, at most 5
+  per user in 24 hours (enforced atomically by `store_committee_message()`). In dry run, or when the quota is full,
+  the message is still stored and shown to the committee in the app.
+
+Residents' sends (`ticket_new` at most 10 per user in 24 hours, `contact`) reserve under `EMAIL_DAILY_CAP − 40`, so a
+full committee send (40 emails) always still fits in what they leave.
+
+Reply-To through Apps Script needs the current [`docs/email/apps-script.gs`](docs/email/apps-script.gs): after
+updating the script, redeploy it (**Deploy → Manage deployments → edit → Version: New version**). An older
+deployment ignores `replyTo`, so replies go to the sending account (the email still names the sender's address).
+
 Until a provider is configured the function runs in **dry run**: it prepares the emails, logs them and records
 them in the history, but sends nothing. The app then shows **"שליחת מיילים טרם הוגדרה (מצב בדיקה)"**.
 

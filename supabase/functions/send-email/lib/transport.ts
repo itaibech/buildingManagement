@@ -1,6 +1,7 @@
 import type { Env } from './types.ts'
 
-export interface MailMessage { to: string; subject: string; html: string; text: string }
+/** replyTo: where a reply goes (kind 'contact': the resident who wrote). Omitted = the sending account. */
+export interface MailMessage { to: string; subject: string; html: string; text: string; replyTo?: string }
 export interface SendResult { ok: boolean; id?: string; error?: string }
 export type Provider = 'appsscript' | 'resend'
 export type FetchFn = (input: string | URL | Request, init?: RequestInit) => Promise<Response>
@@ -53,7 +54,10 @@ export function gmailSafeName(name: string): string {
   return /[\u0080-\uffff]/.test(name) ? name.replace(/ /g, '\u00a0') : name
 }
 
-/** Google Apps Script web app (docs/email/apps-script.gs): {token, to, subject, html, text, fromName} → {ok}. */
+/**
+ * Google Apps Script web app (docs/email/apps-script.gs): {token, to, subject, html, text, fromName, replyTo?} → {ok}.
+ * A relay deployed before replyTo existed ignores the field (the email still goes out, replies go to the account).
+ */
 function appsScript(env: Env, fetchFn: FetchFn): (m: MailMessage) => Promise<SendResult> {
   const url = env.APPS_SCRIPT_URL ?? ''
   const token = env.APPS_SCRIPT_TOKEN ?? ''
@@ -69,7 +73,8 @@ function resend(env: Env, fetchFn: FetchFn): (m: MailMessage) => Promise<SendRes
   const key = env.RESEND_API_KEY ?? ''
   return (m) => post(fetchFn, RESEND_URL, {
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: env.EMAIL_FROM, to: [m.to], subject: m.subject, html: m.html, text: m.text }),
+    body: JSON.stringify({ from: env.EMAIL_FROM, to: [m.to], subject: m.subject, html: m.html, text: m.text,
+      ...(m.replyTo ? { reply_to: m.replyTo } : {}) }),
   }, [key], () => true)
 }
 
