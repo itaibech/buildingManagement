@@ -78,7 +78,7 @@ function MonthChart({ table }: { table: ExpenseTable }) {
 function Expenses({ table }: { table: ExpenseTable }) {
   if (table.categories.length === 0) return <Section title={A.expenses.title}><p>{A.expenses.empty}</p></Section>
   return (
-    <Section title={A.expenses.title}>
+    <Section title={A.expenses.title} className="bm-annual-expenses">
       <MonthChart table={table} />
       <div className="bm-annual-scroll">
         <table className="bm-annual-table bm-annual-wide">
@@ -154,7 +154,7 @@ function Collection({ report }: { report: AnnualReport }) {
   const c = report.collection
   return (
     <Section title={A.collection.title}>
-      <p className="bm-annual-dim">{A.collection.asOf(monthLabel(c.month))}</p>
+      <p className="bm-annual-dim">{c.today ? A.collection.today : A.collection.asOf(monthLabel(c.month))}</p>
       <p className="bm-annual-big">{A.collection.line(c.paidUp, c.total)}</p>
       <div className="bm-annual-meter" aria-hidden="true"><span style={{ width: pct(c.paidUp, c.total) }} /></div>
       <table className="bm-annual-table">

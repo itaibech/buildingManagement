@@ -20,7 +20,7 @@ const db = vi.hoisted(() => ({ admin: false, tables: {} as Record<string, unknow
 
 function builder(table: string) {
   const chain: Record<string, unknown> = {}
-  for (const op of ['select', 'eq', 'lt', 'lte', 'gte', 'order', 'in', 'limit']) chain[op] = () => chain
+  for (const op of ['select', 'eq', 'lt', 'lte', 'gte', 'order', 'in', 'limit', 'range']) chain[op] = () => chain
   chain.then = (resolve: (v: unknown) => unknown) => Promise.resolve({ data: db.tables[table] ?? [], error: null }).then(resolve)
   return chain
 }
@@ -70,7 +70,7 @@ describe('AnnualReportDocument (print sections)', () => {
     expenses: [{ categoryId: 'c1', category: 'ניקיון', month: '2025-03-01', total: 1250 }],
     budget: [{ category: 'ניקיון', planned: 1000, actual: 1250, source: 'default' }],
     collection: { total: 17, paidUp: 14, due: 900 }, collectionMonth: '2025-12-01', withAppendix: true,
-    adminData: { ledger: [{ apartment_id: 'a1', month: '2025-01-01', charged: 300, paid: 300 }], charges: [], numbers: new Map([['a1', 1]]), cash: { today: 5000, openingDate: null, payments: [], expenses: [] } },
+    adminData: { ledger: [{ apartment_id: 'a1', month: '2025-01-01', charged: 300, paid: 300 }], charges: [], numbers: new Map([['a1', 1]]), cash: { today: 5000, openingDate: null, firstDate: '2025-01-01', payments: [], expenses: [] } },
   })
   const renderDoc = (notes: string) => wrap(<AnnualReportDocument report={report} building={{ name: 'הרצל 12', address: 'תל אביב' }} today="2026-02-01" notes={notes} />)
 
@@ -102,9 +102,10 @@ describe('AnnualReportPage', () => {
     expect(headings(printCopy())).not.toContain(A.fund.title)
     expect(headings(printCopy())).not.toContain(A.appendix.title)
     expect(screen.queryByRole('switch')).toBeNull()
-    expect(screen.queryByLabelText(new RegExp(A.notes.label))).toBeNull()
-    for (const table of ['apartment_ledger', 'charges', 'building_cash', 'payments', 'expenses']) expect(db.from).not.toContain(table)
+    expect(screen.queryByLabelText(new RegExp(A.notes.title))).toBeNull()
+    for (const table of ['apartment_ledger', 'charges', 'building_cash', 'payments', 'expenses', 'apartments']) expect(db.from).not.toContain(table)
     expect(within(printCopy()).getByText(norm(A.collection.line(14, 17)))).toBeInTheDocument()
+    expect(within(printCopy()).getByText(A.collection.today)).toBeInTheDocument()
   })
 
   it('admins: the fund, the appendix when switched on, the notes kept per year, and print', async () => {
@@ -116,7 +117,7 @@ describe('AnnualReportPage', () => {
     expect(headings(printCopy())).not.toContain(A.appendix.title)
     fireEvent.click(screen.getByRole('switch'))
     await waitFor(() => expect(headings(printCopy())).toContain(A.appendix.title))
-    fireEvent.change(screen.getByLabelText(new RegExp(A.notes.label)), { target: { value: 'החלפת מעלית' } })
+    fireEvent.change(screen.getByLabelText(new RegExp(A.notes.title)), { target: { value: 'החלפת מעלית' } })
     expect(within(printCopy()).getByText('החלפת מעלית')).toBeInTheDocument()
     expect(JSON.parse(localStorage.getItem('bm-annual-notes') ?? '{}')).toEqual({ [String(year)]: 'החלפת מעלית' })
     fireEvent.click(screen.getByRole('button', { name: A.print }))

@@ -70,7 +70,14 @@ export function budgetReport(rows: readonly BudgetRow[]): BudgetReport {
   return { lines, planned: ils(planned), actual: ils(actual), variance: ils(planned - actual) }
 }
 
-export interface CashInput { today: number; openingDate: string | null; payments: readonly CashFlow[]; expenses: readonly CashFlow[] }
+export interface CashInput {
+  today: number
+  openingDate: string | null
+  /** The first payment or expense ever (null: none). Without an opening-cash date, the cash is known from there on. */
+  firstDate: string | null
+  payments: readonly CashFlow[]
+  expenses: readonly CashFlow[]
+}
 export interface FundBalance {
   /** The date the start balance is for: 1 January, or the opening-cash date when tracking began later that year. */
   startDate: string
@@ -97,13 +104,14 @@ const nextDay = (iso: string): string => {
 
 /**
  * The fund at the start and end of `year`, rolled back from today's cash (building_cash_balance's rule: opening cash
- * plus payments minus expenses from the opening-cash date through today). Null for a future year or one that ended
- * before the cash was tracked.
+ * plus payments minus expenses from the opening-cash date through today). Null for a future year, or one that ended
+ * before the cash was tracked: before the opening-cash date or, without one, before the first payment or expense.
  */
 export function fundBalance(cash: CashInput, year: number, today: string): FundBalance | null {
   const first = `${year}-01-01`
   const last = `${year}-12-31`
-  if (first > today || (cash.openingDate !== null && cash.openingDate > last)) return null
+  const tracked = cash.openingDate ?? cash.firstDate
+  if (first > today || tracked === null || tracked > last) return null
   const startDate = cash.openingDate !== null && cash.openingDate > first ? cash.openingDate : first
   const endIsToday = last >= today
   const start = cashOn(cash, startDate)
@@ -116,11 +124,12 @@ export function collectionMonthFor(year: number, admin: boolean, today: string):
   return admin && year < Number(today.slice(0, 4)) ? `${year}-12-01` : monthOf(today)
 }
 
-export interface CollectionReport { month: string; total: number; paidUp: number; owing: number }
+/** `today`: residents' counts are always as of now (collection_summary ignores their month). */
+export interface CollectionReport { month: string; today: boolean; total: number; paidUp: number; owing: number }
 
 /** Paid up vs owing as counts only (collection_summary; the amount due is left out of the report). */
-export const collectionReport = (c: Collection, month: string): CollectionReport =>
-  ({ month, total: c.total, paidUp: c.paidUp, owing: Math.max(c.total - c.paidUp, 0) })
+export const collectionReport = (c: Collection, month: string, today: boolean): CollectionReport =>
+  ({ month, today, total: c.total, paidUp: c.paidUp, owing: Math.max(c.total - c.paidUp, 0) })
 
 export interface AppendixRow { number: number; charged: number; paid: number; balance: number }
 
@@ -135,7 +144,7 @@ export function apartmentAppendix(ledger: LedgerRow[], year: number, numbers: Re
 }
 
 /** Admin-only inputs: the per-apartment ledger, the charges, the cash. Never passed for residents. */
-export interface AdminInput { ledger: LedgerRow[]; charges: ChargeLine[]; cash: CashInput | null; numbers: ReadonlyMap<string, number> }
+export interface AdminInput { ledger: LedgerRow[]; charges: ChargeLine[]; cash: CashInput; numbers: ReadonlyMap<string, number> }
 
 export interface AnnualInput {
   year: number
@@ -176,8 +185,8 @@ export function buildAnnualReport(input: AnnualInput): AnnualReport {
     receivedIncome: admin ? input.summary.actualIncome : null,
     expenses: expenseTable(input.expenses, input.year),
     budget: budgetReport(input.budget),
-    fund: admin?.cash ? fundBalance(admin.cash, input.year, input.today) : null,
-    collection: collectionReport(input.collection, input.collectionMonth),
+    fund: admin ? fundBalance(admin.cash, input.year, input.today) : null,
+    collection: collectionReport(input.collection, input.collectionMonth, !input.admin),
     appendix: admin && input.withAppendix ? apartmentAppendix(admin.ledger, input.year, admin.numbers) : null,
   }
 }
@@ -231,7 +240,7 @@ export function annualSheets(r: AnnualReport, notes: string): Record<string, Row
     [S.budget]: budgetRows(r.budget),
   }
   if (r.fund) sheets[S.fund] = fundRows(r.fund)
-  sheets[S.collection] = [[A.collection.asOf(monthLabel(c.month))], [A.collection.total, c.total], [A.collection.paidUp, c.paidUp], [A.collection.owing, c.owing]]
+  sheets[S.collection] = [[c.today ? A.collection.today : A.collection.asOf(monthLabel(c.month))], [A.collection.total, c.total], [A.collection.paidUp, c.paidUp], [A.collection.owing, c.owing]]
   if (notes.trim()) sheets[S.notes] = [[A.notes.title], [notes.trim()]]
   if (r.appendix) {
     const H = A.appendix

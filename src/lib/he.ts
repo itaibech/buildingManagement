@@ -1159,7 +1159,6 @@ export const he = {
     appendixToggle: 'לצרף נספח לפי דירה (לוועד בלבד)',
     appendixHint: 'יתרות של כל דירה. לא מוצג לדיירים, וכבוי כברירת מחדל.',
     docTitle: (year: number) => `דוח-שנתי-${year}`,
-    loadFailed: 'לא הצלחנו לטעון את נתוני הדוח',
     cover: {
       heading: (year: number) => `דוח שנתי ${year}`,
       for: 'לאסיפת הדיירים השנתית',
@@ -1197,7 +1196,6 @@ export const he = {
       usedPct: (pct: number) => `${pct}%`,
       total: 'סה״כ',
       empty: 'לא הוגדר תקציב לשנה זו',
-      over: 'חריגה',
     },
     fund: {
       title: 'יתרת הקופה',
@@ -1205,11 +1203,11 @@ export const he = {
       end: (date: string) => `יתרה ב-${date}`,
       today: (date: string) => `יתרה היום (${date})`,
       change: 'שינוי במהלך התקופה',
-      none: 'אין נתוני קופה לשנה זו',
     },
     collection: {
       title: 'גבייה',
       asOf: (month: string) => `נכון לסוף ${month}`,
+      today: 'נכון להיום',
       paidUp: 'דירות ששילמו הכול',
       owing: 'דירות עם יתרת חוב',
       total: 'דירות משלמות',
@@ -1217,7 +1215,6 @@ export const he = {
     },
     notes: {
       title: 'סיכום הוועד ותוכניות לשנה הבאה',
-      label: 'סיכום הוועד ותוכניות לשנה הבאה',
       placeholder: 'מה נעשה השנה, מה מתוכנן לשנה הבאה, החלטות להצבעה…',
       hint: 'נשמר רק בדפדפן הזה, לכל שנה בנפרד.',
     },

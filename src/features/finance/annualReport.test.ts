@@ -67,7 +67,7 @@ describe('budgetReport', () => {
 
 describe('fundBalance', () => {
   const cash = {
-    today: 10000, openingDate: null,
+    today: 10000, openingDate: null, firstDate: '2024-05-01',
     payments: [{ date: '2024-05-01', amount: 2000 }, { date: '2025-01-05', amount: 3000 }, { date: '2025-03-01', amount: 1000 }],
     expenses: [{ date: '2024-07-01', amount: 700 }, { date: '2025-02-01', amount: 500 }],
   }
@@ -86,6 +86,11 @@ describe('fundBalance', () => {
     expect(fundBalance({ ...cash, openingDate: '2025-02-01' }, 2024, '2025-06-15')).toBeNull()
     expect(fundBalance(cash, 2026, '2025-06-15')).toBeNull()
   })
+
+  it('without an opening-cash date: none for years before the first payment or expense, or with no data at all', () => {
+    expect(fundBalance(cash, 2023, '2025-06-15')).toBeNull()
+    expect(fundBalance({ ...cash, firstDate: null }, 2025, '2025-06-15')).toBeNull()
+  })
 })
 
 describe('apartmentAppendix', () => {
@@ -99,7 +104,7 @@ describe('apartmentAppendix', () => {
 
 const ADMIN_DATA: AdminInput = {
   ledger: LEDGER, charges: CHARGES, numbers: new Map([['a1', 1], ['a2', 2]]),
-  cash: { today: 10000, openingDate: null, payments: [], expenses: [] },
+  cash: { today: 10000, openingDate: null, firstDate: '2025-01-01', payments: [], expenses: [] },
 }
 const input = (over: Partial<AnnualInput>): AnnualInput => ({
   year: 2025, today: '2025-06-15', admin: true,
@@ -115,7 +120,7 @@ describe('buildAnnualReport', () => {
     expect(r.receivedIncome).toBe(5000)
     expect(r.fund?.end).toBe(10000)
     expect(r.appendix).toHaveLength(2)
-    expect(r.collection).toEqual({ month: '2025-06-01', total: 17, paidUp: 14, owing: 3 })
+    expect(r.collection).toEqual({ month: '2025-06-01', today: false, total: 17, paidUp: 14, owing: 3 })
   })
 
   it('the appendix is off by default', () => {
@@ -129,7 +134,7 @@ describe('buildAnnualReport', () => {
     expect(r.income).toBeNull()
     expect(r.receivedIncome).toBeNull()
     expect(r.expectedIncome).toBe(7200)
-    expect(r.collection.owing).toBe(3)
+    expect(r.collection).toMatchObject({ owing: 3, today: true })
   })
 })
 

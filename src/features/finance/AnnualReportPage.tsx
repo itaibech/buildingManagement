@@ -35,7 +35,7 @@ function Actions({ report, notes }: { report: AnnualReport | undefined; notes: s
   const { run, loading } = useExporter(A.docTitle(year), () => (report ? annualSheets(report, notes) : {}), undefined, false)
   return (
     <Group gap="sm" grow preventGrowOverflow={false}>
-      <Button mih={44} leftSection={<IconPrinter {...ICON} />} disabled={!report} onClick={() => printAnnualReport(year)} title={A.printHint}>{A.print}</Button>
+      <Button mih={44} leftSection={<IconPrinter {...ICON} />} disabled={!report} onClick={() => printAnnualReport(year)}>{A.print}</Button>
       <Button mih={44} variant="default" leftSection={<IconFileSpreadsheet {...ICON} />} disabled={!report} loading={loading} onClick={run}>{A.excel}</Button>
     </Group>
   )
@@ -51,7 +51,7 @@ function Controls({ year, onYear, admin, appendix, onAppendix, notes, onNotes }:
         onChange={(y) => y && onYear(Number(y))} />
       {admin && (
         <>
-          <Textarea label={A.notes.label} description={A.notes.hint} placeholder={A.notes.placeholder} autosize minRows={4} maxRows={14}
+          <Textarea label={A.notes.title} description={A.notes.hint} placeholder={A.notes.placeholder} autosize minRows={4} maxRows={14}
             value={notes} onChange={(e) => onNotes(e.currentTarget.value)} />
           <Switch size="md" label={A.appendixToggle} description={A.appendixHint} checked={appendix} onChange={(e) => onAppendix(e.currentTarget.checked)} />
         </>

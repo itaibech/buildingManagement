@@ -613,9 +613,17 @@ body {
   .bm-annual-print .bm-annual-scroll {
     overflow: visible;
   }
+  /* The 14-column category × month table gets its own landscape A4 page (named page; elsewhere portrait). */
+  @page annual-landscape {
+    size: A4 landscape;
+    margin: 12mm 12mm;
+  }
+  .bm-annual-print .bm-annual-expenses {
+    page: annual-landscape;
+  }
   .bm-annual-print .bm-annual-wide {
     min-width: 0;
-    font-size: 7pt;
+    font-size: 8.5pt;
   }
   .bm-annual-print .bm-annual-appendix {
     break-before: page;

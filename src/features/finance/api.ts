@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { he } from '../../lib/he'
+import { fetchAll } from '../../lib/fetchAll'
 import { supabase } from '../../lib/supabase'
 import { isFeeMode, type FeeMode } from '../../ui/feeBadge'
 import { notifyError } from '../../ui/notify'
@@ -161,14 +162,35 @@ export function useMyBalance(enabled = true) {
 }
 
 /** Ledger rows up to the end of `year` (earlier years feed the running balance). Optionally one apartment. */
-export function useLedger(year: number, apartmentId?: string, enabled = true) {
+export function useLedger(year: number, apartmentId?: string) {
   return useQuery({
     queryKey: [...KEY, 'ledger', year, apartmentId ?? 'all'],
-    enabled: enabled && apartmentId !== '',
+    enabled: apartmentId !== '',
     queryFn: async (): Promise<LedgerRow[]> => {
       let q = supabase.from('apartment_ledger').select('apartment_id, month, charged, paid, adjusted').lt('month', `${year + 1}-01-01`).order('month')
       if (apartmentId) q = q.eq('apartment_id', apartmentId)
       return must(await q).flatMap((r) =>
+        r.apartment_id && r.month ? [{ apartment_id: r.apartment_id, month: r.month, charged: num(r.charged), paid: num(r.paid), adjusted: num(r.adjusted) }] : [])
+    },
+  })
+}
+
+const LEDGER_COLUMNS = 'apartment_id, month, charged, paid, adjusted'
+
+/**
+ * Admin, "דוח שנתי": every apartment's ledger rows of `year`, paged (no 1000-row cap). `fromStart`: also the earlier
+ * years (the per-apartment appendix carries them into the year-end balance).
+ */
+export function useReportLedger(year: number, fromStart: boolean, enabled: boolean) {
+  return useQuery({
+    queryKey: [...KEY, 'report-ledger', year, fromStart],
+    enabled,
+    queryFn: async (): Promise<LedgerRow[]> => {
+      const rows = await fetchAll((from, to) => {
+        const q = supabase.from('apartment_ledger').select(LEDGER_COLUMNS).lte('month', `${year}-12-01`)
+        return (fromStart ? q : q.gte('month', `${year}-01-01`)).order('month').order('apartment_id').range(from, to)
+      })
+      return rows.flatMap((r) =>
         r.apartment_id && r.month ? [{ apartment_id: r.apartment_id, month: r.month, charged: num(r.charged), paid: num(r.paid), adjusted: num(r.adjusted) }] : [])
     },
   })
@@ -211,6 +233,7 @@ export interface CashFlow { date: string; amount: number }
 /**
  * Admin: the payments and expenses that moved the building's cash from `from` through today (Israel), the same rows
  * building_cash_balance sums (payments by paid_on, expenses by spent_on), so the cash can be rolled back to a date.
+ * Paged: a year of payments can pass the 1000-row cap.
  */
 export function useCashFlows(from: string, today: string, enabled = true) {
   return useQuery({
@@ -218,13 +241,29 @@ export function useCashFlows(from: string, today: string, enabled = true) {
     enabled,
     queryFn: async (): Promise<{ payments: CashFlow[]; expenses: CashFlow[] }> => {
       const [p, e] = await Promise.all([
-        supabase.from('payments').select('paid_on, amount').gte('paid_on', from).lte('paid_on', today),
-        supabase.from('expenses').select('spent_on, amount').gte('spent_on', from).lte('spent_on', today),
+        fetchAll((f, t) => supabase.from('payments').select('paid_on, amount').gte('paid_on', from).lte('paid_on', today).order('paid_on').order('id').range(f, t)),
+        fetchAll((f, t) => supabase.from('expenses').select('spent_on, amount').gte('spent_on', from).lte('spent_on', today).order('spent_on').order('id').range(f, t)),
       ])
       return {
-        payments: must(p).map((r) => ({ date: r.paid_on, amount: num(r.amount) })),
-        expenses: must(e).map((r) => ({ date: r.spent_on, amount: num(r.amount) })),
+        payments: p.map((r) => ({ date: r.paid_on, amount: num(r.amount) })),
+        expenses: e.map((r) => ({ date: r.spent_on, amount: num(r.amount) })),
       }
+    },
+  })
+}
+
+/** Admin: the date of the building's first payment or expense (null when there are none): where cash data begins. */
+export function useFirstCashDate(enabled = true) {
+  return useQuery({
+    queryKey: [...KEY, 'first-cash-date'],
+    enabled,
+    queryFn: async (): Promise<string | null> => {
+      const [p, e] = await Promise.all([
+        supabase.from('payments').select('paid_on').order('paid_on', { ascending: true }).limit(1),
+        supabase.from('expenses').select('spent_on').order('spent_on', { ascending: true }).limit(1),
+      ])
+      const dates = [must(p)[0]?.paid_on, must(e)[0]?.spent_on].filter((d): d is string => !!d).sort()
+      return dates[0] ?? null
     },
   })
 }
