@@ -369,6 +369,177 @@ body {
   border-bottom: 1px solid currentColor;
 }
 
+/* Annual report ("דוח שנתי"): the same document on screen (a card) and in print (A4, a cover page). */
+.bm-annual {
+  line-height: 1.55;
+  --bm-annual-plan: #c9ced6;
+  --bm-annual-actual: #1f4e9c;
+  --bm-annual-over: #c2372c;
+}
+.bm-annual h1,
+.bm-annual h2 {
+  font-family: var(--bm-heading-font);
+  font-weight: 400;
+  line-height: 1.2;
+}
+.bm-annual h2 {
+  font-size: 1.375rem;
+  margin: 24px 0 8px;
+}
+.bm-annual p {
+  margin: 2px 0;
+}
+.bm-annual-cover {
+  text-align: center;
+  padding: 16px 0 24px;
+  border-bottom: 2px solid currentColor;
+}
+.bm-annual-cover h1 {
+  font-size: 2.25rem;
+  margin: 12px 0 4px;
+}
+.bm-annual-building {
+  font-family: var(--bm-heading-font);
+  font-size: 1.375rem;
+}
+.bm-annual-dim {
+  color: #6b7480;
+  font-size: 0.875rem;
+}
+.bm-annual-big {
+  font-family: var(--bm-heading-font);
+  font-size: 1.375rem;
+}
+.bm-annual-scroll {
+  overflow-x: auto;
+}
+.bm-annual-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+.bm-annual-table th,
+.bm-annual-table td {
+  text-align: start;
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(107, 116, 128, 0.3);
+}
+.bm-annual-table td.bm-num,
+.bm-annual-table th:not(:first-child) {
+  text-align: end;
+  white-space: nowrap;
+}
+.bm-annual-wide {
+  font-size: 0.8125rem;
+  min-width: 900px;
+}
+.bm-annual-wide th,
+.bm-annual-wide td {
+  padding: 4px;
+}
+.bm-annual-total td {
+  font-weight: 700;
+  border-top: 2px solid currentColor;
+}
+.bm-annual-over {
+  color: var(--bm-annual-over);
+}
+.bm-annual-chart {
+  margin: 8px 0;
+}
+.bm-annual-chart figcaption {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+.bm-annual-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 140px;
+  border-bottom: 1px solid #6b7480;
+  padding-bottom: 18px;
+  position: relative;
+}
+.bm-annual-bar {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  position: relative;
+}
+.bm-annual-bar-fill {
+  display: block;
+  width: 70%;
+  max-width: 36px;
+  background: var(--bm-annual-actual);
+  border-radius: 3px 3px 0 0;
+}
+.bm-annual-bar-label {
+  position: absolute;
+  bottom: -18px;
+  font-size: 0.75rem;
+}
+.bm-annual-hbar {
+  display: grid;
+  grid-template-columns: minmax(80px, 30%) 1fr;
+  gap: 8px;
+  align-items: center;
+  margin: 4px 0;
+  font-size: 0.875rem;
+}
+.bm-annual-hbar-track {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.bm-annual-hbar-plan,
+.bm-annual-hbar-actual {
+  display: block;
+  height: 8px;
+  min-width: 1px;
+  border-radius: 4px;
+  background: var(--bm-annual-plan);
+}
+.bm-annual-hbar-actual {
+  background: var(--bm-annual-actual);
+}
+.bm-annual-hbar-actual.bm-annual-over {
+  background: var(--bm-annual-over);
+}
+.bm-annual-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400 !important;
+  margin-top: 6px;
+}
+.bm-annual-key-plan,
+.bm-annual-key-actual {
+  display: inline-block;
+  width: 12px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--bm-annual-plan);
+}
+.bm-annual-key-actual {
+  background: var(--bm-annual-actual);
+  margin-inline-start: 8px;
+}
+.bm-annual-meter {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--bm-annual-plan);
+  overflow: hidden;
+  margin: 6px 0;
+}
+.bm-annual-meter span {
+  display: block;
+  height: 100%;
+  background: #2c8a5a;
+}
+
 /* Directory print view (portalled to <body>): hidden on screen, the only thing printed. */
 .bm-print {
   display: none;
@@ -415,6 +586,45 @@ body {
   @page {
     size: A4;
     margin: 16mm 14mm;
+  }
+  .bm-annual-print {
+    font-size: 10.5pt;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .bm-annual-print .bm-annual-cover {
+    break-after: page;
+    border-bottom: 0;
+    padding-top: 30vh;
+  }
+  .bm-annual-print .bm-annual-cover h1 {
+    font-size: 30pt;
+  }
+  .bm-annual-print h2 {
+    break-after: avoid;
+  }
+  .bm-annual-print table,
+  .bm-annual-print figure {
+    break-inside: avoid;
+  }
+  .bm-annual-print thead {
+    display: table-header-group;
+  }
+  .bm-annual-print .bm-annual-scroll {
+    overflow: visible;
+  }
+  .bm-annual-print .bm-annual-wide {
+    min-width: 0;
+    font-size: 7pt;
+  }
+  .bm-annual-print .bm-annual-appendix {
+    break-before: page;
+  }
+  .bm-annual-print .bm-annual-appendix table {
+    break-inside: auto;
+  }
+  .bm-annual-print .bm-annual-appendix tr {
+    break-inside: avoid;
   }
   .bm-protocol-print .bm-protocol-section {
     break-inside: avoid;

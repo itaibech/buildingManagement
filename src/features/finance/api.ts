@@ -161,10 +161,10 @@ export function useMyBalance(enabled = true) {
 }
 
 /** Ledger rows up to the end of `year` (earlier years feed the running balance). Optionally one apartment. */
-export function useLedger(year: number, apartmentId?: string) {
+export function useLedger(year: number, apartmentId?: string, enabled = true) {
   return useQuery({
     queryKey: [...KEY, 'ledger', year, apartmentId ?? 'all'],
-    enabled: apartmentId !== '',
+    enabled: enabled && apartmentId !== '',
     queryFn: async (): Promise<LedgerRow[]> => {
       let q = supabase.from('apartment_ledger').select('apartment_id, month, charged, paid, adjusted').lt('month', `${year + 1}-01-01`).order('month')
       if (apartmentId) q = q.eq('apartment_id', apartmentId)
@@ -198,10 +198,34 @@ export function useExpenseReport(year: number) {
 }
 
 /** Money actually in the building's account today. */
-export function useBuildingCash() {
+export function useBuildingCash(enabled = true) {
   return useQuery({
     queryKey: [...KEY, 'cash'],
+    enabled,
     queryFn: async () => num(must(await supabase.from('building_cash').select('balance'))[0]?.balance),
+  })
+}
+
+export interface CashFlow { date: string; amount: number }
+
+/**
+ * Admin: the payments and expenses that moved the building's cash from `from` through today (Israel), the same rows
+ * building_cash_balance sums (payments by paid_on, expenses by spent_on), so the cash can be rolled back to a date.
+ */
+export function useCashFlows(from: string, today: string, enabled = true) {
+  return useQuery({
+    queryKey: [...KEY, 'cash-flows', from, today],
+    enabled,
+    queryFn: async (): Promise<{ payments: CashFlow[]; expenses: CashFlow[] }> => {
+      const [p, e] = await Promise.all([
+        supabase.from('payments').select('paid_on, amount').gte('paid_on', from).lte('paid_on', today),
+        supabase.from('expenses').select('spent_on, amount').gte('spent_on', from).lte('spent_on', today),
+      ])
+      return {
+        payments: must(p).map((r) => ({ date: r.paid_on, amount: num(r.amount) })),
+        expenses: must(e).map((r) => ({ date: r.spent_on, amount: num(r.amount) })),
+      }
+    },
   })
 }
 
@@ -247,9 +271,10 @@ export function useDeletePayment() {
 // ---------------------------------------------------------------- charges, building fees, apartment fee timeline
 
 /** Levies, extras and openings for `year`, newest month first. */
-export function useCharges(year: number) {
+export function useCharges(year: number, enabled = true) {
   return useQuery({
     queryKey: [...KEY, 'charges', year],
+    enabled,
     queryFn: async (): Promise<Charge[]> =>
       must(await supabase.from('charges').select('id, apartment_id, month, amount, kind, label, ev_reading_id, special_id')
         .gte('month', `${year}-01-01`).lt('month', `${year + 1}-01-01`).order('month', { ascending: false }))
@@ -258,7 +283,7 @@ export function useCharges(year: number) {
 }
 
 /** EV charging: from a meter reading, or an imported/manual extra under the EV label (Excel imports have no reading). */
-const isEvCharge = (c: { ev_reading_id: string | null; kind: string; label: string }): boolean =>
+export const isEvCharge = (c: { ev_reading_id: string | null; kind: string; label: string }): boolean =>
   c.ev_reading_id !== null || (c.kind === 'extra' && c.label === he.import.evLabel)
 
 /** Every charge of one apartment, oldest first, with the EV reading's kWh (null when the reading isn't readable). */

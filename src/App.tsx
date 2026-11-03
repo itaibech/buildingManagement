@@ -15,6 +15,7 @@ const AnnouncementsPage = lazy(() => import('./features/announcements/Announceme
 const TicketsPage = lazy(() => import('./features/tickets/TicketsPage'))
 const TicketPage = lazy(() => import('./features/tickets/TicketPage'))
 const FinancePage = lazy(() => import('./features/finance/FinancePage'))
+const AnnualReportPage = lazy(() => import('./features/finance/AnnualReportPage'))
 const DirectoryPage = lazy(() => import('./features/tenants/DirectoryPage'))
 const MaintenancePage = lazy(() => import('./features/maintenance/MaintenancePage'))
 const ApartmentsPage = lazy(() => import('./features/tenants/ApartmentsPage'))
@@ -73,6 +74,9 @@ export default function App() {
               </Route>
               <Route element={<RequirePermission need={FINANCE_NEED} />}>
                 <Route path="finance" element={<FinancePage />} />
+              </Route>
+              <Route element={<RequirePermission need="finance_reports" />}>
+                <Route path="finance/annual-report" element={<AnnualReportPage />} />
               </Route>
               <Route element={<RequirePermission need="directory" />}>
                 <Route path="directory" element={<DirectoryPage />} />
