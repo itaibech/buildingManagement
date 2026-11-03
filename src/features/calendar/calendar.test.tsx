@@ -56,8 +56,9 @@ beforeEach(() => {
     row({ id: 'e4', title: 'הדברה', category: 'pest_control', starts_at: fromInputs(addDays(today, 8), '10:00') }),
   ]
   db.meetings = [
-    { id: 'm1', title: 'אסיפה כללית', status: 'invited', scheduled_at: fromInputs(addDays(today, 2), '19:00'), location: 'מקלט', meeting_agenda_items: [] },
-    { id: 'm2', title: 'טיוטה', status: 'draft', scheduled_at: fromInputs(addDays(today, 2), '19:00'), location: '', meeting_agenda_items: [] },
+    { id: 'm1', kind: 'general', title: 'אסיפה כללית', status: 'invited', scheduled_at: fromInputs(addDays(today, 2), '19:00'), location: 'מקלט', meeting_agenda_items: [] },
+    { id: 'm3', kind: 'committee', title: 'ישיבת ועד חודשית', status: 'invited', scheduled_at: fromInputs(addDays(today, 6), '20:00'), location: '', meeting_agenda_items: [] },
+    { id: 'm2', kind: 'committee', title: 'טיוטה', status: 'draft', scheduled_at: fromInputs(addDays(today, 2), '19:00'), location: '', meeting_agenda_items: [] },
   ]
 })
 
@@ -98,6 +99,21 @@ describe('CalendarPage', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: C.form.create }))
     await waitFor(() => expect(db.inserts).toHaveLength(1))
     expect(db.inserts[0]).toMatchObject({ title: 'ריסוס', all_day: true, starts_at: fromInputs(today, '00:00'), ends_at: null, recurrence: 'none' })
+  })
+
+  it('admins see committee meetings marked "הוועד בלבד"; general assemblies and residents\' views are not', async () => {
+    wrap(<CalendarPage />)
+    const row = (title: string) => screen.getByText(title).closest('button') as HTMLElement
+    await screen.findByText('ישיבת ועד חודשית')
+    expect(within(row('ישיבת ועד חודשית')).getByText(C.committeeOnly)).toBeInTheDocument()
+    expect(within(row('אסיפה כללית')).queryByText(C.committeeOnly)).not.toBeInTheDocument()
+  })
+
+  it('residents see committee meetings without the committee badge', async () => {
+    auth.isAdmin = false
+    wrap(<CalendarPage />)
+    const title = await screen.findByText('ישיבת ועד חודשית')
+    expect(within(title.closest('button') as HTMLElement).queryByText(C.committeeOnly)).not.toBeInTheDocument()
   })
 
   it('residents get no add action', async () => {

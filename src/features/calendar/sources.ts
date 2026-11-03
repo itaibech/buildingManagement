@@ -12,11 +12,14 @@ const NONE: CalendarItem[] = []
 
 export interface SourceResult { items: CalendarItem[]; isLoading: boolean; isError: boolean; refetch: () => void }
 
-/** Meetings the user may see (residents: invited and published), without drafts. */
-export function meetingItems(meetings: readonly MeetingListItem[]): CalendarItem[] {
+/**
+ * Meetings the user may see (residents: invited and published), without drafts. Admins see committee meetings (ישיבת ועד,
+ * not a general assembly) marked "הוועד בלבד", like committee-only events.
+ */
+export function meetingItems(meetings: readonly MeetingListItem[], isAdmin: boolean): CalendarItem[] {
   return meetings.filter((m) => m.status !== 'draft').map((m) => ({
     id: m.id, source: 'meeting', title: m.title, description: '', location: m.location, category: 'meeting', allDay: false,
-    startsAt: m.scheduled_at, endsAt: null, recurrence: 'none', until: null, committee: false, link: `/meetings/${m.id}`,
+    startsAt: m.scheduled_at, endsAt: null, recurrence: 'none', until: null, committee: isAdmin && m.kind === 'committee', link: `/meetings/${m.id}`,
   }))
 }
 
@@ -27,9 +30,9 @@ function useEventsSource(): SourceResult {
 }
 
 function useMeetingsSource(): SourceResult {
-  const { can } = useAuth()
+  const { can, isAdmin } = useAuth()
   const q = useMeetings(can('meetings'))
-  const items = useMemo(() => meetingItems(q.data ?? []), [q.data])
+  const items = useMemo(() => meetingItems(q.data ?? [], isAdmin), [q.data, isAdmin])
   return { items, isLoading: q.isLoading, isError: q.isError, refetch: () => void q.refetch() }
 }
 
