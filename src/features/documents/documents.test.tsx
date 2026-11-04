@@ -14,7 +14,7 @@ const db = vi.hoisted(() => ({
   admin: false, rows: [] as unknown[], listError: null as { message: string } | null, calls: [] as unknown[][],
 }))
 vi.mock('../../lib/supabase', () => {
-  const select = { order: async () => ({ data: db.listError ? null : db.rows, error: db.listError }) }
+  const select = { order: () => select, range: async () => ({ data: db.listError ? null : db.rows, error: db.listError }) }
   const bucket = {
     createSignedUrls: async (paths: string[]) => { db.calls.push(['signMany', paths]); return { data: [], error: null } },
     createSignedUrl: async (path: string, ttl: number, o: unknown) => {

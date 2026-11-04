@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Database } from '../../lib/db.types'
+import { fetchAll } from '../../lib/fetchAll'
 import { supabase } from '../../lib/supabase'
 import { notifyCommitteeOfTicket } from '../committee/api'
 import { PHOTO_BUCKET, photoMime, photoPath } from './photos'
@@ -43,11 +44,11 @@ const fail = (error: { message: string } | null): void => {
 }
 
 async function fetchTickets(statuses: readonly TicketStatus[] | undefined): Promise<TicketListItem[]> {
-  let query = supabase.from('tickets').select('*, ticket_photos(count)').order('created_at', { ascending: false })
-  if (statuses) query = query.in('status', [...statuses])
-  const { data, error } = await query
-  fail(error)
-  return (data ?? []).map(({ ticket_photos, ...t }) => ({ ...t, status: asStatus(t.status), photoCount: ticket_photos[0]?.count ?? 0 }))
+  const data = await fetchAll((f, t) => {
+    const query = supabase.from('tickets').select('*, ticket_photos(count)')
+    return (statuses ? query.in('status', [...statuses]) : query).order('created_at', { ascending: false }).order('id').range(f, t)
+  })
+  return data.map(({ ticket_photos, ...t }) => ({ ...t, status: asStatus(t.status), photoCount: ticket_photos[0]?.count ?? 0 }))
 }
 
 /** Tickets, newest first. `statuses` undefined means all. */

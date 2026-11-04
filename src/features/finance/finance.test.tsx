@@ -31,7 +31,7 @@ function builder(table: string) {
     ? { data: null, error: { message: 'boom' } }
     : { data: db.tables[table] ?? [], error: null })
   const chain: Record<string, unknown> = {}
-  for (const op of ['select', 'eq', 'lt', 'gte', 'order', 'in', 'insert', 'upsert', 'update', 'delete', 'limit']) {
+  for (const op of ['select', 'eq', 'lt', 'gte', 'order', 'in', 'insert', 'upsert', 'update', 'delete', 'limit', 'range']) {
     chain[op] = (...args: unknown[]) => { db.calls.push({ table, op, args }); ops.push(op); return chain }
   }
   chain.single = () => Promise.resolve(ops.some((op) => db.fail.has(`${table}.${op}`)) ? { data: null, error: { message: 'boom' } } : { data: { id: 'new' }, error: null })

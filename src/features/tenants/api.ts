@@ -2,6 +2,7 @@ import { FunctionsHttpError } from '@supabase/supabase-js'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo } from 'react'
 import type { Database } from '../../lib/db.types'
+import { fetchAll } from '../../lib/fetchAll'
 import { he } from '../../lib/he'
 import { supabase } from '../../lib/supabase'
 import { sourceOf, type AptPayment } from './aptData'
@@ -337,8 +338,8 @@ export function useApartmentPayments(apartmentId: string, enabled = true) {
     queryKey: ['finance', 'apartment-payments', apartmentId],
     enabled,
     queryFn: async (): Promise<AptPayment[]> => {
-      const data = rows(await supabase.from('payments').select('id, paid_on, for_month, amount, method, note, source, settlement_id, special_id')
-        .eq('apartment_id', apartmentId).order('paid_on', { ascending: false }))
+      const data = await fetchAll((f, t) => supabase.from('payments').select('id, paid_on, for_month, amount, method, note, source, settlement_id, special_id')
+        .eq('apartment_id', apartmentId).order('paid_on', { ascending: false }).order('id').range(f, t))
       return data.map((p) => ({ id: p.id, paid_on: p.paid_on, for_month: p.for_month, amount: Number(p.amount), method: p.method, note: p.note, source: sourceOf(p) }))
     },
   })
@@ -356,7 +357,8 @@ export function useApartmentTickets(apartmentId: string, enabled = true) {
       if (residents.length === 0) return []
       const users = rows(await supabase.from('profiles').select('user_id').in('resident_id', residents)).map((p) => p.user_id)
       if (users.length === 0) return []
-      return rows(await supabase.from('tickets').select('id, title, status, created_at').in('opened_by', users).order('created_at', { ascending: false }))
+      return fetchAll((f, t) => supabase.from('tickets').select('id, title, status, created_at').in('opened_by', users)
+        .order('created_at', { ascending: false }).order('id').range(f, t))
     },
   })
 }
@@ -369,9 +371,9 @@ export function useApartmentMeetings(apartmentId: string, enabled = true) {
     queryKey: ['meetings', 'apartment', apartmentId],
     enabled,
     queryFn: async (): Promise<AptMeeting[]> => {
-      const data = rows(await supabase.from('meeting_attendance')
+      const data = await fetchAll((f, t) => supabase.from('meeting_attendance')
         .select('id, status, attendee_name, proxy_name, meetings!inner(id, title, scheduled_at, opened_at, status)')
-        .eq('apartment_id', apartmentId).eq('meetings.status', 'published'))
+        .eq('apartment_id', apartmentId).eq('meetings.status', 'published').order('id').range(f, t))
       return data.map((a) => ({ id: a.id, meetingId: a.meetings.id, title: a.meetings.title, at: a.meetings.opened_at ?? a.meetings.scheduled_at,
         status: a.status, name: a.status === 'proxy' ? a.proxy_name : a.attendee_name })).sort((a, b) => b.at.localeCompare(a.at))
     },
@@ -387,11 +389,11 @@ export function useApartmentLog(apartmentId: string, enabled = true) {
     enabled,
     queryFn: async (): Promise<AptLogEntry[]> => {
       const [audit, mail] = await Promise.all([
-        supabase.from('admin_audit').select('id, created_at, action, details').eq('apartment_id', apartmentId),
-        supabase.from('email_log').select('id, created_at, kind, sent, dry_run').contains('apartment_ids', [apartmentId]),
+        fetchAll((f, t) => supabase.from('admin_audit').select('id, created_at, action, details').eq('apartment_id', apartmentId).order('id').range(f, t)),
+        fetchAll((f, t) => supabase.from('email_log').select('id, created_at, kind, sent, dry_run').contains('apartment_ids', [apartmentId]).order('id').range(f, t)),
       ])
-      const a = rows(audit).map((r): AptLogEntry => ({ id: r.id, at: r.created_at, kind: 'audit', action: r.action, details: '' }))
-      const m = rows(mail).map((r): AptLogEntry => ({ id: r.id, at: r.created_at, kind: 'email', action: r.kind, details: r.dry_run ? 'dry' : String(r.sent) }))
+      const a = audit.map((r): AptLogEntry => ({ id: r.id, at: r.created_at, kind: 'audit', action: r.action, details: '' }))
+      const m = mail.map((r): AptLogEntry => ({ id: r.id, at: r.created_at, kind: 'email', action: r.kind, details: r.dry_run ? 'dry' : String(r.sent) }))
       return [...a, ...m].sort((x, y) => y.at.localeCompare(x.at))
     },
   })

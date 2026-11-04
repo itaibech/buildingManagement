@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { he } from '../../lib/he'
+import { fetchAll } from '../../lib/fetchAll'
 import { supabase } from '../../lib/supabase'
 import { notifyError } from '../../ui/notify'
 import { useMyApartmentId } from '../finance/api'
@@ -70,9 +71,11 @@ export function useEvReadings(chargerId?: string) {
     queryKey: [...KEY, 'readings', chargerId ?? 'all'],
     enabled: chargerId !== '',
     queryFn: async (): Promise<Reading[]> => {
-      let q = supabase.from('ev_readings').select('id, charger_id, month, reading, read_on, note, source, kwh, rate, amount').order('month', { ascending: false })
-      if (chargerId) q = q.eq('charger_id', chargerId)
-      return must(await q).map((r) => ({ ...r, reading: num(r.reading), kwh: numOrNull(r.kwh), rate: numOrNull(r.rate), amount: numOrNull(r.amount) }))
+      const rows = await fetchAll((f, t) => {
+        const q = supabase.from('ev_readings').select('id, charger_id, month, reading, read_on, note, source, kwh, rate, amount')
+        return (chargerId ? q.eq('charger_id', chargerId) : q).order('month', { ascending: false }).order('id').range(f, t)
+      })
+      return rows.map((r) => ({ ...r, reading: num(r.reading), kwh: numOrNull(r.kwh), rate: numOrNull(r.rate), amount: numOrNull(r.amount) }))
     },
   })
 }
@@ -92,8 +95,8 @@ export function useEvPayments(apartmentIds: readonly string[]) {
     queryKey: [...KEY, 'payments', [...apartmentIds].sort().join(',')],
     enabled: apartmentIds.length > 0,
     queryFn: async (): Promise<EvPayment[]> =>
-      must(await supabase.from('payments').select('apartment_id, paid_on, amount, note, source')
-        .in('apartment_id', [...apartmentIds]).like('note', `${he.ev.chargeLabel}%`).order('paid_on'))
+      (await fetchAll((f, t) => supabase.from('payments').select('apartment_id, paid_on, amount, note, source')
+        .in('apartment_id', [...apartmentIds]).like('note', `${he.ev.chargeLabel}%`).order('paid_on').order('id').range(f, t)))
         .map((p) => ({ ...p, amount: num(p.amount) })),
   })
 }
@@ -120,8 +123,8 @@ export function useMainEvCharges(apartmentIds: readonly string[]) {
     queryKey: [...KEY, 'main-charges', [...apartmentIds].sort().join(',')],
     enabled: apartmentIds.length > 0,
     queryFn: async (): Promise<{ apartment_id: string; month: string; amount: number }[]> =>
-      must(await supabase.from('charges').select('apartment_id, month, amount').in('apartment_id', [...apartmentIds])
-        .eq('source', 'import').eq('kind', 'extra').eq('label', he.ev.chargeLabel)).map((c) => ({ ...c, amount: num(c.amount) })),
+      (await fetchAll((f, t) => supabase.from('charges').select('apartment_id, month, amount').in('apartment_id', [...apartmentIds])
+        .eq('source', 'import').eq('kind', 'extra').eq('label', he.ev.chargeLabel).order('id').range(f, t))).map((c) => ({ ...c, amount: num(c.amount) })),
   })
 }
 

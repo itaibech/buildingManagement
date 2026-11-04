@@ -1,6 +1,7 @@
 // Projects data access, reads (the writes are in mutations.ts). RLS and the 0030 RPCs enforce every rule: residents get
 // the chosen quote only (all quotes and files when show_quotes), aggregates only from project_progress, no expense rows.
 import { useQuery } from '@tanstack/react-query'
+import { fetchAll } from '../../lib/fetchAll'
 import { supabase } from '../../lib/supabase'
 import { groupLevies } from './logic'
 import {
@@ -40,9 +41,8 @@ export function useProjects() {
   return useQuery({
     queryKey: [...PROJECTS_KEY, 'list'],
     queryFn: async (): Promise<Project[]> => {
-      const { data, error } = await supabase.from('projects').select(PROJECT_COLUMNS).order('created_at', { ascending: false })
-      fail(error)
-      return (data ?? []).map(toProject)
+      const data = await fetchAll((f, t) => supabase.from('projects').select(PROJECT_COLUMNS).order('created_at', { ascending: false }).order('id').range(f, t))
+      return data.map(toProject)
     },
   })
 }
@@ -117,9 +117,8 @@ export function useLevyOptions(enabled: boolean) {
     queryKey: [...PROJECTS_KEY, 'levies'],
     enabled,
     queryFn: async (): Promise<LevyOption[]> => {
-      const { data, error } = await supabase.from('charges').select('label, month').eq('kind', 'levy')
-      fail(error)
-      return groupLevies(data ?? [])
+      // Every levy charge ever (one per apartment per levy month): grows past 1000 rows, so paged.
+      return groupLevies(await fetchAll((f, t) => supabase.from('charges').select('label, month').eq('kind', 'levy').order('id').range(f, t)))
     },
   })
 }

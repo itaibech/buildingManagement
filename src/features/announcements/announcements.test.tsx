@@ -18,7 +18,10 @@ const toast = vi.hoisted(() => ({ success: vi.fn() }))
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: (table: string) => ({
-      select: () => Promise.resolve({ data: table === 'announcements' ? db.rows : [], error: null }),
+      select: () => {
+        const chain = { order: () => chain, range: () => Promise.resolve({ data: table === 'announcements' ? db.rows : [], error: null }) }
+        return chain
+      },
       insert: (values: unknown) => {
         db.inserts.push(values)
         return Promise.resolve({ error: null })

@@ -24,7 +24,7 @@ vi.mock('../../lib/supabase', () => ({
       select: () => {
         const rows: Record<string, unknown[]> = { calendar_events: db.events, meetings: db.meetings, maintenance_tasks: db.tasks }
         const result = { data: rows[table] ?? [], error: null }
-        const chain = { order: () => chain, then: (done: (r: typeof result) => unknown) => Promise.resolve(result).then(done) }
+        const chain = { order: () => chain, range: () => chain, then: (done: (r: typeof result) => unknown) => Promise.resolve(result).then(done) }
         return chain
       },
       insert: (values: unknown) => { db.inserts.push(values); return Promise.resolve({ error: null }) },

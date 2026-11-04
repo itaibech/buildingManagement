@@ -1,5 +1,6 @@
 // Polls data access (the only place the feature touches supabase). RLS and the 0031 RPCs enforce every rule.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { fetchAll } from '../../lib/fetchAll'
 import { supabase } from '../../lib/supabase'
 import { notifyError } from '../../ui/notify'
 import { useMyApartmentId } from '../finance/api'
@@ -20,9 +21,8 @@ export function usePolls(enabled = true) {
     queryKey: [...KEY, 'list'],
     enabled,
     queryFn: async (): Promise<Poll[]> => {
-      const { data, error } = await supabase.from('polls').select(SELECT).order('closes_at', { ascending: false })
-      fail(error)
-      return (data ?? []).map(toPoll)
+      const data = await fetchAll((f, t) => supabase.from('polls').select(SELECT).order('closes_at', { ascending: false }).order('id').range(f, t))
+      return data.map(toPoll)
     },
   })
 }
@@ -62,9 +62,8 @@ export function useMyVotes() {
     enabled: mine.isSuccess,
     queryFn: async (): Promise<Map<string, PollVote>> => {
       if (!apartmentId) return new Map()
-      const { data, error } = await supabase.from('poll_votes').select('*').eq('apartment_id', apartmentId)
-      fail(error)
-      return new Map((data ?? []).map((v) => [v.poll_id, v]))
+      const data = await fetchAll((f, t) => supabase.from('poll_votes').select('*').eq('apartment_id', apartmentId).order('id').range(f, t))
+      return new Map(data.map((v) => [v.poll_id, v]))
     },
   })
   return { apartmentId, votes: q.data, isLoading: mine.isLoading || q.isLoading, isError: mine.isError || q.isError }
