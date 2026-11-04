@@ -1,7 +1,7 @@
 import { Button, FileInput, Select, Stack, Text, Textarea } from '@mantine/core'
 import { useForm, type UseFormReturnType } from '@mantine/form'
 import { he } from '../../lib/he'
-import { DateInput, focusFirstError, notifySuccess } from '../../ui'
+import { DateInput, focusFirstError, notifySuccess, PasteButton, PasteHint, usePasteFile } from '../../ui'
 import { todayISO } from '../../lib/dates'
 import { formatDate } from '../../lib/format'
 import { useExpenseCategories, useMarkDone, type Task } from './api'
@@ -46,6 +46,8 @@ export function DoneForm({ task, onDone }: { task: Task; onDone: () => void }) {
       report: (v) => { const problem = v ? fileProblem(v) : null; return problem ? REPORT_PROBLEMS[problem] : null },
     },
   })
+  const pasteReport = (f: File) => { form.setFieldValue('report', f); form.validateField('report') }
+  const zone = usePasteFile({ accept: ACCEPT, onFile: pasteReport })
   const preview = form.values.doneOn ? nextDue(form.values.doneOn, task.frequency) : null
   const submit = form.onSubmit((v) => {
     const cost = costOf(v)
@@ -63,8 +65,12 @@ export function DoneForm({ task, onDone }: { task: Task; onDone: () => void }) {
         {preview && <Text size="sm" c="dimmed" className="bm-num">{he.maintenance.nextDuePreview(formatDate(preview))}</Text>}
         <Textarea label={he.maintenance.note} autosize minRows={2} maxRows={6} {...form.getInputProps('note')} />
         <CostFields form={form} />
-        <FileInput label={he.maintenance.report} description={he.maintenance.reportHint} placeholder={he.maintenance.reportPick}
-          accept={ACCEPT} clearable {...form.getInputProps('report')} />
+        <Stack gap={4} ref={zone}>
+          <FileInput label={he.maintenance.report} description={he.maintenance.reportHint} placeholder={he.maintenance.reportPick}
+            accept={ACCEPT} clearable {...form.getInputProps('report')} />
+          <PasteButton onFile={pasteReport} />
+          <PasteHint />
+        </Stack>
         <Button type="submit" fullWidth loading={markDone.isPending}>{he.maintenance.markDone}</Button>
       </Stack>
     </form>

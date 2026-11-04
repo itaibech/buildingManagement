@@ -6,6 +6,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { he } from '../../lib/he'
+import { paste } from '../../test/paste'
 import { theme } from '../../ui/theme'
 import { proofError, proofMime, proofPath } from './ledger'
 import { PaymentForm } from './PaymentForm'
@@ -165,6 +166,24 @@ describe('the payment dialog', () => {
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(P.failed))
     const uploaded = db.log[1]?.slice('upload:'.length)
     expect(db.log).toContain(`remove:${uploaded}`)
+  })
+})
+
+describe('pasting a proof into the payment dialog', () => {
+  const shot = new File(['png'], 'image.png', { type: 'image/png' })
+  it('a pasted screenshot becomes the proof, named clipboard-<timestamp>.png, next to a "הדבקה מהלוח" button', async () => {
+    wrap(<PaymentForm apartmentId="a1" onDone={vi.fn()} />)
+    expect(screen.getByRole('button', { name: he.paste.button })).toBeInTheDocument()
+    expect(screen.getByText(he.paste.fieldHint)).toBeInTheDocument()
+    paste(screen.getByLabelText(new RegExp(he.finance.amount)), { files: [shot] })
+    expect(await screen.findByText(/^clipboard-\d+\.png$/)).toBeInTheDocument()
+  })
+  it('a text paste into the amount is left alone; a wrong type gets the same Hebrew error', async () => {
+    wrap(<PaymentForm apartmentId="a1" onDone={vi.fn()} />)
+    expect(paste(screen.getByLabelText(new RegExp(he.finance.amount)), { text: '300' }).defaultPrevented).toBe(false)
+    expect(screen.getByRole('button', { name: P.attach })).toBeInTheDocument()
+    paste(document.body, { files: [new File(['MZ'], 'setup.exe', { type: 'application/x-msdownload' })] })
+    expect(await screen.findByRole('alert')).toHaveTextContent(P.errors.type)
   })
 })
 

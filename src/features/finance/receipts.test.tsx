@@ -7,11 +7,13 @@ import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { todayISO } from '../../lib/dates'
 import { HEBREW_MONTHS, he } from '../../lib/he'
+import { paste } from '../../test/paste'
 import { theme } from '../../ui/theme'
 import type { Expense } from './api'
 import { expenseExportName } from '../export/buildWorkbook'
 import { ExpenseExportDialog } from './ExpenseExport'
 import { exportYears } from './ledger'
+import { ExpenseForm } from './ExpenseForms'
 import { ExpensesTab } from './ExpensesTab'
 import { ReceiptControl } from './ReceiptControl'
 
@@ -195,6 +197,27 @@ describe('ReceiptControl', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: R.remove }))
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith(R.removed))
     expect(db.log).toEqual(['update:{"receipt_path":null,"receipt_name":null}', 'remove:e1/old.pdf'])
+  })
+})
+
+describe('pasting a receipt', () => {
+  const shot = new File(['png'], '', { type: 'image/png' })
+  it('the new-expense dialog: a pasted screenshot becomes the receipt; a wrong type gets the picker\'s Hebrew error', async () => {
+    wrap(<ExpenseForm onDone={vi.fn()} />)
+    expect(screen.getByRole('button', { name: he.paste.button })).toBeInTheDocument()
+    paste(screen.getByLabelText(he.finance.vendor), { files: [new File(['x'], 'a.zip', { type: 'application/zip' })] })
+    expect(await screen.findByText(he.finance.errors.receiptType)).toBeInTheDocument()
+    paste(screen.getByLabelText(he.finance.vendor), { files: [shot] })
+    expect(await screen.findByText(/^clipboard-\d+\.png$/)).toBeInTheDocument()
+  })
+  it('an expense row: Ctrl+V on the focused paperclip uploads the screenshot as the receipt', async () => {
+    wrap(<><ReceiptControl expense={expense()} /><ReceiptControl expense={expense({ id: 'e2' })} /></>)
+    paste(document.body, { files: [shot] })
+    expect(db.log).toHaveLength(0)
+    paste(screen.getAllByRole('button', { name: R.add })[1], { files: [shot] })
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith(R.saved))
+    expect(db.log[0]).toMatch(/^upload:e2\/[0-9a-f-]{36}\.png$/)
+    expect(db.log[1]).toMatch(/"receipt_name":"clipboard-\d+\.png"/)
   })
 })
 

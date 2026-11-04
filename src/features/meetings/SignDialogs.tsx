@@ -1,13 +1,14 @@
 import { Alert, Button, FileInput, Group, Stack, Text, TextInput } from '@mantine/core'
 import { useState } from 'react'
 import { he } from '../../lib/he'
-import { notifySuccess } from '../../ui'
+import { notifySuccess, PasteButton, PasteHint, usePasteFile } from '../../ui'
 import { FormModal } from '../tenants/dialogs'
 import { fileProblem, meetingRpc, uploadMeetingFile, useMeetingCall } from './api'
 import { SignaturePad } from './SignaturePad'
 import type { MeetingDetail, SignatureRole } from './types'
 
 const S = he.meetings.sign
+const SCAN_ACCEPT = 'image/*,application/pdf'
 
 interface DrawProps { meeting: MeetingDetail; role: SignatureRole | null; onClose: () => void }
 
@@ -46,6 +47,7 @@ export function ScanDialog({ meeting, opened, onClose }: { meeting: MeetingDetai
   const call = useMeetingCall()
   const [file, setFile] = useState<File | null>(null)
   const problem = file ? fileProblem(file) : null
+  const zone = usePasteFile({ accept: SCAN_ACCEPT, onFile: setFile, enabled: opened })
   const save = () => file && !problem && call.mutate(async () => {
     const path = await uploadMeetingFile(meeting.id, file)
     await meetingRpc.sign(meeting.id, 'chair', meeting.chair_name, path, 'scan')
@@ -55,7 +57,11 @@ export function ScanDialog({ meeting, opened, onClose }: { meeting: MeetingDetai
     <FormModal opened={opened} title={S.scan} onClose={onClose} compact>
       <Stack>
         <Text size="sm">{S.scanHint}</Text>
-        <FileInput label={S.scanFile} accept="image/*,application/pdf" value={file} onChange={setFile} clearable />
+        <Stack gap={4} ref={zone}>
+          <FileInput label={S.scanFile} accept={SCAN_ACCEPT} value={file} onChange={setFile} clearable />
+          <PasteButton onFile={setFile} />
+          <PasteHint />
+        </Stack>
         {problem && <Alert color="debt">{problem === 'size' ? S.fileTooBig : S.fileType}</Alert>}
         <Group justify="flex-end" gap="sm">
           <Button variant="default" onClick={onClose}>{S.cancel}</Button>

@@ -3,7 +3,7 @@ import { IconDots, IconFileText, IconPaperclip, IconPencil, IconTrash } from '@t
 import { todayISO } from '../../lib/dates'
 import { formatDate, formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
-import { notifyError, notifySuccess, StatusBadge } from '../../ui'
+import { notifyError, notifySuccess, PasteButton, PasteHint, StatusBadge, usePasteFile } from '../../ui'
 import { useAddContractFile, useContractFiles, useRemoveContractFile, type Contract, type ContractFile } from './api'
 import { ACCEPT, fileProblem, useSupplierFileUrls } from './files'
 import { contractStatus, effectiveEnd } from './logic'
@@ -46,14 +46,19 @@ function Files({ contractId }: { contractId: string }) {
     add.mutate({ contractId, file }, { onSuccess: () => notifySuccess(C.uploaded), onError: () => notifyError(C.fileFailed) })
   }
   const onRemove = (f: ContractFile) => remove.mutate(f, { onSuccess: () => notifySuccess(C.removed), onError: () => notifyError(he.toast.failed) })
+  const zone = usePasteFile({ accept: ACCEPT, onFile: pick, enabled: !add.isPending })
   return (
-    <Stack gap={4}>
+    <Stack gap={4} ref={zone}>
       {(files.data ?? []).map((f) => <FileRow key={f.id} file={f} url={urls.data?.[f.file_path]} onRemove={() => onRemove(f)} />)}
-      <FileButton onChange={pick} accept={ACCEPT}>
-        {(props) => <Button {...props} variant="default" size="compact-md" mih={44} loading={add.isPending}
-          leftSection={<IconPaperclip {...ICON} />} style={{ alignSelf: 'flex-start' }}>{C.upload}</Button>}
-      </FileButton>
+      <Group gap="xs">
+        <FileButton onChange={pick} accept={ACCEPT}>
+          {(props) => <Button {...props} variant="default" size="compact-md" mih={44} loading={add.isPending}
+            leftSection={<IconPaperclip {...ICON} />}>{C.upload}</Button>}
+        </FileButton>
+        <PasteButton onFile={pick} disabled={add.isPending} />
+      </Group>
       <Text size="xs" c="dimmed">{C.uploadHint}</Text>
+      <PasteHint />
     </Stack>
   )
 }

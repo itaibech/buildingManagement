@@ -5,7 +5,7 @@ import { Fragment, useState } from 'react'
 import { todayISO } from '../../lib/dates'
 import { formatILS, monthLabel } from '../../lib/format'
 import { he } from '../../lib/he'
-import { DateInput, focusFirstError, notifyError, notifySuccess } from '../../ui'
+import { DateInput, focusFirstError, notifyError, notifySuccess, PasteButton, PasteHint, usePasteFile } from '../../ui'
 import { useExpenseCategories } from '../maintenance/api'
 import { useApplyTemplates, useSaveExpense, useSaveTemplate, type Template } from './api'
 import { MoneyInput } from './fields'
@@ -25,8 +25,9 @@ function ReceiptField({ file, onChange }: { file: File | null; onChange: (f: Fil
     setError(err)
     onChange(err ? null : f)
   }
+  const zone = usePasteFile({ accept: RECEIPT_ACCEPT, onFile: pick })
   return (
-    <Stack gap={4}>
+    <Stack gap={4} ref={zone}>
       <Text size="sm" fw={600}>{he.finance.receipt}</Text>
       {file ? (
         <Group gap="xs" wrap="nowrap">
@@ -35,11 +36,15 @@ function ReceiptField({ file, onChange }: { file: File | null; onChange: (f: Fil
           <CloseButton size={44} aria-label={he.finance.removeReceipt} onClick={() => pick(null)} />
         </Group>
       ) : (
-        <FileButton accept={RECEIPT_ACCEPT} onChange={pick}>
-          {(props) => <Button variant="default" leftSection={<IconPaperclip size={18} stroke={1.75} />} {...props}>{he.finance.attachReceipt}</Button>}
-        </FileButton>
+        <Group gap="xs">
+          <FileButton accept={RECEIPT_ACCEPT} onChange={pick}>
+            {(props) => <Button variant="default" mih={44} leftSection={<IconPaperclip size={18} stroke={1.75} />} {...props}>{he.finance.attachReceipt}</Button>}
+          </FileButton>
+          <PasteButton onFile={pick} />
+        </Group>
       )}
       <Text size="xs" c={error ? 'debt.7' : 'dimmed'}>{error ?? he.finance.receiptHint}</Text>
+      <PasteHint />
     </Stack>
   )
 }

@@ -2,7 +2,7 @@ import { Button, FileInput, Group, Radio, Select, Stack, Text, Textarea, TextInp
 import { useForm } from '@mantine/form'
 import { IconPaperclip } from '@tabler/icons-react'
 import { he } from '../../lib/he'
-import { DateInput, focusFirstError, notifySuccess } from '../../ui'
+import { DateInput, focusFirstError, notifySuccess, PasteButton, PasteHint, usePasteFile } from '../../ui'
 import { createDocument, docFileProblem, updateDocument, useDocumentCall, type BuildingDocument, type DocumentInput } from './api'
 import { CATEGORIES, type Category, type Visibility } from './logic'
 
@@ -57,13 +57,19 @@ export function DocumentForm({ doc, onDone }: { doc?: BuildingDocument; onDone: 
     const run = doc ? () => updateDocument(doc.id, input, file) : file ? () => createDocument(input, file) : null
     if (run) call.mutate(run, { onSuccess: () => { notifySuccess(doc ? T.updated : T.created); onDone() } })
   }, focusFirstError)
+  const pasteFile = (f: File) => { form.setFieldValue('file', f); form.validateField('file') }
+  const zone = usePasteFile({ accept: ACCEPT, onFile: pasteFile })
   return (
     <form onSubmit={submit} noValidate>
       <Stack>
         <TextInput label={F.title} withAsterisk data-autofocus maxLength={200} {...form.getInputProps('title')} />
         <Select label={F.category} data={CATEGORY_OPTIONS} allowDeselect={false} {...form.getInputProps('category')} />
-        <FileInput label={doc ? F.newFile : F.file} withAsterisk={!doc} description={doc ? F.newFileHint : F.fileHint} accept={ACCEPT}
-          placeholder={F.pickFile} clearable leftSection={<IconPaperclip size={18} stroke={1.75} aria-hidden="true" />} {...form.getInputProps('file')} />
+        <Stack gap={4} ref={zone}>
+          <FileInput label={doc ? F.newFile : F.file} withAsterisk={!doc} description={doc ? F.newFileHint : F.fileHint} accept={ACCEPT}
+            placeholder={F.pickFile} clearable leftSection={<IconPaperclip size={18} stroke={1.75} aria-hidden="true" />} {...form.getInputProps('file')} />
+          <PasteButton onFile={pasteFile} />
+          <PasteHint />
+        </Stack>
         <Textarea label={F.description} autosize minRows={2} maxLength={2000} {...form.getInputProps('description')} />
         <Group grow align="flex-start" wrap="wrap">
           <DateInput label={F.documentDate} miw={160} {...form.getInputProps('document_date')} />

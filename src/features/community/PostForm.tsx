@@ -1,13 +1,14 @@
-import { ActionIcon, Alert, Box, Button, FileButton, Image, Input, Select, Stack, Textarea, TextInput } from '@mantine/core'
+import { ActionIcon, Alert, Box, Button, FileButton, Group, Image, Input, Select, Stack, Textarea, TextInput } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { IconCamera, IconX } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import { he } from '../../lib/he'
-import { focusFirstError, notifyError, notifySuccess } from '../../ui'
+import { focusFirstError, notifyError, notifySuccess, PasteButton, PasteHint, usePasteFile } from '../../ui'
 import { useCreatePost, useUpdatePost, type Post, type PostInput } from './api'
 import { asCategory, CATEGORIES, hasText, limitMessage, MAX_BODY, MAX_TITLE, photoError } from './board'
 
 const C = he.community
+const PHOTO_ACCEPT = 'image/*,.heic,.heif'
 const CATEGORY_OPTIONS = CATEGORIES.map((c) => ({ value: c, label: C.categories[c] }))
 
 /** One optional photo with a preview (the preview URL is revoked when replaced or unmounted). */
@@ -22,8 +23,9 @@ function SinglePhoto({ file, onChange }: { file: File | null; onChange: (f: File
     setError(problem)
     if (!problem) onChange(f)
   }
+  const zone = usePasteFile({ accept: PHOTO_ACCEPT, onFile: pick })
   return (
-    <Input.Wrapper label={C.photo} description={C.photoHint} error={error}>
+    <Input.Wrapper ref={zone} label={C.photo} description={C.photoHint} error={error}>
       <Box mt="xs">
         {url ? (
           <Box pos="relative" w={96} h={96}>
@@ -34,10 +36,14 @@ function SinglePhoto({ file, onChange }: { file: File | null; onChange: (f: File
             </ActionIcon>
           </Box>
         ) : (
-          <FileButton onChange={pick} accept="image/*,.heic,.heif">
-            {(props) => <Button {...props} variant="light" leftSection={<IconCamera size={20} stroke={1.75} />}>{C.addPhoto}</Button>}
-          </FileButton>
+          <Group gap="xs">
+            <FileButton onChange={pick} accept={PHOTO_ACCEPT}>
+              {(props) => <Button {...props} variant="light" mih={44} leftSection={<IconCamera size={20} stroke={1.75} />}>{C.addPhoto}</Button>}
+            </FileButton>
+            <PasteButton onFile={pick} />
+          </Group>
         )}
+        <PasteHint />
       </Box>
     </Input.Wrapper>
   )

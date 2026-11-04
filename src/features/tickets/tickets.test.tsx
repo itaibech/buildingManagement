@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import { MantineProvider } from '@mantine/core'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { he } from '../../lib/he'
+import { paste } from '../../test/paste'
 import { theme } from '../../ui/theme'
 import type { TicketDetail, TicketListItem } from './api'
 import { TicketForm } from './TicketForm'
@@ -148,6 +149,27 @@ describe('TicketForm', () => {
     expect(m.create).toHaveBeenCalledWith({ values: { title: 'מים בחניה', description: '', location: '' }, files: [photo] }, expect.anything())
     expect(m.success).toHaveBeenCalledWith(he.tickets.sent)
     expect(onDone).toHaveBeenCalled()
+  })
+})
+
+describe('TicketForm pasted photos', () => {
+  it('a screenshot pasted while typing the description is added as a photo and sent; a text paste is not', () => {
+    m.create.mockImplementation((_v, o) => o?.onSuccess?.({ id: 'new', failedPhotos: 0 }))
+    wrap(<TicketForm onDone={vi.fn()} />)
+    expect(screen.getByRole('button', { name: he.paste.button })).toBeInTheDocument()
+    const title = screen.getByLabelText(new RegExp(he.tickets.title))
+    expect(paste(title, { text: 'מים' }).defaultPrevented).toBe(false)
+    fireEvent.change(title, { target: { value: 'נזילה' } })
+    act(() => { paste(title, { files: [file('image.png', 'image/png')] }) })
+    expect(screen.getByRole('img', { name: he.tickets.photo(1) })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: he.tickets.send }))
+    const sent = (m.create.mock.calls[0][0] as { files: File[] }).files
+    expect(sent.map((f) => f.name)).toEqual([expect.stringMatching(/^clipboard-\d+\.png$/)])
+  })
+  it('a pasted PDF gets the picker\'s Hebrew error', () => {
+    wrap(<TicketForm onDone={vi.fn()} />)
+    act(() => { paste(document.body, { files: [file('doc.pdf', 'application/pdf')] }) })
+    expect(screen.getByText(he.tickets.errors.notImage('doc.pdf'))).toBeInTheDocument()
   })
 })
 

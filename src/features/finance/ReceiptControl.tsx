@@ -1,9 +1,9 @@
-import { ActionIcon, Button, Menu } from '@mantine/core'
+import { ActionIcon, Box, Button, Menu } from '@mantine/core'
 import { useMediaQuery } from '@mantine/hooks'
 import { IconCamera, IconEye, IconFile, IconPaperclip, IconReceipt, IconReplace, IconTrash } from '@tabler/icons-react'
 import { useRef, useState, type RefObject } from 'react'
 import { he } from '../../lib/he'
-import { notifyError, notifySuccess } from '../../ui'
+import { notifyError, notifySuccess, usePasteFile } from '../../ui'
 import { ConfirmDialog } from '../tenants/dialogs'
 import { receiptUrl, useRemoveReceipt, useSetReceipt, type Expense } from './api'
 import { RECEIPT_ACCEPT, receiptError } from './ledger'
@@ -83,8 +83,10 @@ export function ReceiptControl({ expense }: { expense: Expense }) {
   const confirmRemove = () => remove.mutate(expense, {
     onSuccess: ({ fileStayed }) => { (fileStayed ? notifyError : notifySuccess)(fileStayed ? R.fileStayed : R.removed); setConfirming(false) },
   })
+  // Focus the row's 📎 and press Ctrl+V to attach a screenshot.
+  const zone = usePasteFile({ accept: RECEIPT_ACCEPT, onFile: upload, enabled: !setReceipt.isPending })
   return (
-    <>
+    <Box ref={zone} display="contents">
       <Picker inputRef={file} onPick={upload} />
       <Picker inputRef={camera} camera onPick={upload} />
       {path ? (
@@ -95,6 +97,6 @@ export function ReceiptControl({ expense }: { expense: Expense }) {
       )}
       <ConfirmDialog opened={confirming} title={R.removeConfirm} body={R.removeBody} confirmLabel={R.remove}
         loading={remove.isPending} failed={remove.isError} onClose={() => setConfirming(false)} onConfirm={confirmRemove} />
-    </>
+    </Box>
   )
 }
