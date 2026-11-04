@@ -10,7 +10,7 @@ export const DAY_OPTIONS = [30, 14, 7, 3, 2, 1] as const
 export const MAX_DAYS = 6
 
 export type ReminderLogRow = Pick<Database['public']['Tables']['maintenance_reminders_log']['Row'],
-  'id' | 'item_kind' | 'title' | 'due_on' | 'offset_days' | 'sent_on' | 'dry_run'>
+  'id' | 'item_kind' | 'item_id' | 'title' | 'due_on' | 'offset_days' | 'sent_on' | 'dry_run'>
 
 const KEY = ['maintenance', 'reminders'] as const
 export const HISTORY_ROWS = 30
@@ -47,16 +47,27 @@ export function useSaveReminderSettings() {
   })
 }
 
+/** The log has a row per admin emailed: one history line per reminder (the newest row of each). */
+export function distinctReminders(rows: readonly ReminderLogRow[], limit = HISTORY_ROWS): ReminderLogRow[] {
+  const seen = new Set<string>()
+  return rows.filter((r) => {
+    const key = `${r.item_kind}:${r.item_id}:${r.due_on}:${r.offset_days}:${r.dry_run}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  }).slice(0, limit)
+}
+
 /** "היסטוריית תזכורות": the last 30 reminders sent (admins; RLS). */
 export function useReminderHistory() {
   return useQuery({
     queryKey: [...KEY, 'history'],
     queryFn: async (): Promise<ReminderLogRow[]> => {
       const { data, error } = await supabase.from('maintenance_reminders_log')
-        .select('id, item_kind, title, due_on, offset_days, sent_on, dry_run')
-        .order('created_at', { ascending: false }).limit(HISTORY_ROWS)
+        .select('id, item_kind, item_id, title, due_on, offset_days, sent_on, dry_run')
+        .order('created_at', { ascending: false }).limit(HISTORY_ROWS * 5)
       if (error) throw new Error(error.message)
-      return data
+      return distinctReminders(data)
     },
   })
 }

@@ -1,17 +1,17 @@
 /** cron-reminders: the digest email's content (Hebrew; render() in send-email's template escapes every string). */
 import type { EmailContent, EmailSection, EmailSectionItem } from '../../send-email/lib/template.ts'
-import { OVERDUE, TODAY, type DueEntry } from './digest.ts'
+import type { DueEntry } from './digest.ts'
 
-/** "היום", "בעוד יום", "בעוד שבוע", ..., "באיחור". */
-export function offsetHeading(offset: number): string {
-  if (offset === TODAY) return 'היום'
-  if (offset === OVERDUE) return 'באיחור'
-  const named: Record<number, string> = { 1: 'בעוד יום', 2: 'בעוד יומיים', 7: 'בעוד שבוע', 14: 'בעוד שבועיים' }
-  return named[offset] ?? `בעוד ${offset} ימים`
+/** The section of an item `daysLeft` days from its due date: "היום", "בעוד יום", "בעוד שבוע", ..., "באיחור". */
+export function daysLeftHeading(daysLeft: number): string {
+  if (daysLeft === 0) return 'היום'
+  if (daysLeft < 0) return 'באיחור'
+  const named: Record<number, string> = { 1: 'בעוד יום', 2: 'בעוד יומיים', 7: 'בעוד שבוע', 14: 'בעוד שבועיים', 30: 'בעוד חודש' }
+  return named[daysLeft] ?? `בעוד ${daysLeft} ימים`
 }
 
-/** Sections in reading order: today, then the nearest first, overdue last. */
-const rank = (offset: number): number => (offset === OVERDUE ? Number.MAX_SAFE_INTEGER : offset)
+/** One section per heading (all overdue items together); today first, then the nearest, overdue last. */
+const bucket = (daysLeft: number): number => (daysLeft < 0 ? Number.MAX_SAFE_INTEGER : daysLeft)
 
 /** YYYY-MM-DD → DD/MM/YYYY, as the app shows dates. */
 const formatDay = (iso: string): string => {
@@ -33,19 +33,19 @@ function itemOf(e: DueEntry, appUrl: string): EmailSectionItem {
   }
 }
 
-/** The digest's sections, grouped by offset, items by due date then title. */
+/** The digest's sections, grouped by days left, items by due date then title. */
 export function digestSections(entries: readonly DueEntry[], appUrl: string): EmailSection[] {
-  const offsets = [...new Set(entries.map((e) => e.offset))].sort((a, b) => rank(a) - rank(b))
-  return offsets.map((offset) => ({
-    heading: offsetHeading(offset),
-    items: entries.filter((e) => e.offset === offset)
+  const buckets = [...new Set(entries.map((e) => bucket(e.daysLeft)))].sort((a, b) => a - b)
+  return buckets.map((b) => ({
+    heading: daysLeftHeading(b === Number.MAX_SAFE_INTEGER ? -1 : b),
+    items: entries.filter((e) => bucket(e.daysLeft) === b)
       .sort((a, b) => (a.item.dueOn ?? '').localeCompare(b.item.dueOn ?? '') || a.item.title.localeCompare(b.item.title, 'he'))
       .map((e) => itemOf(e, appUrl)),
   }))
 }
 
 export const digestSubject = (n: number): string =>
-  n === 1 ? 'תזכורת תחזוקה: משימה אחת קרובה' : `תזכורת תחזוקה: ${n} משימות קרובות`
+  n === 1 ? 'תזכורת תחזוקה: פריט אחד לטיפול' : `תזכורת תחזוקה: ${n} פריטים לטיפול`
 
 /** One committee member's digest. */
 export function digestContent(entries: readonly DueEntry[], name: string, appUrl: string): EmailContent {

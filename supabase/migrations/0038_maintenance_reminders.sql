@@ -1,13 +1,16 @@
 -- 0038 maintenance reminders by email ("תזכורות תחזוקה במייל"): a daily digest to the committee before maintenance
 -- tasks / inspections and supplier contracts are due. The first path from pg_cron to email, built to be reused.
 --   * maintenance_reminder_settings: one row per building (admins read and write it; RLS). No row = the defaults:
---     on, 7 and 1 days before, plus overdue. The due date itself ("היום") is always included while on.
---   * maintenance_reminders_log: each (item, due date, offset) is emailed at most once (unique index). offset_days:
---     days before the due date, 0 = the day itself, -1 = overdue (tasks only, the day after). Admins read their
---     building's rows (RLS); only the cron-reminders Edge Function (service role) writes them.
+--     on, 7 and 1 days before, plus overdue. The due date itself ("היום") and each item's own remind_days (tasks and
+--     contracts, 0032) are always included while on.
+--   * maintenance_reminders_log: one row per (item, due date, offset, recipient admin); a real reminder is emailed at
+--     most once (partial unique index over the rows that aren't dry runs, so a dry run never blocks a real send).
+--     offset_days: days before the due date, 0 = the day itself, -1 = overdue (tasks only). Admins read their
+--     building's rows (RLS); only the cron-reminders Edge Function (service role) writes them, through
+--     claim_maintenance_reminders().
 --   * email_log.kind gains 'maintenance_reminder' (added to whatever the constraint allows, like 0035).
 --   * The schedule: pg_cron runs public.maintenance_reminders_cron() hourly; it acts only during the 08:00 hour in
---     Israel (DST-safe, as in 0035) and POSTs to the cron-reminders function with pg_net. The function picks what is
+--     Israel, retried at 09:00 and 10:00 (DST-safe, as in 0035; the log keeps the retries idempotent), and POSTs to the cron-reminders function with pg_net. The function picks what is
 --     due at send time (a task marked done meanwhile has a new next_due, so it is skipped) and sends the digest.
 --   * Auth with no secret handled by a person: private.cron_config (schema not exposed by the API, no grants to the
 --     API roles) holds a random secret generated here. pg_cron sends it as x-cron-secret; the function (verify_jwt
@@ -64,14 +67,17 @@ create table public.maintenance_reminders_log (
   item_id uuid not null,
   title text not null check (char_length(title) <= 200),
   due_on date not null,
-  offset_days int not null check (offset_days between -1 and 60),
+  offset_days int not null check (offset_days between -1 and 365),
+  -- The admin it was emailed to (one digest each, so a failed send to one admin is retried for them only).
+  recipient uuid not null references auth.users on delete cascade,
   sent_on date not null,
   dry_run boolean not null default false,
   email_log_id uuid references public.email_log on delete set null,
   created_at timestamptz not null default now()
 );
 create unique index maintenance_reminders_log_once
-  on public.maintenance_reminders_log (item_kind, item_id, due_on, offset_days);
+  on public.maintenance_reminders_log (item_kind, item_id, due_on, offset_days, recipient) where not dry_run;
+create index maintenance_reminders_log_recipient_idx on public.maintenance_reminders_log (recipient);
 create index maintenance_reminders_log_building_idx on public.maintenance_reminders_log (building_id, created_at desc);
 create index maintenance_reminders_log_email_log_idx on public.maintenance_reminders_log (email_log_id)
   where email_log_id is not null;
@@ -82,6 +88,23 @@ grant all on public.maintenance_reminders_log to service_role;
 create policy maintenance_reminders_log_admin_select on public.maintenance_reminders_log for select to authenticated
   using ((select public.is_admin())
     and building_id = (select p.building_id from public.profiles p where p.user_id = (select auth.uid())));
+
+-- Claims rows for the function: real rows already logged are skipped (the partial unique index), so concurrent or
+-- retried runs send each reminder once; dry-run rows are always inserted. Returns the rows inserted now.
+create function public.claim_maintenance_reminders(p_rows jsonb)
+returns table (id uuid, item_kind text, item_id uuid, due_on date, offset_days int, recipient uuid)
+language sql volatile set search_path = ''
+as $$
+  insert into public.maintenance_reminders_log as l
+    (building_id, item_kind, item_id, title, due_on, offset_days, recipient, sent_on, dry_run)
+  select r.building_id, r.item_kind, r.item_id, left(r.title, 200), r.due_on, r.offset_days, r.recipient, r.sent_on, r.dry_run
+  from jsonb_to_recordset(p_rows) as r (building_id uuid, item_kind text, item_id uuid, title text, due_on date,
+    offset_days int, recipient uuid, sent_on date, dry_run boolean)
+  on conflict (item_kind, item_id, due_on, offset_days, recipient) where not dry_run do nothing
+  returning l.id, l.item_kind, l.item_id, l.due_on, l.offset_days, l.recipient;
+$$;
+revoke execute on function public.claim_maintenance_reminders(jsonb) from public, anon, authenticated;
+grant execute on function public.claim_maintenance_reminders(jsonb) to service_role;
 
 -- ---------------------------------------------------------------- the cron secret (never exposed)
 create schema if not exists private;
@@ -107,15 +130,15 @@ revoke execute on function public.cron_reminders_secret() from public, anon, aut
 grant execute on function public.cron_reminders_secret() to service_role;
 
 -- ---------------------------------------------------------------- the daily job (pg_cron → pg_net)
--- True during the 08:00 hour in Israel (both UTC+2 and UTC+3).
+-- True from 08:00 to 10:59 in Israel (both UTC+2 and UTC+3): 08:10 runs, 09:10 and 10:10 retry what failed.
 create function public.maintenance_reminders_due_hour(p_now timestamptz) returns boolean
 language sql stable set search_path = ''
 as $$
-  select extract(hour from p_now at time zone 'Asia/Jerusalem') = 8;
+  select extract(hour from p_now at time zone 'Asia/Jerusalem') between 8 and 10;
 $$;
 revoke execute on function public.maintenance_reminders_due_hour(timestamptz) from public, anon, authenticated;
 
--- Scheduled hourly in UTC; at 08:xx Israel time it queues a POST to cron-reminders (p_now: tests pin the clock).
+-- Scheduled hourly in UTC; at 08:xx-10:xx Israel time it queues a POST to cron-reminders (p_now: tests pin the clock).
 -- Returns the pg_net request id, or null when it didn't call (another hour, or no functions_url yet).
 create function public.maintenance_reminders_cron(p_now timestamptz default now()) returns bigint
 language plpgsql security definer set search_path = ''
@@ -141,7 +164,7 @@ end;
 $$;
 revoke execute on function public.maintenance_reminders_cron(timestamptz) from public, anon, authenticated;
 
--- Hourly at :10 UTC (winter UTC+2 → 06:10 UTC, summer UTC+3 → 05:10 UTC act). Same fallback as 0035 where pg_cron
+-- Hourly at :10 UTC (winter UTC+2 → 06:10-08:10 UTC, summer UTC+3 → 05:10-07:10 UTC act). Same fallback as 0035 where pg_cron
 -- is missing: a WARNING, nothing scheduled.
 do $$
 begin

@@ -28,7 +28,7 @@ function DayToggles({ value, disabled, onChange }: { value: number[]; disabled: 
           )
         })}
       </Group>
-      <Text size="xs" c="dimmed">{R.daysHint}</Text>
+      <Text size="xs" c="dimmed">{R.daysHint} {R.daysItemHint}</Text>
     </Stack>
   )
 }

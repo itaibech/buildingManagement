@@ -16,6 +16,12 @@ export function safeEqual(given: string, expected: string): boolean {
   return diff === 0
 }
 
+/** The migration's secret: 32 random bytes as 64 lower-case hex characters. */
+const SECRET_FORMAT = /^[0-9a-f]{64}$/
+
+/** A cheap format check, so a request without a well-formed header is refused before any database call. */
+export const looksLikeSecret = (given: string | null): given is string => !!given && SECRET_FORMAT.test(given)
+
 /** Whether the request carries the database's secret. A missing or short expected secret never matches. */
 export function secretMatches(given: string | null, expected: string | null): boolean {
   if (!given || !expected || expected.length < MIN_SECRET) return false

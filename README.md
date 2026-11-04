@@ -317,15 +317,16 @@ Secrets take effect on the next call; no redeploy is needed.
 ### Automatic maintenance reminders (תזכורות תחזוקה במייל)
 
 Every morning at 08:00 Israel time the committee (the building's approved admins) gets **one digest email** that
-lists the maintenance tasks / inspections due in 7 days and in 1 day, those due today, and those that became overdue
-yesterday, plus supplier contracts ending in 7 days, in 1 day or today. Each item shows its title, the linked
+lists the maintenance tasks / inspections and supplier contracts due in 7 days, in 1 day, at each item's own
+"תזכורת לפני המועד" (`remind_days`, e.g. 30 days for a contract), and today, plus tasks that became overdue (once per
+due date). A reminder whose day was missed (the job didn't run) goes out on the next run. Each item shows its title, the linked
 supplier's name and phone, the due date and a link into the app. Admins change the days (or turn it off) in
 **הגדרות → תזכורות תחזוקה במייל**, which also shows the last 30 reminders; the maintenance page says when the next
 ones go out. On by default: no setup is needed beyond the email setup above (without it the job runs as a dry run).
 
 How it runs, with no person clicking and no secret handled by a person (migration 0038):
-1. `pg_cron` runs `public.maintenance_reminders_cron()` every hour at :10 UTC. It acts only during the 08:00 hour in
-   Israel, so summer and winter time need no second schedule.
+1. `pg_cron` runs `public.maintenance_reminders_cron()` every hour at :10 UTC. It acts from 08:00 to 10:59 in Israel
+   (08:10, with 09:10 and 10:10 retrying anything that failed), so summer and winter time need no second schedule.
 2. It POSTs to the `cron-reminders` Edge Function with `pg_net` (`net.http_post`), sending an `x-cron-secret`
    header. The secret was generated inside the database by the migration (`gen_random_bytes`) and lives in
    `private.cron_config`, a schema the Data API doesn't expose, with no grants to `anon` or `authenticated`.
@@ -333,8 +334,10 @@ How it runs, with no person clicking and no secret handled by a person (migratio
    it gets from the platform (`cron_reminders_secret()`, callable by the service role only), compares in constant
    time, and answers 401 to anything else.
 4. It re-reads the due dates at send time (a task marked done meanwhile has moved on and is skipped), claims each
-   (item, due date, offset) in `maintenance_reminders_log` (a unique index: sent at most once), and sends through the
-   same transport and template as `send-email`, inside the daily cap minus the committee's reserved 40.
+   (item, due date, offset, admin) in `maintenance_reminders_log` (a partial unique index over the real sends: at most
+   once, so the retries send nothing twice; dry runs never block a later real send), and sends each admin their digest
+   through the same transport and template as `send-email`, inside the daily cap minus the committee's reserved 40. An
+   admin whose email failed keeps their reminders unclaimed, so the next retry sends them.
 5. The function URL contains the project ref, which the database can't know: the deploy workflow sets
    `private.cron_config.functions_url` after `db push` (`supabase db query --linked`). While it is null (local and CI
    databases) the job does nothing.

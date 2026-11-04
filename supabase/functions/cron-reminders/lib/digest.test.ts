@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { render } from '../../send-email/lib/template.ts'
-import { digestContent, digestSections, digestSubject, offsetHeading } from './content.ts'
+import { daysLeftHeading, digestContent, digestSections, digestSubject } from './content.ts'
 import { addDays } from './db.ts'
-import { cleanDays, daysBetween, DEFAULT_SETTINGS, entryKey, israelDate, OVERDUE, selectDue, TODAY, type ReminderItem } from './digest.ts'
+import { cleanDays, daysBetween, DEFAULT_SETTINGS, entryKey, israelDate, offsetsFor, OVERDUE, selectDue, TODAY, type ReminderItem } from './digest.ts'
 
 const TODAY_ISO = '2026-11-04'
 const item = (over: Partial<ReminderItem>): ReminderItem => ({
-  kind: 'task', id: 't1', title: 'בדיקת מז"חים שנתית', dueOn: TODAY_ISO, supplierId: null, supplierName: null, supplierPhone: null, ...over,
+  kind: 'task', id: 't1', title: 'בדיקת מז"חים שנתית', dueOn: TODAY_ISO, remindDays: 0, supplierId: null, supplierName: null, supplierPhone: null, ...over,
 })
 const none = new Set<string>()
 
@@ -41,33 +41,61 @@ describe('selectDue', () => {
     item({ id: 'day', dueOn: '2026-11-05' }),
     item({ id: 'today', dueOn: TODAY_ISO }),
     item({ id: 'overdue', dueOn: '2026-11-03' }),
-    item({ id: 'old', dueOn: '2026-11-01' }),
-    item({ id: 'six', dueOn: '2026-11-10' }),
+    item({ id: 'later', dueOn: '2026-11-20' }),
     item({ id: 'done-once', dueOn: null }),
   ]
-  const ids = (s = DEFAULT_SETTINGS, list = items, sent = none) => selectDue(list, s, TODAY_ISO, sent).map((e) => [e.item.id, e.offset])
+  const ids = (s = DEFAULT_SETTINGS, list = items, sent = none, today = TODAY_ISO) =>
+    selectDue(list, s, today, sent).map((e) => [e.item.id, e.offset])
 
-  it('7 and 1 days before, the day itself and the day after (overdue), nothing else', () => {
+  it('7 and 1 days before, the day itself and overdue; nothing before the first offset day', () => {
     expect(ids()).toEqual([['week', 7], ['day', 1], ['today', TODAY], ['overdue', OVERDUE]])
   })
   it('configurable offsets; overdue can be turned off; off = nothing', () => {
-    expect(ids({ enabled: true, daysBefore: [6], includeOverdue: false })).toEqual([['today', TODAY], ['six', 6]])
+    expect(ids({ enabled: true, daysBefore: [16], includeOverdue: false })).toEqual([['week', 16], ['day', 16], ['today', TODAY], ['later', 16]])
     expect(ids({ ...DEFAULT_SETTINGS, enabled: false })).toEqual([])
   })
   it('a task marked done (next_due moved on, or none for a one-off) is skipped', () => {
     const done = [item({ id: 'week', dueOn: '2027-11-11' }), item({ id: 'day', dueOn: null })]
     expect(ids(DEFAULT_SETTINGS, done)).toEqual([])
   })
-  it('contracts get the same offsets and today, but are never overdue', () => {
-    const list = [
-      item({ kind: 'contract', id: 'c7', dueOn: '2026-11-11' }), item({ kind: 'contract', id: 'c1', dueOn: '2026-11-05' }),
-      item({ kind: 'contract', id: 'c0', dueOn: TODAY_ISO }), item({ kind: 'contract', id: 'cx', dueOn: '2026-11-03' }),
-    ]
-    expect(ids(DEFAULT_SETTINGS, list)).toEqual([['c7', 7], ['c1', 1], ['c0', TODAY]])
+  it('an item\'s own remind_days is one more offset, alongside the building\'s 7 and 1', () => {
+    expect(offsetsFor(item({ remindDays: 30 }), DEFAULT_SETTINGS)).toEqual([0, 1, 7, 30])
+    expect(offsetsFor(item({ remindDays: 7 }), DEFAULT_SETTINGS)).toEqual([0, 1, 7])
+    expect(ids(DEFAULT_SETTINGS, [item({ id: 'x', dueOn: '2026-11-24', remindDays: 30 })])).toEqual([['x', 30]])
+  })
+
+  /** Runs every day from `from` for `days` days, logging what was sent: [date, offset]. */
+  function simulate(list: ReminderItem[], from: string, days: number, skip: string[] = []): [string, number][] {
+    const sent = new Set<string>()
+    const out: [string, number][] = []
+    for (let i = 0; i < days; i += 1) {
+      const today = addDays(from, i)
+      if (skip.includes(today)) continue
+      for (const e of selectDue(list, DEFAULT_SETTINGS, today, sent)) {
+        sent.add(entryKey(e.item.kind, e.item.id, e.item.dueOn ?? '', e.offset))
+        out.push([today, e.offset])
+      }
+    }
+    return out
+  }
+
+  it('a contract with remind_days 30 emails at 30, 7, 1 and 0 days, once each, never overdue', () => {
+    const c = item({ kind: 'contract', id: 'c', dueOn: '2026-12-04', remindDays: 30 })
+    expect(simulate([c], '2026-10-01', 90)).toEqual([['2026-11-04', 30], ['2026-11-27', 7], ['2026-12-03', 1], ['2026-12-04', 0]])
+  })
+  it('a task: 30, 7, 1, 0 and once overdue (the first run after the due date)', () => {
+    const t = item({ id: 't', dueOn: '2026-12-04', remindDays: 30 })
+    expect(simulate([t], '2026-10-01', 90)).toEqual([['2026-11-04', 30], ['2026-11-27', 7], ['2026-12-03', 1], ['2026-12-04', 0], ['2026-12-05', OVERDUE]])
+  })
+  it('catch-up: a missed day is sent on the next run, still once', () => {
+    const t = item({ id: 't', dueOn: '2026-11-11' })
+    expect(simulate([t], '2026-11-01', 20, ['2026-11-04', '2026-11-10', '2026-11-11', '2026-11-12']))
+      .toEqual([['2026-11-05', 7], ['2026-11-13', OVERDUE]])
   })
   it('once only: an (item, due date, offset) already logged is not sent again; a new due date is', () => {
-    const sent = new Set([entryKey('task', 'week', '2026-11-11', 7), entryKey('task', 'today', '2026-11-04', 7)])
-    expect(ids(DEFAULT_SETTINGS, items, sent)).toEqual([['day', 1], ['today', TODAY], ['overdue', OVERDUE]])
+    const sent = new Set([entryKey('task', 'week', '2026-11-11', 7), entryKey('task', 'overdue', '2026-11-03', OVERDUE)])
+    expect(ids(DEFAULT_SETTINGS, items, sent)).toEqual([['day', 1], ['today', TODAY]])
+    expect(ids(DEFAULT_SETTINGS, [item({ id: 'week', dueOn: '2027-11-11' })], sent, '2027-11-04')).toEqual([['week', 7]])
     expect(entryKey('task', 'a', '2026-11-11', 7)).not.toBe(entryKey('contract', 'a', '2026-11-11', 7))
   })
   it('cleans the offsets: whole days 1-60, distinct', () => {
@@ -77,18 +105,22 @@ describe('selectDue', () => {
 
 describe('digest content', () => {
   const entries = [
-    { item: item({ id: 'a', title: 'ניקוי <גג>', dueOn: '2026-11-11', supplierId: 's1', supplierName: 'אינסטלציה & בניו', supplierPhone: '050-1234567' }), offset: 7 },
-    { item: item({ id: 'b', dueOn: '2026-11-03' }), offset: OVERDUE },
-    { item: item({ id: 'c', title: 'מעליות', dueOn: TODAY_ISO }), offset: TODAY },
-    { item: item({ kind: 'contract', id: 'k', title: 'שירות מעלית', dueOn: '2026-11-05', supplierId: 's2', supplierName: 'מעליות בע"מ' }), offset: 1 },
+    { item: item({ id: 'a', title: 'ניקוי <גג>', dueOn: '2026-11-11', supplierId: 's1', supplierName: 'אינסטלציה & בניו', supplierPhone: '050-1234567' }), offset: 7, daysLeft: 7 },
+    { item: item({ id: 'b', dueOn: '2026-11-03' }), offset: OVERDUE, daysLeft: -1 },
+    { item: item({ id: 'c', title: 'מעליות', dueOn: TODAY_ISO }), offset: TODAY, daysLeft: 0 },
+    { item: item({ kind: 'contract', id: 'k', title: 'שירות מעלית', dueOn: '2026-11-05', supplierId: 's2', supplierName: 'מעליות בע"מ' }), offset: 7, daysLeft: 1 },
+    { item: item({ id: 'd', dueOn: '2026-10-01' }), offset: OVERDUE, daysLeft: -34 },
   ]
-  it('sections in order: היום, בעוד יום, בעוד שבוע, באיחור', () => {
-    expect(digestSections(entries, 'https://app/').map((s) => s.heading)).toEqual(['היום', 'בעוד יום', 'בעוד שבוע', 'באיחור'])
-    expect(offsetHeading(3)).toBe('בעוד 3 ימים')
+  it('sections by days left, in order: היום, בעוד יום, בעוד שבוע, באיחור (all overdue together)', () => {
+    const sections = digestSections(entries, 'https://app/')
+    expect(sections.map((s) => s.heading)).toEqual(['היום', 'בעוד יום', 'בעוד שבוע', 'באיחור'])
+    expect(sections[3].items).toHaveLength(2)
+    expect(daysLeftHeading(5)).toBe('בעוד 5 ימים')
+    expect(daysLeftHeading(30)).toBe('בעוד חודש')
   })
   it('subject counts the items', () => {
-    expect(digestSubject(4)).toBe('תזכורת תחזוקה: 4 משימות קרובות')
-    expect(digestContent(entries, 'דנה', 'https://app/').subject).toBe('תזכורת תחזוקה: 4 משימות קרובות')
+    expect(digestSubject(1)).toBe('תזכורת תחזוקה: פריט אחד לטיפול')
+    expect(digestContent(entries, 'דנה', 'https://app/').subject).toBe('תזכורת תחזוקה: 5 פריטים לטיפול')
   })
   it('each item: title, supplier name and phone, the due date and a link; all text escaped', () => {
     const r = render({ buildingName: 'הבניין', appUrl: 'https://app/' }, digestContent(entries, 'דנה', 'https://app/'))

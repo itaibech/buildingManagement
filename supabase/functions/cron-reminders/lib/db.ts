@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Admin } from '../../send-email/lib/types.ts'
-import { daysBetween, entryKey, MAX_DAYS_BEFORE, type ItemKind, type ReminderItem, type ReminderSettings } from './digest.ts'
-import { KIND, type Claimed, type ClaimRow, type ReminderData } from './handler.ts'
+import { daysBetween, entryKey, MAX_OFFSET, type ItemKind, type ReminderItem, type ReminderSettings } from './digest.ts'
+import { KIND, recipientKey, type Claimed, type ClaimRow, type ReminderData } from './handler.ts'
 
 interface Result<T> { data: T | null; error: { message: string } | null }
 
@@ -35,20 +35,20 @@ function supplierOf(embed: Embed<SupplierRef>): Pick<ReminderItem, 'supplierId' 
 }
 
 async function tasks(db: SupabaseClient, buildingId: string, from: string, to: string): Promise<ReminderItem[]> {
-  const rows = must<{ id: string; title: string; next_due: string; vendor: string; supplier: Embed<SupplierRef> }[]>(await db
-    .from('maintenance_tasks').select('id, title, next_due, vendor, supplier:suppliers(id, name, phone, is_draft)')
+  const rows = must<{ id: string; title: string; next_due: string; vendor: string; remind_days: number; supplier: Embed<SupplierRef> }[]>(await db
+    .from('maintenance_tasks').select('id, title, next_due, vendor, remind_days, supplier:suppliers(id, name, phone, is_draft)')
     .eq('building_id', buildingId).gte('next_due', from).lte('next_due', to))
   return rows.map((r) => {
     const s = supplierOf(r.supplier)
-    return { kind: 'task', id: r.id, title: r.title, dueOn: r.next_due, ...s, supplierName: s.supplierName ?? (r.vendor.trim() || null) }
+    return { kind: 'task', id: r.id, title: r.title, dueOn: r.next_due, remindDays: r.remind_days, ...s, supplierName: s.supplierName ?? (r.vendor.trim() || null) }
   })
 }
 
 async function contracts(db: SupabaseClient, buildingId: string, from: string, to: string): Promise<ReminderItem[]> {
-  const rows = must<{ id: string; title: string; ends_on: string; supplier: Embed<SupplierRef> }[]>(await db
-    .from('supplier_contracts').select('id, title, ends_on, supplier:suppliers!inner(id, name, phone, is_draft, building_id)')
+  const rows = must<{ id: string; title: string; ends_on: string; remind_days: number; supplier: Embed<SupplierRef> }[]>(await db
+    .from('supplier_contracts').select('id, title, ends_on, remind_days, supplier:suppliers!inner(id, name, phone, is_draft, building_id)')
     .eq('supplier.building_id', buildingId).gte('ends_on', from).lte('ends_on', to))
-  return rows.map((r) => ({ kind: 'contract', id: r.id, title: r.title, dueOn: r.ends_on, ...supplierOf(r.supplier) }))
+  return rows.map((r) => ({ kind: 'contract', id: r.id, title: r.title, dueOn: r.ends_on, remindDays: r.remind_days, ...supplierOf(r.supplier) }))
 }
 
 async function settings(db: SupabaseClient, buildingId: string): Promise<ReminderSettings | null> {
@@ -57,20 +57,21 @@ async function settings(db: SupabaseClient, buildingId: string): Promise<Reminde
   return r && { enabled: r.enabled, daysBefore: r.days_before, includeOverdue: r.include_overdue }
 }
 
-async function sentKeys(db: SupabaseClient, buildingId: string, today: string): Promise<Set<string>> {
-  const rows = must<{ item_kind: ItemKind; item_id: string; due_on: string; offset_days: number }[]>(await db
-    .from('maintenance_reminders_log').select('item_kind, item_id, due_on, offset_days')
-    .eq('building_id', buildingId).gte('due_on', addDays(today, -1)))
-  return new Set(rows.map((r) => entryKey(r.item_kind, r.item_id, r.due_on, r.offset_days)))
+type LogKey = { item_kind: ItemKind; item_id: string; due_on: string; offset_days: number; recipient: string }
+
+/** Rows for due dates from a year back (the overdue window): real rows only on a real run. */
+async function sentKeys(db: SupabaseClient, buildingId: string, today: string, dryRun: boolean): Promise<Set<string>> {
+  const q = db.from('maintenance_reminders_log').select('item_kind, item_id, due_on, offset_days, recipient')
+    .eq('building_id', buildingId).gte('due_on', addDays(today, -MAX_OFFSET))
+  const rows = must<LogKey[]>(await (dryRun ? q : q.eq('dry_run', false)))
+  return new Set(rows.map((r) => recipientKey(r.recipient, entryKey(r.item_kind, r.item_id, r.due_on, r.offset_days))))
 }
 
-/** The unique index decides: rows already there are skipped, so a concurrent run claims each entry once. */
+/** claim_maintenance_reminders (0038): the partial unique index decides, so a concurrent run claims each entry once. */
 async function claim(db: SupabaseClient, rows: ClaimRow[]): Promise<Claimed[]> {
   if (!rows.length) return []
-  const out = must<{ id: string; item_kind: ItemKind; item_id: string; due_on: string; offset_days: number }[]>(await db
-    .from('maintenance_reminders_log').upsert(rows, { onConflict: 'item_kind,item_id,due_on,offset_days', ignoreDuplicates: true })
-    .select('id, item_kind, item_id, due_on, offset_days'))
-  return out.map((r) => ({ id: r.id, key: entryKey(r.item_kind, r.item_id, r.due_on, r.offset_days) }))
+  const out = must<(LogKey & { id: string })[]>(await db.rpc('claim_maintenance_reminders', { p_rows: rows }))
+  return out.map((r) => ({ id: r.id, key: recipientKey(r.recipient, entryKey(r.item_kind, r.item_id, r.due_on, r.offset_days)) }))
 }
 
 async function admins(db: SupabaseClient, buildingId: string): Promise<Admin[]> {
@@ -92,12 +93,12 @@ export function reminderData(db: SupabaseClient): ReminderData {
     buildings: async () => must<{ id: string; name: string }[]>(await db.from('buildings').select('id, name')),
     settings: (b) => settings(db, b),
     items: async (b, today) => {
-      const [from, to] = [addDays(today, -1), addDays(today, MAX_DAYS_BEFORE)]
+      const [from, to] = [addDays(today, -MAX_OFFSET), addDays(today, MAX_OFFSET)]
       const all = (await Promise.all([tasks(db, b, from, to), contracts(db, b, from, to)])).flat()
       return all.filter((i) => i.dueOn !== null && daysBetween(today, i.dueOn) !== null)
     },
     admins: (b) => admins(db, b),
-    sentKeys: (b, today) => sentKeys(db, b, today),
+    sentKeys: (b, today, dryRun) => sentKeys(db, b, today, dryRun),
     claim: (rows) => claim(db, rows),
     release: async (ids) => { if (ids.length) maybe(await db.from('maintenance_reminders_log').delete().in('id', ids)) },
     linkLog: async (ids, logId) => { if (ids.length) maybe(await db.from('maintenance_reminders_log').update({ email_log_id: logId }).in('id', ids)) },

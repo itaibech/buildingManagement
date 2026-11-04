@@ -78,11 +78,13 @@ describe('ReminderSettingsCard', () => {
   })
   it('shows the history: title, offset, dates, and dry runs marked', async () => {
     db.history = [
-      { id: 'l1', item_kind: 'task', title: 'בדיקת מז"חים שנתית', due_on: '2026-11-03', offset_days: -1, sent_on: '2026-11-04', dry_run: false },
-      { id: 'l2', item_kind: 'contract', title: 'שירות מעלית', due_on: '2026-11-11', offset_days: 7, sent_on: '2026-11-04', dry_run: true },
+      { id: 'l1', item_kind: 'task', item_id: 't1', title: 'בדיקת מז"חים שנתית', due_on: '2026-11-03', offset_days: -1, sent_on: '2026-11-04', dry_run: false },
+      // The same reminder to a second admin: one history line.
+      { id: 'l1b', item_kind: 'task', item_id: 't1', title: 'בדיקת מז"חים שנתית', due_on: '2026-11-03', offset_days: -1, sent_on: '2026-11-04', dry_run: false },
+      { id: 'l2', item_kind: 'contract', item_id: 'c1', title: 'שירות מעלית', due_on: '2026-11-11', offset_days: 7, sent_on: '2026-11-04', dry_run: true },
     ]
     wrap(<ReminderSettingsCard />)
-    expect(await screen.findByText('בדיקת מז"חים שנתית')).toBeTruthy()
+    expect(await screen.findAllByText('בדיקת מז"חים שנתית')).toHaveLength(1)
     expect(screen.getByText('נשלח 04/11/2026 · באיחור · מועד 03/11/2026')).toBeTruthy()
     expect(screen.getByText(`${R.contract}: שירות מעלית`)).toBeTruthy()
     expect(screen.getByText(R.dryRun)).toBeTruthy()

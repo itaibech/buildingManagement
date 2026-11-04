@@ -983,14 +983,14 @@ isOneToOne: true
                   ]
                 },"maintenance_reminders_log": {
                   Row: {
-                    "building_id": string,"created_at": string,"dry_run": boolean,"due_on": string,"email_log_id": string | null,"id": string,"item_id": string,"item_kind": string,"offset_days": number,"sent_on": string,"title": string
+                    "building_id": string,"created_at": string,"dry_run": boolean,"due_on": string,"email_log_id": string | null,"id": string,"item_id": string,"item_kind": string,"offset_days": number,"recipient": string,"sent_on": string,"title": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "building_id": string,"created_at"?: string,"dry_run"?: boolean,"due_on": string,"email_log_id"?: string | null,"id"?: string,"item_id": string,"item_kind": string,"offset_days": number,"sent_on": string,"title": string
+                    "building_id": string,"created_at"?: string,"dry_run"?: boolean,"due_on": string,"email_log_id"?: string | null,"id"?: string,"item_id": string,"item_kind": string,"offset_days": number,"recipient": string,"sent_on": string,"title": string
                   }
                   Update: {
-                    "building_id"?: string,"created_at"?: string,"dry_run"?: boolean,"due_on"?: string,"email_log_id"?: string | null,"id"?: string,"item_id"?: string,"item_kind"?: string,"offset_days"?: number,"sent_on"?: string,"title"?: string
+                    "building_id"?: string,"created_at"?: string,"dry_run"?: boolean,"due_on"?: string,"email_log_id"?: string | null,"id"?: string,"item_id"?: string,"item_kind"?: string,"offset_days"?: number,"recipient"?: string,"sent_on"?: string,"title"?: string
                   }
                   Relationships: [
                     {
@@ -1896,6 +1896,11 @@ isOneToOne: false
                            },
 "choose_project_quote":
 { Args: { "p_meeting"?: string,"p_note"?: string,"p_project": string,"p_quote"?: string }; Returns: undefined
+                           },
+"claim_maintenance_reminders":
+{ Args: { "p_rows": Json }; Returns: {
+              "due_on": string,"id": string,"item_id": string,"item_kind": string,"offset_days": number,"recipient": string
+            }[]
                            },
 "close_meeting":
 { Args: { "p_closed_at"?: string,"p_meeting": string }; Returns: undefined

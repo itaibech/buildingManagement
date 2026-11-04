@@ -12,6 +12,8 @@ export interface ReminderItem {
   title: string
   /** null = nothing due (a one-off task already done, an undated contract): never reminded. */
   dueOn: string | null
+  /** The item's own reminder window (remind_days, 0032): one more offset besides the building's. 0 = none. */
+  remindDays: number
   supplierId: string | null
   supplierName: string | null
   supplierPhone: string | null
@@ -25,8 +27,11 @@ export const DEFAULT_SETTINGS: ReminderSettings = { enabled: true, daysBefore: [
 export const TODAY = 0
 export const OVERDUE = -1
 export const MAX_DAYS_BEFORE = 60
+/** The largest offset (an item's remind_days) and how far back an overdue task is still looked at. */
+export const MAX_OFFSET = 365
 
-export interface DueEntry { item: ReminderItem; offset: number }
+/** offset: the log's offset_days; daysLeft: days from today to the due date (negative = overdue), for the email. */
+export interface DueEntry { item: ReminderItem; offset: number; daysLeft: number }
 
 /** The once-only key, as in maintenance_reminders_log's unique index. */
 export const entryKey = (kind: ItemKind, id: string, dueOn: string, offset: number): string => `${kind}:${id}:${dueOn}:${offset}`
@@ -55,27 +60,36 @@ export function daysBetween(from: string, to: string): number | null {
 export const cleanDays = (days: readonly number[]): number[] =>
   [...new Set(days.filter((d) => Number.isInteger(d) && d >= 1 && d <= MAX_DAYS_BEFORE))].sort((a, b) => b - a)
 
-/** The offset an item is due today, or null. Contracts end, they don't become overdue. */
-function offsetFor(item: ReminderItem, s: ReminderSettings, today: string): number | null {
+/** Every offset of the item, smallest first: the day itself, the building's days, the item's own remind_days. */
+export const offsetsFor = (item: ReminderItem, s: ReminderSettings): number[] => [...new Set([TODAY, ...cleanDays(s.daysBefore),
+  ...(Number.isInteger(item.remindDays) && item.remindDays > 0 && item.remindDays <= MAX_OFFSET ? [item.remindDays] : [])])]
+  .sort((a, b) => a - b)
+
+/**
+ * The reminder the item is due now, or null. Before the due date: the smallest offset whose day has come (today is
+ * on or after "due − offset"), so a missed day is caught up on the next run and a later offset replaces an earlier
+ * one. On the day: 0. After it: overdue (tasks only, once per due date).
+ */
+function offsetFor(item: ReminderItem, s: ReminderSettings, today: string): { offset: number; daysLeft: number } | null {
   if (!item.dueOn) return null
-  const diff = daysBetween(today, item.dueOn)
-  if (diff === null) return null
-  if (diff === 0) return TODAY
-  if (diff > 0) return cleanDays(s.daysBefore).includes(diff) ? diff : null
-  return diff === -1 && s.includeOverdue && item.kind === 'task' ? OVERDUE : null
+  const daysLeft = daysBetween(today, item.dueOn)
+  if (daysLeft === null || daysLeft > MAX_OFFSET) return null
+  if (daysLeft < 0) return s.includeOverdue && item.kind === 'task' && daysLeft >= -MAX_OFFSET ? { offset: OVERDUE, daysLeft } : null
+  const offset = offsetsFor(item, s).find((k) => k >= daysLeft)
+  return offset === undefined ? null : { offset, daysLeft }
 }
 
 /**
- * Today's digest: every item whose due date is exactly one of the offsets away (or today, or yesterday when overdue
- * is on), minus what was already sent (`sent`: entryKey values). Nothing while the building turned reminders off.
+ * Today's digest for one recipient: each item's current reminder (offsetFor), minus what was already sent to them
+ * (`sent`: entryKey values). Nothing while the building turned reminders off.
  */
 export function selectDue(items: readonly ReminderItem[], s: ReminderSettings, today: string, sent: ReadonlySet<string>): DueEntry[] {
   if (!s.enabled) return []
   const out: DueEntry[] = []
   for (const item of items) {
-    const offset = offsetFor(item, s, today)
-    if (offset === null || !item.dueOn || sent.has(entryKey(item.kind, item.id, item.dueOn, offset))) continue
-    out.push({ item, offset })
+    const due = offsetFor(item, s, today)
+    if (due === null || !item.dueOn || sent.has(entryKey(item.kind, item.id, item.dueOn, due.offset))) continue
+    out.push({ item, ...due })
   }
   return out
 }
