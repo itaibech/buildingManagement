@@ -27,7 +27,7 @@ export interface Deps {
 export const THROTTLE_MS = 500
 /** At most this many emails per call (~20 s at the throttle), well inside the function's wall-clock limit. */
 export const MAX_PER_CALL = 40
-const APP_URL = 'https://itaibech.github.io/buildingManagement/'
+export const APP_URL = 'https://itaibech.github.io/buildingManagement/'
 const SAMPLES = 3
 
 const mask = (email: string): string => email.replace(/^(.).*(@.*)$/, '$1***$2')

@@ -529,6 +529,36 @@ export const he = {
       category: 'בחרו קטגוריה להוצאה',
       cost: 'הסכום חייב להיות חיובי',
     },
+    reminders: {
+      title: 'תזכורות תחזוקה במייל',
+      body: 'כל בוקר ב-8:00 נשלח לחברי הוועד מייל אחד עם המשימות, הבדיקות והחוזים שהמועד שלהם קרוב. משימה שסומנה כבוצעה לא תופיע.',
+      daysItemHint: 'בנוסף נשלחת תזכורת לפי "תזכורת לפני המועד" של כל משימה וחוזה.',
+      enabled: 'שליחת תזכורות במייל',
+      daysBefore: 'כמה ימים לפני המועד',
+      daysHint: 'בנוסף נשלחת תזכורת ביום המועד עצמו.',
+      dayOption: (n: number) => (n === 1 ? 'יום' : n === 2 ? 'יומיים' : `${n} ימים`),
+      dayToggle: (label: string) => `תזכורת ${label} לפני המועד`,
+      includeOverdue: 'תזכורת נוספת למחרת המועד, אם המשימה עדיין לא בוצעה',
+      save: 'שמירת התזכורות',
+      saved: 'הגדרות התזכורות נשמרו',
+      saveFailed: 'השמירה נכשלה. נסו שוב.',
+      loadFailed: 'לא הצלחנו לטעון את הגדרות התזכורות.',
+      /** "7 ימים ויום" (the days before, largest first). */
+      daysPhrase: (days: readonly number[]) => {
+        const parts = [...days].sort((a, b) => b - a).map((n) => (n === 1 ? 'יום' : n === 2 ? 'יומיים' : `${n} ימים`))
+        const last = parts.pop() ?? ''
+        return parts.length ? `${parts.join(', ')} ו${/^\d/.test(last) ? '-' : ''}${last}` : last
+      },
+      line: (days: string) => `תזכורת במייל תישלח ${days} לפני`,
+      lineToday: 'תזכורת במייל תישלח ביום המועד',
+      history: 'היסטוריית תזכורות',
+      historyEmpty: 'עוד לא נשלחו תזכורות.',
+      historyFailed: 'לא הצלחנו לטעון את היסטוריית התזכורות.',
+      offset: (n: number) => (n === 0 ? 'ביום המועד' : n === -1 ? 'באיחור' : n === 1 ? 'יום לפני' : n === 2 ? 'יומיים לפני' : `${n} ימים לפני`),
+      historyRow: (sent: string, offset: string, due: string) => `נשלח ${sent} · ${offset} · מועד ${due}`,
+      contract: 'חוזה',
+      dryRun: 'לא נשלח (המייל לא הוגדר)',
+    },
   },
   suppliers: {
     add: 'ספק חדש',
@@ -2557,7 +2587,7 @@ export const he = {
       history: 'היסטוריית מיילים',
       empty: 'עוד לא נשלחו מיילים.',
       loadFailed: 'לא הצלחנו לטעון את היסטוריית המיילים.',
-      kinds: { announcement: 'הודעה', ticket: 'קריאת שירות', debt: 'תזכורת חוב', test: 'בדיקה', meeting: 'ישיבה', ticket_new: 'תקלה חדשה לוועד', contact: 'פנייה לוועד', debt_followup: 'מעקב חובות' } as Record<string, string>,
+      kinds: { announcement: 'הודעה', ticket: 'קריאת שירות', debt: 'תזכורת חוב', test: 'בדיקה', meeting: 'ישיבה', ticket_new: 'תקלה חדשה לוועד', contact: 'פנייה לוועד', debt_followup: 'מעקב חובות', maintenance_reminder: 'תזכורת תחזוקה' } as Record<string, string>,
       counts: (recipients: number, sent: number, failed: number) =>
         `${recipients.toLocaleString('he-IL')} נמענים · נשלחו ${sent.toLocaleString('he-IL')}${failed ? ` · נכשלו ${failed.toLocaleString('he-IL')}` : ''}`,
       dryRun: 'מצב בדיקה',

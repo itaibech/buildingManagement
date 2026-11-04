@@ -955,6 +955,64 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"maintenance_reminder_settings": {
+                  Row: {
+                    "building_id": string,"days_before": number[],"enabled": boolean,"include_overdue": boolean,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "building_id": string,"days_before"?: number[],"enabled"?: boolean,"include_overdue"?: boolean,"updated_at"?: string
+                  }
+                  Update: {
+                    "building_id"?: string,"days_before"?: number[],"enabled"?: boolean,"include_overdue"?: boolean,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "maintenance_reminder_settings_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: true
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "maintenance_reminder_settings_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: true
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"maintenance_reminders_log": {
+                  Row: {
+                    "building_id": string,"created_at": string,"dry_run": boolean,"due_on": string,"email_log_id": string | null,"id": string,"item_id": string,"item_kind": string,"offset_days": number,"recipient": string,"sent_on": string,"title": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "building_id": string,"created_at"?: string,"dry_run"?: boolean,"due_on": string,"email_log_id"?: string | null,"id"?: string,"item_id": string,"item_kind": string,"offset_days": number,"recipient": string,"sent_on": string,"title": string
+                  }
+                  Update: {
+                    "building_id"?: string,"created_at"?: string,"dry_run"?: boolean,"due_on"?: string,"email_log_id"?: string | null,"id"?: string,"item_id"?: string,"item_kind"?: string,"offset_days"?: number,"recipient"?: string,"sent_on"?: string,"title"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "maintenance_reminders_log_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "maintenance_reminders_log_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "maintenance_reminders_log_email_log_id_fkey"
+      columns: ["email_log_id"]
+isOneToOne: false
+      referencedRelation: "email_log"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"maintenance_tasks": {
                   Row: {
                     "building_id": string,"created_at": string,"frequency": string,"id": string,"next_due": string | null,"remind_days": number,"supplier_id": string | null,"title": string,"vendor": string
@@ -1839,6 +1897,11 @@ isOneToOne: false
 "choose_project_quote":
 { Args: { "p_meeting"?: string,"p_note"?: string,"p_project": string,"p_quote"?: string }; Returns: undefined
                            },
+"claim_maintenance_reminders":
+{ Args: { "p_rows": Json }; Returns: {
+              "due_on": string,"id": string,"item_id": string,"item_kind": string,"offset_days": number,"recipient": string
+            }[]
+                           },
 "close_meeting":
 { Args: { "p_closed_at"?: string,"p_meeting": string }; Returns: undefined
                            },
@@ -1871,6 +1934,9 @@ isOneToOne: false
                            },
 "create_building_document":
 { Args: { "p_category": string,"p_description"?: string,"p_document_date"?: string,"p_expires_on"?: string,"p_file_name": string,"p_file_path": string,"p_id": string,"p_size_bytes": number,"p_title": string,"p_visibility": string }; Returns: string
+                           },
+"cron_reminders_secret":
+{ Args: Record<PropertyKey, never>; Returns: string
                            },
 "current_month":
 { Args: Record<PropertyKey, never>; Returns: string
@@ -2065,6 +2131,12 @@ isOneToOne: false
                            },
 "is_supplier_storage_path":
 { Args: { "p_name": string }; Returns: boolean
+                           },
+"maintenance_reminders_cron":
+{ Args: { "p_now"?: string }; Returns: number
+                           },
+"maintenance_reminders_due_hour":
+{ Args: { "p_now": string }; Returns: boolean
                            },
 "mark_task_done":
 { Args: { "p_category_id"?: string,"p_cost"?: number,"p_done_on": string,"p_note": string,"p_report_name"?: string,"p_report_path"?: string,"p_task_id": string }; Returns: string

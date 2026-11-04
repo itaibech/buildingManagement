@@ -55,6 +55,16 @@ jobs:
       # Invites users by email (auth.admin.inviteUserByEmail needs the service role). Admins only; JWT verification on.
       # APP_URL (optional secret) is where the invite link lands; it defaults to the live site.
       - run: supabase functions deploy admin-invite-user --project-ref "$SUPABASE_PROJECT_REF"
+      # Maintenance email reminders (0038): pg_cron calls it through pg_net once a day. No JWT (verify_jwt = false in
+      # supabase/config.toml): it checks the x-cron-secret header against the secret the migration generated in the DB.
+      - run: supabase functions deploy cron-reminders --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
+      # The database can't know its own functions URL, so the job stays idle until this sets it. Nothing secret is
+      # handled or printed: the URL is public and the cron secret never leaves the database.
+      - name: Point the cron job at the functions URL
+        run: |
+          [[ "$SUPABASE_PROJECT_REF" =~ ^[a-z0-9]{20}$ ]] || { echo "SUPABASE_PROJECT_REF has an unexpected format"; exit 1; }
+          url="https://${SUPABASE_PROJECT_REF}.supabase.co/functions/v1"
+          supabase db query --linked "update private.cron_config set functions_url = '${url}', updated_at = now() where functions_url is distinct from '${url}'" > /dev/null
   deploy:
     needs: [build, migrate]
     runs-on: ubuntu-latest

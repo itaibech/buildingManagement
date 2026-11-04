@@ -160,4 +160,16 @@ describe('MaintenancePage', () => {
     expect(screen.queryByRole('button', { name: he.maintenance.markDone })).toBeNull()
     expect(screen.queryByRole('button', { name: he.maintenance.add })).toBeNull()
   })
+
+  it('opens the task from the reminder email link (#/maintenance?task=<id>)', async () => {
+    db.tasks = [task({ id: 't1', title: 'בדיקת מז"חים שנתית' }), task({ id: 't2', title: 'אחרת' })]
+    render(
+      <MantineProvider theme={theme}><QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={['/maintenance?task=t1']}><MaintenancePage /></MemoryRouter>
+      </QueryClientProvider></MantineProvider>,
+    )
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveTextContent('בדיקת מז"חים שנתית')
+    expect(dialog).toHaveTextContent(he.maintenance.log)
+  })
 })
