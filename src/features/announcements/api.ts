@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo } from 'react'
 import { useAuth } from '../../auth/AuthProvider'
 import type { Database } from '../../lib/db.types'
+import { fetchAll } from '../../lib/fetchAll'
 import { he } from '../../lib/he'
 import { supabase } from '../../lib/supabase'
 import { notifyError } from '../../ui/notify'
@@ -22,13 +23,11 @@ const KEY = ['announcements'] as const
 
 async function fetchAnnouncements(userId: string | undefined): Promise<AnnouncementItem[]> {
   const [list, reads] = await Promise.all([
-    supabase.from('announcements').select('*'),
-    supabase.from('announcement_reads').select('announcement_id'),
+    fetchAll((f, t) => supabase.from('announcements').select('*').order('id').range(f, t)),
+    fetchAll((f, t) => supabase.from('announcement_reads').select('announcement_id').order('announcement_id').range(f, t)),
   ])
-  if (list.error) throw new Error(list.error.message)
-  if (reads.error) throw new Error(reads.error.message)
-  const read = new Set(reads.data.map((r) => r.announcement_id))
-  return list.data.map((a) => ({ ...a, isRead: isReadBy(a, read, userId) }))
+  const read = new Set(reads.map((r) => r.announcement_id))
+  return list.map((a) => ({ ...a, isRead: isReadBy(a, read, userId) }))
 }
 
 function useAnnouncementsSelect<T>(select: (items: AnnouncementItem[], today: string) => T) {

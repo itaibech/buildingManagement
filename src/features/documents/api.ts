@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Database } from '../../lib/db.types'
 import { he } from '../../lib/he'
+import { fetchAll } from '../../lib/fetchAll'
 import { supabase } from '../../lib/supabase'
 import { notifyError } from '../../ui/notify'
 import { orderVersions, toCategory, type Category, type Visibility } from './logic'
@@ -70,10 +71,9 @@ export function useDocuments(enabled = true) {
     queryKey: [...KEY, 'list'],
     enabled,
     queryFn: async (): Promise<BuildingDocument[]> => {
-      const { data, error } = await supabase.from('building_documents')
-        .select('*, building_document_versions(id, file_path, file_name, size_bytes, created_at)').order('title')
-      fail(error)
-      return (data ?? []).map(toDocument)
+      const data = await fetchAll((f, t) => supabase.from('building_documents')
+        .select('*, building_document_versions(id, file_path, file_name, size_bytes, created_at)').order('title').order('id').range(f, t))
+      return data.map(toDocument)
     },
   })
 }

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Database } from '../../lib/db.types'
+import { fetchAll } from '../../lib/fetchAll'
 import { supabase } from '../../lib/supabase'
 import { photoMime, photoPath } from '../tickets/photos'
 import { asCategory, asStatus, type Category, type PostStatus } from './board'
@@ -60,9 +61,8 @@ function toPost(row: PostRow, commentCount: number, authors: Map<string, Author>
 }
 
 async function fetchPosts(): Promise<Post[]> {
-  const { data, error } = await supabase.from('community_posts').select('*, community_comments(count)').order('created_at', { ascending: false })
-  fail(error)
-  const rows = data ?? []
+  const rows = await fetchAll((f, t) => supabase.from('community_posts').select('*, community_comments(count)')
+    .order('created_at', { ascending: false }).order('id').range(f, t))
   const [authors, urls] = await Promise.all([authorsFor(rows.map((r) => r.author_id)), signedUrls(rows.map((r) => r.photo_path))])
   return rows.map(({ community_comments, ...r }) => toPost(r, community_comments[0]?.count ?? 0, authors, urls))
 }
@@ -182,9 +182,9 @@ export function useModerate() {
 }
 
 async function fetchRemovals(): Promise<Removal[]> {
-  const { data, error } = await supabase.from('community_removals').select('id, kind, title, reason, created_at').order('created_at', { ascending: false })
-  fail(error)
-  return (data ?? []).map((r) => ({ ...r, kind: r.kind === 'comment' ? 'comment' : 'post' }))
+  const data = await fetchAll((f, t) => supabase.from('community_removals').select('id, kind, title, reason, created_at')
+    .order('created_at', { ascending: false }).order('id').range(f, t))
+  return data.map((r) => ({ ...r, kind: r.kind === 'comment' ? 'comment' : 'post' }))
 }
 
 /** The committee's removals of the viewer's posts and comments, until dismissed. */

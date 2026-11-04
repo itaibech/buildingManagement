@@ -14,7 +14,7 @@ const db = vi.hoisted(() => ({ tables: {} as Record<string, unknown[]>, rpcCalls
 
 function builder(table: string) {
   const chain: Record<string, unknown> = {}
-  for (const op of ['select', 'eq', 'lt', 'gte', 'order', 'limit']) chain[op] = () => chain
+  for (const op of ['select', 'eq', 'lt', 'gte', 'order', 'limit', 'range']) chain[op] = () => chain
   chain.then = (resolve: (v: unknown) => unknown) => Promise.resolve({ data: db.tables[table] ?? [], error: null }).then(resolve)
   return chain
 }

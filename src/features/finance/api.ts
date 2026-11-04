@@ -161,21 +161,23 @@ export function useMyBalance(enabled = true) {
   return { ...q, isLoading: mine.isLoading || q.isLoading, isError: mine.isError || q.isError }
 }
 
+const LEDGER_COLUMNS = 'apartment_id, month, charged, paid, adjusted'
+
 /** Ledger rows up to the end of `year` (earlier years feed the running balance). Optionally one apartment. */
 export function useLedger(year: number, apartmentId?: string) {
   return useQuery({
     queryKey: [...KEY, 'ledger', year, apartmentId ?? 'all'],
     enabled: apartmentId !== '',
     queryFn: async (): Promise<LedgerRow[]> => {
-      let q = supabase.from('apartment_ledger').select('apartment_id, month, charged, paid, adjusted').lt('month', `${year + 1}-01-01`).order('month')
-      if (apartmentId) q = q.eq('apartment_id', apartmentId)
-      return must(await q).flatMap((r) =>
+      const rows = await fetchAll((from, to) => {
+        const q = supabase.from('apartment_ledger').select(LEDGER_COLUMNS).lt('month', `${year + 1}-01-01`)
+        return (apartmentId ? q.eq('apartment_id', apartmentId) : q).order('month').order('apartment_id').range(from, to)
+      })
+      return rows.flatMap((r) =>
         r.apartment_id && r.month ? [{ apartment_id: r.apartment_id, month: r.month, charged: num(r.charged), paid: num(r.paid), adjusted: num(r.adjusted) }] : [])
     },
   })
 }
-
-const LEDGER_COLUMNS = 'apartment_id, month, charged, paid, adjusted'
 
 /**
  * Admin, "דוח שנתי": every apartment's ledger rows of `year`, paged (no 1000-row cap). `fromStart`: also the earlier
@@ -275,9 +277,9 @@ export function usePayments(month: string) {
   return useQuery({
     queryKey: [...KEY, 'payments', month],
     queryFn: async (): Promise<Payment[]> =>
-      must(await supabase.from('payments').select('id, apartment_id, paid_on, amount, method, note, is_special')
+      (await fetchAll((f, t) => supabase.from('payments').select('id, apartment_id, paid_on, amount, method, note, is_special')
         .gte('paid_on', month).lt('paid_on', shiftMonth(month, 1))
-        .order('paid_on', { ascending: false }).order('created_at', { ascending: false }))
+        .order('paid_on', { ascending: false }).order('created_at', { ascending: false }).order('id').range(f, t)))
         .map((p) => ({ ...p, amount: num(p.amount), method: p.method as PaymentMethod })),
   })
 }
@@ -315,8 +317,8 @@ export function useCharges(year: number, enabled = true) {
     queryKey: [...KEY, 'charges', year],
     enabled,
     queryFn: async (): Promise<Charge[]> =>
-      must(await supabase.from('charges').select('id, apartment_id, month, amount, kind, label, ev_reading_id, special_id')
-        .gte('month', `${year}-01-01`).lt('month', `${year + 1}-01-01`).order('month', { ascending: false }))
+      (await fetchAll((f, t) => supabase.from('charges').select('id, apartment_id, month, amount, kind, label, ev_reading_id, special_id')
+        .gte('month', `${year}-01-01`).lt('month', `${year + 1}-01-01`).order('month', { ascending: false }).order('id').range(f, t)))
         .map((c) => ({ ...c, amount: num(c.amount), kind: c.kind as ChargeKind })),
   })
 }
@@ -330,8 +332,8 @@ export function useApartmentCharges(apartmentId: string) {
   return useQuery({
     queryKey: [...KEY, 'apartment-charges', apartmentId],
     queryFn: async (): Promise<ApartmentCharge[]> =>
-      must(await supabase.from('charges').select('id, month, amount, kind, label, note, settlement_id, special_id, ev_reading_id, ev_readings(kwh)')
-        .eq('apartment_id', apartmentId).order('month').order('created_at'))
+      (await fetchAll((f, t) => supabase.from('charges').select('id, month, amount, kind, label, note, settlement_id, special_id, ev_reading_id, ev_readings(kwh)')
+        .eq('apartment_id', apartmentId).order('month').order('created_at').order('id').range(f, t)))
         .map((c) => ({
           id: c.id, month: c.month, amount: num(c.amount), kind: c.kind as ChargeKind, label: c.label, note: c.note,
           settlementId: c.settlement_id, ev: isEvCharge(c), kwh: c.ev_readings ? num(c.ev_readings.kwh) : null, specialId: c.special_id,
@@ -344,7 +346,8 @@ export function useSpecialPayments(apartmentId: string) {
   return useQuery({
     queryKey: [...KEY, 'special-payments', apartmentId],
     queryFn: async (): Promise<SpecialPayment[]> =>
-      must(await supabase.from('payments').select('id, special_id, for_month, paid_on, amount').eq('apartment_id', apartmentId).eq('is_special', true))
+      (await fetchAll((f, t) => supabase.from('payments').select('id, special_id, for_month, paid_on, amount')
+        .eq('apartment_id', apartmentId).eq('is_special', true).order('id').range(f, t)))
         .flatMap((p) => (p.special_id ? [{ id: p.id, specialId: p.special_id, month: p.for_month ?? `${p.paid_on.slice(0, 7)}-01`, amount: num(p.amount) }] : [])),
   })
 }
@@ -367,8 +370,8 @@ export function useSpecialLinks(specialId: string | null) {
     enabled: specialId !== null,
     queryFn: async (): Promise<SpecialLinks> => {
       const id = specialId ?? ''
-      const pay = must(await supabase.from('payments').select('amount').eq('special_id', id))[0]
-      const exp = must(await supabase.from('expenses').select('amount, expense_categories(name)').eq('special_id', id))[0]
+      const pay = must(await supabase.from('payments').select('amount').eq('special_id', id).limit(1))[0]
+      const exp = must(await supabase.from('expenses').select('amount, expense_categories(name)').eq('special_id', id).limit(1))[0]
       return { payment: pay ? num(pay.amount) : null, expense: exp ? { amount: num(exp.amount), category: catName(exp.expense_categories) } : null }
     },
   })
@@ -467,9 +470,9 @@ const EXPENSE_COLUMNS = 'id, category_id, spent_on, amount, vendor, note, receip
 export const expensesQuery = (year: number) => ({
   queryKey: [...KEY, 'expenses', year],
   queryFn: async (): Promise<Expense[]> =>
-    must(await supabase.from('expenses').select(EXPENSE_COLUMNS)
+    (await fetchAll((f, t) => supabase.from('expenses').select(EXPENSE_COLUMNS)
       .gte('spent_on', `${year}-01-01`).lt('spent_on', `${year + 1}-01-01`)
-      .order('spent_on', { ascending: false }).order('created_at', { ascending: false }).order('id'))
+      .order('spent_on', { ascending: false }).order('created_at', { ascending: false }).order('id').range(f, t)))
       .map(({ expense_categories, ...e }) => ({ ...e, amount: num(e.amount), category: catName(expense_categories) })),
 })
 

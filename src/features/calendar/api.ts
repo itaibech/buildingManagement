@@ -1,5 +1,6 @@
 // Calendar data access (the only place the feature touches its table). RLS decides who sees and writes what.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { fetchAll } from '../../lib/fetchAll'
 import { supabase } from '../../lib/supabase'
 import { isCategory, isRecurrence, type CalendarEventRow, type CalendarItem } from './types'
 
@@ -24,8 +25,7 @@ export function useCalendarEvents(enabled: boolean) {
     queryKey: KEY,
     enabled,
     queryFn: async (): Promise<CalendarItem[]> => {
-      const { data, error } = await supabase.from('calendar_events').select('*').order('starts_at')
-      if (error) throw new Error(error.message)
+      const data = await fetchAll((f, t) => supabase.from('calendar_events').select('*').order('starts_at').order('id').range(f, t))
       return data.map(toItem)
     },
   })

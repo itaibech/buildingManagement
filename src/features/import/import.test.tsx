@@ -23,7 +23,7 @@ const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 vi.mock('../../lib/supabase', () => {
   const chain = (table: string): Record<string, unknown> => {
     const c: Record<string, unknown> = {}
-    for (const op of ['select', 'order', 'eq', 'gte', 'lt']) c[op] = () => c
+    for (const op of ['select', 'order', 'eq', 'gte', 'lt', 'range']) c[op] = () => c
     c.then = (resolve: (v: unknown) => unknown) => Promise.resolve({ data: db.tables[table] ?? [], error: null }).then(resolve)
     return c
   }

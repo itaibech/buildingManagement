@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { useAuth } from '../../auth/AuthProvider'
+import { fetchAll } from '../../lib/fetchAll'
 import { supabase } from '../../lib/supabase'
 import { useAnnouncements, useMarkRead, useUnreadCount } from '../announcements/api'
 import { buildFeed, unseenTicketCount, unseenTicketIds, type ActivityKind, type FeedItem, type TicketActivity } from './feed'
@@ -13,9 +14,9 @@ const KINDS: readonly ActivityKind[] = ['created', 'status', 'edited', 'other', 
 const asKind = (k: string | null): ActivityKind | null => KINDS.find((x) => x === k) ?? null
 
 export async function fetchActivity(): Promise<TicketActivity[]> {
-  const { data, error } = await supabase.rpc('my_ticket_activity')
-  if (error) throw new Error(error.message)
-  return (data ?? []).map((r) => ({ ...r, activity_kind: asKind(r.activity_kind) }))
+  // One row per call; an admin sees every call ever opened, and the unseen badge counts them all, so no .limit().
+  const data = await fetchAll((f, t) => supabase.rpc('my_ticket_activity').order('ticket_id').range(f, t))
+  return data.map((r) => ({ ...r, activity_kind: asKind(r.activity_kind) }))
 }
 
 /** The calls the user is notified about (admins: all; residents: their own), with unseen flags. */

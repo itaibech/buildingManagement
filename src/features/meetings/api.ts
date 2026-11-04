@@ -1,6 +1,7 @@
 // Meetings data access (the only place the feature touches supabase). RLS and the 0021 RPCs enforce every rule.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { he } from '../../lib/he'
+import { fetchAll } from '../../lib/fetchAll'
 import { supabase } from '../../lib/supabase'
 import { notifyError } from '../../ui/notify'
 import { meetingError } from './errors'
@@ -22,9 +23,9 @@ export function useMeetings(enabled = true) {
     queryKey: [...KEY, 'list'],
     enabled,
     queryFn: async (): Promise<MeetingListItem[]> => {
-      const { data, error } = await supabase.from('meetings').select('*, meeting_agenda_items(decision)').order('scheduled_at', { ascending: false })
-      fail(error)
-      return (data ?? []).map(({ meeting_agenda_items, ...m }) => ({
+      const data = await fetchAll((f, t) => supabase.from('meetings').select('*, meeting_agenda_items(decision)')
+        .order('scheduled_at', { ascending: false }).order('id').range(f, t))
+      return data.map(({ meeting_agenda_items, ...m }) => ({
         ...toMeeting(m), decisions: meeting_agenda_items.map((i) => i.decision).filter(Boolean),
       }))
     },

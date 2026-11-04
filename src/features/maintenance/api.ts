@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Database } from '../../lib/db.types'
 import { he } from '../../lib/he'
+import { fetchAll } from '../../lib/fetchAll'
 import { supabase } from '../../lib/supabase'
 import { notifyError } from '../../ui/notify'
 import { removeSupplierFiles, uploadSupplierFile } from '../suppliers/files'
@@ -64,8 +65,7 @@ export function useTasks(enabled = true) {
 
 /** Task id to its most recent done date, read on demand for the export (same table the task detail reads). */
 export async function fetchLastDone(): Promise<Map<string, string>> {
-  const { data, error } = await supabase.from('maintenance_log').select('task_id, done_on').order('done_on', { ascending: false })
-  if (error) throw new Error(error.message)
+  const data = await fetchAll((f, t) => supabase.from('maintenance_log').select('task_id, done_on').order('done_on', { ascending: false }).order('id').range(f, t))
   const last = new Map<string, string>()
   for (const row of data) if (!last.has(row.task_id)) last.set(row.task_id, row.done_on)
   return last
@@ -77,11 +77,9 @@ export function useTaskLog(taskId: string | undefined) {
     queryKey: logKey(taskId ?? ''),
     enabled: Boolean(taskId),
     queryFn: async (): Promise<LogEntry[]> => {
-      const { data, error } = await supabase
+      return fetchAll((f, t) => supabase
         .from('maintenance_log').select('*').eq('task_id', taskId ?? '')
-        .order('done_on', { ascending: false }).order('created_at', { ascending: false })
-      if (error) throw new Error(error.message)
-      return data
+        .order('done_on', { ascending: false }).order('created_at', { ascending: false }).order('id').range(f, t))
     },
   })
 }
@@ -150,11 +148,11 @@ export function useDeleteTask() {
     mutationFn: async (id: string) => {
       // The row first (its log cascades), then the inspection reports: storage doesn't cascade, and a failed cleanup
       // only leaves an unreachable file in the admin-only bucket, never a task pointing at a missing report.
-      const reports = await supabase.from('maintenance_log').select('report_path').eq('task_id', id).not('report_path', 'is', null)
-      if (reports.error) throw new Error(reports.error.message)
+      const reports = await fetchAll((f, t) => supabase.from('maintenance_log').select('report_path').eq('task_id', id).not('report_path', 'is', null)
+        .order('id').range(f, t))
       const { error } = await supabase.from('maintenance_tasks').delete().eq('id', id)
       if (error) throw new Error(error.message)
-      await removeSupplierFiles((reports.data ?? []).flatMap((r) => (r.report_path ? [r.report_path] : []))).catch(() => undefined)
+      await removeSupplierFiles(reports.flatMap((r) => (r.report_path ? [r.report_path] : []))).catch(() => undefined)
     },
     onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
   })
