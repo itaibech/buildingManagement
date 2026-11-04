@@ -3,7 +3,11 @@
 export type PaymentSource = 'manual' | 'import' | 'auto' | 'settlement' | 'special'
 
 /** One payment of the apartment, as the payments section lists it. */
-export interface AptPayment { id: string; paid_on: string; for_month: string | null; amount: number; method: string; note: string; source: PaymentSource }
+export interface AptPayment {
+  id: string; paid_on: string; for_month: string | null; amount: number; method: string; note: string; source: PaymentSource
+  /** The transfer proof (0037), or null. */
+  proof_path?: string | null
+}
 
 /** ידני / יובא / הוראת קבע / הסדר / מיוחד: a settlement or special-charge payment by its link, else by its source. */
 export function sourceOf(r: { source: string; settlement_id: string | null; special_id: string | null }): PaymentSource {

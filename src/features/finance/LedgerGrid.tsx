@@ -4,7 +4,7 @@ import { todayISO } from '../../lib/dates'
 import { formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
 import { EmptyState } from '../../ui'
-import type { ApartmentCharge, SpecialPayment } from './api'
+import type { ApartmentCharge, ProofPayment, SpecialPayment } from './api'
 import { useDesktop } from './hooks'
 import { monthName, yearMonths, type LedgerRow } from './ledger'
 import { MonthCell, type MonthView } from './LedgerMonth'
@@ -18,6 +18,8 @@ export interface LedgerGridProps {
   charges: readonly ApartmentCharge[]
   /** Payments recorded with special charges (shown in the month's details). */
   specialPayments?: readonly SpecialPayment[]
+  /** Payments with a transfer proof (a 📎 in their month). */
+  proofs?: readonly ProofPayment[]
   /** The open months (settlementPlan of everything). */
   open: readonly PlanRow[]
   /** Admins may undo a write-off from a month's details. */
@@ -30,7 +32,7 @@ const amount = (n: number): string => (n === 0 ? '—' : formatILS(n))
 const OPEN_ROW: CSSProperties = { background: 'var(--mantine-color-debt-0)' }
 
 /** The year's months that have happened, as month views, with each quiet stretch folded into one item. */
-function buildItems({ year, rows, charges, open, specialPayments = [] }: LedgerGridProps): { items: Item[]; views: MonthView[] } {
+function buildItems({ year, rows, charges, open, specialPayments = [], proofs = [] }: LedgerGridProps): { items: Item[]; views: MonthView[] } {
   const now = todayISO().slice(0, 7)
   const months = yearMonths(year).filter((m) => m.slice(0, 7) <= now)
   const byMonth = new Map(rows.filter((r) => months.includes(r.month)).map((r) => [r.month, r]))
@@ -43,6 +45,7 @@ function buildItems({ year, rows, charges, open, specialPayments = [] }: LedgerG
       month, gross: Math.round(((r?.charged ?? 0) - adjusted) * 100) / 100, paid: r?.paid ?? 0, adjusted,
       open: open.find((p) => p.month === month)?.open ?? 0, balance: balances[i] ?? 0, charges: charges.filter((c) => c.month === month),
       specialPayments: specialPayments.filter((p) => p.month === month), alloc: alloc.get(month),
+      proofs: proofs.filter((p) => p.month === month).map((p) => p.path),
     }
   })
   const items = groupLedgerMonths(months, byMonth).map((g): Item =>

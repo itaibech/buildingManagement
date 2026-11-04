@@ -338,9 +338,9 @@ export function useApartmentPayments(apartmentId: string, enabled = true) {
     queryKey: ['finance', 'apartment-payments', apartmentId],
     enabled,
     queryFn: async (): Promise<AptPayment[]> => {
-      const data = await fetchAll((f, t) => supabase.from('payments').select('id, paid_on, for_month, amount, method, note, source, settlement_id, special_id')
+      const data = await fetchAll((f, t) => supabase.from('payments').select('id, paid_on, for_month, amount, method, note, source, settlement_id, special_id, proof_path')
         .eq('apartment_id', apartmentId).order('paid_on', { ascending: false }).order('id').range(f, t))
-      return data.map((p) => ({ id: p.id, paid_on: p.paid_on, for_month: p.for_month, amount: Number(p.amount), method: p.method, note: p.note, source: sourceOf(p) }))
+      return data.map((p) => ({ id: p.id, paid_on: p.paid_on, for_month: p.for_month, amount: Number(p.amount), method: p.method, note: p.note, source: sourceOf(p), proof_path: p.proof_path }))
     },
   })
 }

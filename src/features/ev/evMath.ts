@@ -5,8 +5,11 @@ import { he } from '../../lib/he'
 export interface Rate { rate: number; effective_from: string }
 export interface EvPreview { kwh: number; amount: number; error?: 'lower' | 'next' | 'noRate' | 'future' }
 export interface HistoryReading { id: string; month: string; reading: number; kwh: number | null; rate: number | null; amount: number | null }
-export interface EvPaymentLike { paid_on: string; amount: number; note: string }
-export interface HistoryRow { id: string; month: string; reading: number; kwh: number | null; rate: number | null; amount: number | null; paid: number; diff: number }
+export interface EvPaymentLike { paid_on: string; amount: number; note: string; proof_path?: string | null }
+export interface HistoryRow { id: string; month: string; reading: number; kwh: number | null; rate: number | null; amount: number | null; paid: number; diff: number
+  /** Transfer proofs (0037) of that month's EV payments. */
+  proofs: string[]
+}
 
 /** Agorot as an integer, so sums and differences don't drift (0.1 + 0.2). */
 const cents = (n: number): number => Math.round(n * 100)
@@ -57,14 +60,16 @@ export const isEvPayment = (note: string): boolean => note.trim().startsWith(he.
 /** One row per reading, newest first, with what was paid for EV that month and the difference (paid − amount). */
 export function historyRows(readings: readonly HistoryReading[], payments: readonly EvPaymentLike[]): HistoryRow[] {
   const paid = new Map<string, number>()
+  const proofs = new Map<string, string[]>()
   for (const p of payments) {
     if (!isEvPayment(p.note)) continue
     const month = `${p.paid_on.slice(0, 7)}-01`
     paid.set(month, (paid.get(month) ?? 0) + cents(p.amount))
+    if (p.proof_path) proofs.set(month, [...(proofs.get(month) ?? []), p.proof_path])
   }
   return [...readings].sort((a, b) => b.month.localeCompare(a.month)).map((r) => {
     const p = paid.get(r.month) ?? 0
-    return { ...r, paid: p / 100, diff: (p - cents(r.amount ?? 0)) / 100 }
+    return { ...r, paid: p / 100, diff: (p - cents(r.amount ?? 0)) / 100, proofs: proofs.get(r.month) ?? [] }
   })
 }
 

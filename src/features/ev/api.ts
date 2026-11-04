@@ -12,7 +12,7 @@ export interface EvRate extends Rate { id: string }
 export interface Reading extends HistoryReading { charger_id: string; read_on: string | null; note: string; source: string }
 export interface ReadingInput { charger_id: string; month: string; reading: number; read_on: string | null; note: string }
 export interface ReadingResult { kwh: number; rate: number; amount: number; previous: number }
-export interface EvPayment { apartment_id: string; paid_on: string; amount: number; note: string; source: string }
+export interface EvPayment { apartment_id: string; paid_on: string; amount: number; note: string; source: string; proof_path: string | null }
 export type EvImportCounts = Partial<Record<'chargers' | 'readings' | 'kept_manual' | 'rates' | 'payments' | 'main_charges', number>>
 
 // Under ['finance'] so finance mutations (payments) refresh EV views, and EV mutations refresh balances.
@@ -95,7 +95,7 @@ export function useEvPayments(apartmentIds: readonly string[]) {
     queryKey: [...KEY, 'payments', [...apartmentIds].sort().join(',')],
     enabled: apartmentIds.length > 0,
     queryFn: async (): Promise<EvPayment[]> =>
-      (await fetchAll((f, t) => supabase.from('payments').select('apartment_id, paid_on, amount, note, source')
+      (await fetchAll((f, t) => supabase.from('payments').select('apartment_id, paid_on, amount, note, source, proof_path')
         .in('apartment_id', [...apartmentIds]).like('note', `${he.ev.chargeLabel}%`).order('paid_on').order('id').range(f, t)))
         .map((p) => ({ ...p, amount: num(p.amount) })),
   })

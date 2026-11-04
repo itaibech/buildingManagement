@@ -68,13 +68,13 @@ describe('historyRows', () => {
     ]
     const payments = [
       { paid_on: '2026-08-06', amount: 50, note: 'טעינת רכב חשמלי' },
-      { paid_on: '2026-08-20', amount: 43.1, note: 'טעינת רכב חשמלי' },
+      { paid_on: '2026-08-20', amount: 43.1, note: 'טעינת רכב חשמלי', proof_path: 'p2/x.pdf' },
       { paid_on: '2026-08-01', amount: 330, note: 'דמי ועד' },
     ]
     const rows = historyRows(readings, payments)
     expect(rows.map((r) => r.month)).toEqual(['2026-08-01', '2026-07-01'])
-    expect(rows[0]).toEqual({ id: 'r2', month: '2026-08-01', reading: 640.15, kwh: 127.35, rate: 0.574, amount: 73.1, paid: 93.1, diff: 20 })
-    expect(rows[1]).toMatchObject({ paid: 0, diff: -93.16 })
+    expect(rows[0]).toEqual({ id: 'r2', month: '2026-08-01', reading: 640.15, kwh: 127.35, rate: 0.574, amount: 73.1, paid: 93.1, diff: 20, proofs: ['p2/x.pdf'] })
+    expect(rows[1]).toMatchObject({ paid: 0, diff: -93.16, proofs: [] })
   })
 })
 

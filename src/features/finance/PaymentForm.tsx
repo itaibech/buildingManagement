@@ -1,12 +1,14 @@
 import { Button, Select, Stack, TextInput } from '@mantine/core'
 import { useForm } from '@mantine/form'
+import { useState } from 'react'
 import { todayISO } from '../../lib/dates'
 import { formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
-import { DateInput, focusFirstError, notifySuccess } from '../../ui'
+import { DateInput, focusFirstError, notifyError, notifySuccess } from '../../ui'
 import { PAYMENT_METHODS, useBalances, useSavePayment, type PaymentMethod } from './api'
 import { MoneyInput } from './fields'
 import { useApartmentOptions } from './hooks'
+import { ProofField } from './ProofControl'
 
 interface PaymentValues {
   apartmentId: string | null
@@ -19,25 +21,29 @@ interface PaymentValues {
 const METHOD_DATA = PAYMENT_METHODS.map((m) => ({ value: m, label: he.finance.methods[m] }))
 const isMethod = (v: string | null): v is PaymentMethod => PAYMENT_METHODS.some((m) => m === v)
 
-/** "רישום תשלום": apartment, date (today), amount (defaults to what it owes), method and a note. */
+const VALIDATE = {
+  apartmentId: (v: string | null) => (v ? null : he.finance.errors.apartment),
+  paidOn: (v: string) => (v ? null : he.finance.errors.paidOn),
+  amount: (v: number | string) => (typeof v === 'number' && v > 0 ? null : he.finance.errors.positive),
+}
+
+/** "רישום תשלום": apartment, date (today), amount (defaults to what it owes), method, a note and an optional transfer proof. */
 export function PaymentForm({ apartmentId, note, onDone }: { apartmentId?: string; note?: string; onDone: () => void }) {
   const save = useSavePayment()
   const options = useApartmentOptions()
   const balances = useBalances()
+  const [proof, setProof] = useState<File | null>(null)
   const owed = (id: string | null) => balances.data?.find((b) => b.apartmentId === id)?.balance ?? 0
   const form = useForm<PaymentValues>({
     initialValues: { apartmentId: apartmentId ?? null, paidOn: todayISO(), amount: '', method: 'transfer', note: note ?? '' },
-    validate: {
-      apartmentId: (v) => (v ? null : he.finance.errors.apartment),
-      paidOn: (v) => (v ? null : he.finance.errors.paidOn),
-      amount: (v) => (typeof v === 'number' && v > 0 ? null : he.finance.errors.positive),
-    },
+    validate: VALIDATE,
   })
   const current = owed(form.values.apartmentId)
   const submit = form.onSubmit((v) => {
     if (!v.apartmentId || typeof v.amount !== 'number') return
-    save.mutate({ apartment_id: v.apartmentId, paid_on: v.paidOn, amount: v.amount, method: v.method, note: v.note.trim() }, {
-      onSuccess: () => { notifySuccess(he.finance.paymentRecorded); onDone() },
+    const values = { apartment_id: v.apartmentId, paid_on: v.paidOn, amount: v.amount, method: v.method, note: v.note.trim() }
+    save.mutate({ values, proof }, {
+      onSuccess: ({ proofFailed }) => { (proofFailed ? notifyError : notifySuccess)(proofFailed ? he.finance.proof.failed : he.finance.paymentRecorded); onDone() },
     })
   }, focusFirstError)
   return (
@@ -55,6 +61,7 @@ export function PaymentForm({ apartmentId, note, onDone }: { apartmentId?: strin
         <Select label={he.finance.method} data={METHOD_DATA} allowDeselect={false} value={form.values.method}
           onChange={(v) => isMethod(v) && form.setFieldValue('method', v)} />
         <TextInput label={he.finance.note} {...form.getInputProps('note')} />
+        <ProofField file={proof} onChange={setProof} />
         <Button type="submit" fullWidth loading={save.isPending}>{he.finance.recordPayment}</Button>
       </Stack>
     </form>
