@@ -4,7 +4,7 @@ import { IconPaperclip } from '@tabler/icons-react'
 import { useState } from 'react'
 import { formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
-import { focusFirstError, notifyError, notifySuccess } from '../../ui'
+import { focusFirstError, notifyError, notifySuccess, PasteButton, PasteHint, usePasteFile } from '../../ui'
 import { MoneyInput } from '../finance/fields'
 import { RECEIPT_ACCEPT, receiptError } from '../finance/ledger'
 import { useMeetings } from '../meetings/api'
@@ -24,9 +24,10 @@ function FileField({ current, file, onFile, onDrop }: { current: string | null; 
     setError(err)
     if (!err) onFile(f)
   }
+  const zone = usePasteFile({ accept: RECEIPT_ACCEPT, onFile: pick })
   const name = file?.name ?? current
   return (
-    <Stack gap={4}>
+    <Stack gap={4} ref={zone}>
       <Text size="sm" fw={600}>{Q.file}</Text>
       {name ? (
         <Group gap="xs" wrap="nowrap">
@@ -35,11 +36,15 @@ function FileField({ current, file, onFile, onDrop }: { current: string | null; 
           <CloseButton size={44} aria-label={Q.removeFile} onClick={() => { onFile(null); onDrop() }} />
         </Group>
       ) : (
-        <FileButton accept={RECEIPT_ACCEPT} onChange={pick}>
-          {(props) => <Button variant="default" leftSection={<IconPaperclip {...ICON} />} style={{ alignSelf: 'flex-start' }} {...props}>{Q.attach}</Button>}
-        </FileButton>
+        <Group gap="xs">
+          <FileButton accept={RECEIPT_ACCEPT} onChange={pick}>
+            {(props) => <Button variant="default" mih={44} leftSection={<IconPaperclip {...ICON} />} {...props}>{Q.attach}</Button>}
+          </FileButton>
+          <PasteButton onFile={pick} />
+        </Group>
       )}
       <Text size="xs" c={error ? 'debt.7' : 'dimmed'}>{error ?? Q.fileHint}</Text>
+      <PasteHint />
     </Stack>
   )
 }

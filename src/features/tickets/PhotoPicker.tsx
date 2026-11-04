@@ -3,7 +3,10 @@ import { useMediaQuery } from '@mantine/hooks'
 import { IconCamera, IconX } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
 import { he } from '../../lib/he'
+import { PasteButton, PasteHint, usePasteFile } from '../../ui'
 import { MAX_PHOTOS, validatePhotos } from './photos'
+
+const PHOTO_ACCEPT = 'image/*,.heic,.heif'
 
 export interface PickedPhoto {
   file: File
@@ -46,12 +49,14 @@ export function PhotoPicker({ value, onChange }: PhotoPickerProps) {
     setError(problem)
     if (!problem) onChange([...value, ...picked.map((file) => ({ file, url: URL.createObjectURL(file) }))])
   }
+  const paste = (file: File) => { if (value.length < MAX_PHOTOS) add([file]) }
+  const zone = usePasteFile({ accept: PHOTO_ACCEPT, onFile: paste })
   const remove = (photo: PickedPhoto) => {
     URL.revokeObjectURL(photo.url)
     onChange(value.filter((p) => p !== photo))
   }
   return (
-    <Input.Wrapper label={he.tickets.photos} description={he.tickets.photosHint} error={error}>
+    <Input.Wrapper ref={zone} label={he.tickets.photos} description={he.tickets.photosHint} error={error}>
       <Stack gap="sm" mt="xs">
         {value.length > 0 && (
           <Group gap="sm">
@@ -59,10 +64,14 @@ export function PhotoPicker({ value, onChange }: PhotoPickerProps) {
           </Group>
         )}
         {value.length < MAX_PHOTOS && (
-          <FileButton onChange={add} accept="image/*,.heic,.heif" multiple capture={mobile ? 'environment' : undefined}>
-            {(props) => <Button {...props} variant="light" leftSection={<IconCamera size={20} stroke={1.75} />}>{he.tickets.addPhotos}</Button>}
-          </FileButton>
+          <Group gap="xs">
+            <FileButton onChange={add} accept={PHOTO_ACCEPT} multiple capture={mobile ? 'environment' : undefined}>
+              {(props) => <Button {...props} variant="light" mih={44} leftSection={<IconCamera size={20} stroke={1.75} />}>{he.tickets.addPhotos}</Button>}
+            </FileButton>
+            <PasteButton onFile={paste} />
+          </Group>
         )}
+        <PasteHint />
       </Stack>
     </Input.Wrapper>
   )

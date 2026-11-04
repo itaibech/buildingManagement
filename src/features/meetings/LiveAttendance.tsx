@@ -1,13 +1,14 @@
-import { Anchor, Autocomplete, Button, Card, Checkbox, FileButton, Group, SegmentedControl, Stack, Text, TextInput } from '@mantine/core'
+import { Anchor, Autocomplete, Box, Button, Card, Checkbox, FileButton, Group, SegmentedControl, Stack, Text, TextInput } from '@mantine/core'
 import { IconPaperclip } from '@tabler/icons-react'
 import { useState } from 'react'
 import { he } from '../../lib/he'
-import { AptPlate, notifyError } from '../../ui'
+import { AptPlate, notifyError, PasteButton, PasteHint, usePasteFile } from '../../ui'
 import { fileProblem, uploadMeetingFile, useMeetingFileUrls, type AttendanceValue } from './api'
 import { arrivalAt, meetingTime } from './fmt'
 import { ATTENDANCE_STATUSES, type Attendance } from './types'
 
 const L = he.meetings.live
+const PROXY_ACCEPT = 'image/*,application/pdf'
 
 export interface ApartmentLine { id: string; number: number; residents: string[] }
 
@@ -21,13 +22,16 @@ function ProxyFile({ meetingId, path, onPath }: { meetingId: string; path: strin
     setBusy(true)
     try { onPath(await uploadMeetingFile(meetingId, file)) } catch { notifyError(he.meetings.errors.generic) } finally { setBusy(false) }
   }
+  const zone = usePasteFile({ accept: PROXY_ACCEPT, onFile: (f) => void pick(f), enabled: !busy })
   return (
-    <Group gap="sm" wrap="wrap">
-      <FileButton onChange={(f) => void pick(f)} accept="image/*,application/pdf">
-        {(props) => <Button {...props} variant="default" loading={busy} leftSection={<IconPaperclip size={18} stroke={1.75} />}>{L.proxyFile}</Button>}
+    <Group gap="sm" wrap="wrap" ref={zone}>
+      <FileButton onChange={(f) => void pick(f)} accept={PROXY_ACCEPT}>
+        {(props) => <Button {...props} variant="default" mih={44} loading={busy} leftSection={<IconPaperclip size={18} stroke={1.75} />}>{L.proxyFile}</Button>}
       </FileButton>
+      <PasteButton onFile={(f) => void pick(f)} disabled={busy} />
       {path && <Text size="sm" c="paid.8">{L.proxyFileAttached}</Text>}
       {path && urls.data?.[path] && <Anchor href={urls.data[path]} target="_blank" rel="noopener noreferrer" size="sm">{L.proxyFileView}</Anchor>}
+      <Box w="100%"><PasteHint /></Box>
     </Group>
   )
 }

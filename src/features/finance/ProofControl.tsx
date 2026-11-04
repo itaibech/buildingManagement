@@ -1,8 +1,8 @@
-import { ActionIcon, Button, CloseButton, FileButton, Group, Image, Menu, Stack, Text, ThemeIcon } from '@mantine/core'
+import { ActionIcon, Box, Button, CloseButton, FileButton, Group, Image, Menu, Stack, Text, ThemeIcon } from '@mantine/core'
 import { IconEye, IconFileTypePdf, IconPaperclip, IconPhoto, IconReplace, IconTrash } from '@tabler/icons-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { he } from '../../lib/he'
-import { notifyError, notifySuccess } from '../../ui'
+import { notifyError, notifySuccess, PasteButton, PasteHint, usePasteFile } from '../../ui'
 import { ConfirmDialog } from '../tenants/dialogs'
 import { proofUrl, useRemoveProof, useSetProof, type Payment } from './api'
 import { PROOF_ACCEPT, proofError, proofMime } from './ledger'
@@ -41,8 +41,9 @@ export function ProofField({ file, onChange }: { file: File | null; onChange: (f
     setError(err)
     onChange(err ? null : f)
   }
+  const zone = usePasteFile({ accept: PROOF_ACCEPT, onFile: pick })
   return (
-    <Stack gap={4}>
+    <Stack gap={4} ref={zone}>
       <Text size="sm" fw={600}>{P.label}</Text>
       {file ? (
         <Group gap="sm" wrap="nowrap">
@@ -51,11 +52,15 @@ export function ProofField({ file, onChange }: { file: File | null; onChange: (f
           <CloseButton size={44} aria-label={P.removePicked} onClick={() => pick(null)} />
         </Group>
       ) : (
-        <FileButton accept={PROOF_ACCEPT} onChange={pick}>
-          {(props) => <Button variant="default" mih={44} leftSection={<IconPaperclip {...ICON} />} {...props}>{P.attach}</Button>}
-        </FileButton>
+        <Group gap="xs">
+          <FileButton accept={PROOF_ACCEPT} onChange={pick}>
+            {(props) => <Button variant="default" mih={44} leftSection={<IconPaperclip {...ICON} />} {...props}>{P.attach}</Button>}
+          </FileButton>
+          <PasteButton onFile={pick} />
+        </Group>
       )}
       <Text size="xs" c={error ? 'debt.7' : 'dimmed'} role={error ? 'alert' : undefined}>{error ?? P.hint}</Text>
+      <PasteHint />
     </Stack>
   )
 }
@@ -112,8 +117,10 @@ function EditProof({ payment }: { payment: ProofRow }) {
   const confirmRemove = () => remove.mutate(payment, {
     onSuccess: ({ fileStayed }) => { (fileStayed ? notifyError : notifySuccess)(fileStayed ? P.fileStayed : P.removed); setConfirming(false) },
   })
+  // Focus the row's 📎 and press Ctrl+V to attach a screenshot.
+  const zone = usePasteFile({ accept: PROOF_ACCEPT, onFile: upload, enabled: !set.isPending })
   return (
-    <>
+    <Box ref={zone} display="contents">
       <input ref={input} type="file" hidden tabIndex={-1} aria-hidden="true" accept={PROOF_ACCEPT}
         onChange={(e) => { const f = e.currentTarget.files?.[0]; e.currentTarget.value = ''; if (f) upload(f) }} />
       {path ? (
@@ -126,6 +133,6 @@ function EditProof({ payment }: { payment: ProofRow }) {
       )}
       <ConfirmDialog opened={confirming} title={P.removeConfirm} body={P.removeBody} confirmLabel={P.remove}
         loading={remove.isPending} failed={remove.isError} onClose={() => setConfirming(false)} onConfirm={confirmRemove} />
-    </>
+    </Box>
   )
 }

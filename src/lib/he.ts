@@ -2682,6 +2682,12 @@ export const he = {
       signerName: 'שם: ____________________',
     },
   },
+  paste: {
+    button: 'הדבקה מהלוח',
+    desktopHint: 'העתיקו תמונה ולחצו Ctrl+V (או ⌘+V) בחלון',
+    mobileHint: 'לחצו לחיצה ארוכה ובחרו הדבקה',
+    fieldHint: 'אפשר גם להדביק צילום מסך (Ctrl+V)',
+  },
   toast: {
     apartmentSaved: 'הדירה נשמרה',
     apartmentDeleted: 'הדירה נמחקה',

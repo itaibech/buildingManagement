@@ -2,7 +2,7 @@ import { ActionIcon, Anchor, Button, Card, FileButton, Group, Stack, Text, Title
 import { IconFileText, IconPaperclip, IconTrash } from '@tabler/icons-react'
 import { useState } from 'react'
 import { he } from '../../lib/he'
-import { notifyError, notifySuccess } from '../../ui'
+import { notifyError, notifySuccess, PasteButton, PasteHint, usePasteFile } from '../../ui'
 import { ConfirmDialog } from '../tenants/dialogs'
 import { addMeetingDocument, documentProblem, removeMeetingDocument, useDocumentCall, useMeetingDocuments, type MeetingDocument } from './api'
 import type { MeetingStatus } from './types'
@@ -45,13 +45,17 @@ function Upload({ meetingId }: { meetingId: string }) {
     if (problem) return notifyError(PROBLEMS[problem])
     call.mutate(() => addMeetingDocument(meetingId, file), { onSuccess: () => notifySuccess(T.uploaded) })
   }
+  const zone = usePasteFile({ accept: ACCEPT, onFile: pick, enabled: !call.isPending })
   return (
-    <Stack gap={4}>
-      <FileButton onChange={pick} accept={ACCEPT}>
-        {(props) => <Button {...props} variant="default" loading={call.isPending} leftSection={<IconPaperclip {...ICON} />}
-          style={{ alignSelf: 'flex-start' }}>{T.upload}</Button>}
-      </FileButton>
+    <Stack gap={4} ref={zone}>
+      <Group gap="xs">
+        <FileButton onChange={pick} accept={ACCEPT}>
+          {(props) => <Button {...props} variant="default" mih={44} loading={call.isPending} leftSection={<IconPaperclip {...ICON} />}>{T.upload}</Button>}
+        </FileButton>
+        <PasteButton onFile={pick} disabled={call.isPending} />
+      </Group>
       <Text size="xs" c="dimmed">{T.hint}</Text>
+      <PasteHint />
     </Stack>
   )
 }
