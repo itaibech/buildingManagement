@@ -4,6 +4,7 @@ import { fetchAll } from '../../lib/fetchAll'
 import { supabase } from '../../lib/supabase'
 import { notifyError } from '../../ui/notify'
 import { useMyApartmentId } from '../finance/api'
+import { sweepProofs } from '../finance/proofSweep'
 import type { EvImportPayload } from './buildEvImport'
 import type { HistoryReading, Rate } from './evMath'
 
@@ -148,6 +149,8 @@ export function useImportEv() {
   return useMutation({
     mutationFn: async (payload: EvImportPayload): Promise<EvImportCounts> => {
       const data: unknown = must(await supabase.rpc('import_ev', { payload }))
+      // Replaced EV payments' proofs were queued by 0037: remove the files.
+      if (await sweepProofs()) notifyError(he.finance.proof.fileStayed)
       const keys = ['chargers', 'readings', 'kept_manual', 'rates', 'payments', 'main_charges'] as const
       return Object.fromEntries(keys.map((k) => [k, field(data, k)]))
     },

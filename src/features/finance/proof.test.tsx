@@ -18,6 +18,8 @@ const db = vi.hoisted(() => ({
   log: [] as string[],
   /** The payment update matches no row (deleted meanwhile, or RLS). */
   updateMissing: false,
+  /** Storage answers a remove without removing anything (e.g. a network or RLS failure). */
+  removeNothing: false,
 }))
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 
@@ -36,12 +38,15 @@ function builder(table: string) {
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: (table: string) => builder(table),
-    rpc: () => Promise.resolve({ data: null, error: null }),
+    rpc: (fn: string, args: unknown) => { db.log.push(`rpc:${fn}:${JSON.stringify(args)}`); return Promise.resolve({ data: null, error: null }) },
     storage: {
       from: () => ({
         upload: (path: string) => { db.log.push(`upload:${path}`); return Promise.resolve({ error: null }) },
         copy: (from: string, to: string) => { db.log.push(`copy:${from}>${to}`); return Promise.resolve({ error: null }) },
-        remove: (paths: string[]) => { db.log.push(`remove:${paths.join(',')}`); return Promise.resolve({ data: paths.map((name) => ({ name })), error: null }) },
+        remove: (paths: string[]) => {
+          db.log.push(`remove:${paths.join(',')}`)
+          return Promise.resolve({ data: db.removeNothing ? [] : paths.map((name) => ({ name })), error: null })
+        },
         createSignedUrl: (path: string, seconds: number) => {
           db.log.push(`sign:${path}:${seconds}`)
           return Promise.resolve({ data: { signedUrl: 'https://signed.example.test/p' }, error: null })
@@ -84,6 +89,7 @@ beforeEach(() => {
   db.tables = {}
   db.log = []
   db.updateMissing = false
+  db.removeNothing = false
   toast.success.mockReset()
   toast.error.mockReset()
 })
@@ -162,6 +168,20 @@ describe('the payment dialog', () => {
   })
 })
 
+describe('a failed link whose cleanup fails too', () => {
+  it('queues the uploaded file for the next sweep', async () => {
+    db.updateMissing = true
+    db.removeNothing = true
+    const { container } = wrap(<PaymentForm apartmentId="a1" onDone={vi.fn()} />)
+    fireEvent.change(screen.getByLabelText(new RegExp(he.finance.amount)), { target: { value: '300' } })
+    pick(fileInput(container), pdf)
+    fireEvent.click(screen.getByRole('button', { name: he.finance.recordPayment }))
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(P.failed))
+    const uploaded = db.log[1]?.slice('upload:'.length)
+    expect(db.log).toContain(`rpc:queue_payment_proof:${JSON.stringify({ p_path: uploaded })}`)
+  })
+})
+
 describe('the payments list', () => {
   const rows = [
     { id: 'p1', apartment_id: 'a1', paid_on: '2026-10-05', amount: 300, method: 'transfer', note: '', is_special: false,
@@ -178,6 +198,19 @@ describe('the payments list', () => {
     expect(screen.getAllByRole('button', { name: P.add })).toHaveLength(1)
     fireEvent.click(chip)
     for (const item of [P.view, P.replace, P.remove]) expect(await screen.findByRole('menuitem', { name: item, hidden: true })).toBeInTheDocument()
+  })
+
+  it('standing-order (auto) payments get no proof control: the sync replaces them', () => {
+    wrap(<ProofControl payment={{ id: 'p9', proof_path: null, source: 'auto' }} />)
+    expect(screen.queryByRole('button', { name: P.add })).toBeNull()
+    expect(screen.queryByRole('button', { name: P.actions })).toBeNull()
+  })
+
+  it('menu items and the attach button are 44px touch targets', async () => {
+    wrap(<ProofControl payment={{ id: 'p1', proof_path: 'p1/old.jpg' }} />)
+    fireEvent.click(screen.getByRole('button', { name: P.actions }))
+    const item = await screen.findByRole('menuitem', { name: P.view, hidden: true })
+    expect(item.style.minHeight).toContain('2.75rem')
   })
 
   it('📎 opens the proof through a 60-second signed URL in a new tab', async () => {

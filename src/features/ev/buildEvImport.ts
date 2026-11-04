@@ -106,6 +106,22 @@ export function summarizeEv(chargers: ChargerPlan[], rates: readonly Rate[]): Ye
 /** `${apartment}|YYYY-MM-01` */
 export const paymentKey = (apartment: number, month: string): string => `${apartment}|${month.slice(0, 7)}-01`
 
+export interface ProofRow { apartment: number; month: string; source: string }
+
+/**
+ * Payments with a transfer proof that the import deletes (0009): 'ev-import' payments in the apartment-months the
+ * payload covers (its readings' and payments' months), and with replace_main_ev the main import's EV payments in the
+ * months it sends a payment for.
+ */
+export function evProofsLost(payload: EvImportPayload, proofs: readonly ProofRow[]): number {
+  const paid = new Set(payload.payments.map((p) => paymentKey(p.apartment, p.paid_on)))
+  const covered = coveredKeys(payload.chargers, payload.payments)
+  return proofs.filter((p) => {
+    const k = paymentKey(p.apartment, p.month)
+    return p.source === 'ev-import' ? covered.has(k) : p.source === 'import' && !!payload.replace_main_ev && paid.has(k)
+  }).length
+}
+
 export interface PayloadOptions { includePayments: boolean; skipPayments: ReadonlySet<string>; replaceMain?: boolean }
 
 /** paymentKey()s of every apartment-month the import covers (readings and payments). */

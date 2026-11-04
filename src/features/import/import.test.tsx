@@ -23,7 +23,7 @@ const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 vi.mock('../../lib/supabase', () => {
   const chain = (table: string): Record<string, unknown> => {
     const c: Record<string, unknown> = {}
-    for (const op of ['select', 'order', 'eq', 'gte', 'lt', 'range']) c[op] = () => c
+    for (const op of ['select', 'order', 'eq', 'gte', 'lt', 'range', 'limit', 'delete', 'in']) c[op] = () => c
     c.then = (resolve: (v: unknown) => unknown) => Promise.resolve({ data: db.tables[table] ?? [], error: null }).then(resolve)
     return c
   }
@@ -296,6 +296,37 @@ describe('ImportPage', () => {
       fireEvent.click(screen.getByRole('button', { name: he.import.confirm }))
       expect(await screen.findByText(he.import.doneTitle)).toBeInTheDocument()
       expect(db.removed).toEqual([['e1/a.pdf', 'e2/b.jpg']])
+      expect(toast.error).not.toHaveBeenCalled()
+    })
+
+    it('warns that imported payments with a proof will lose it, and asks to confirm first', async () => {
+      db.tables.payments = [
+        { paid_on: '2026-02-01', amount: 100, source: 'import', proof_path: 'p1/a.jpg', apartments: { number: 1 } },
+        { paid_on: '2026-02-03', amount: 100, source: 'import', proof_path: null, apartments: { number: 1 } },
+        { paid_on: '2026-02-05', amount: 100, source: 'manual', proof_path: 'p3/c.pdf', apartments: { number: 2 } },
+      ]
+      await toPreview()
+      expect(screen.getByText(he.import.proofsLost(1))).toBeInTheDocument()
+      expect(he.import.proofsLost(2)).toBe('2 תשלומים עם אסמכתה יוחלפו – האסמכתאות יימחקו')
+      const confirm = screen.getByRole('button', { name: he.import.confirm })
+      expect(confirm).toBeDisabled()
+      fireEvent.click(screen.getByRole('checkbox', { name: he.import.proofsLostAck }))
+      expect(confirm).toBeEnabled()
+    })
+
+    it('no proof warning when no imported payment has one', async () => {
+      db.tables.payments = [{ paid_on: '2026-02-05', amount: 100, source: 'manual', proof_path: 'p3/c.pdf', apartments: { number: 2 } }]
+      await toPreview()
+      expect(screen.queryByText(he.import.proofsLost(1))).toBeNull()
+      expect(screen.getByRole('button', { name: he.import.confirm })).toBeEnabled()
+    })
+
+    it('removes the replaced payments\' queued proof files after the import', async () => {
+      db.tables.payment_proof_trash = [{ path: 'p1/a.jpg' }]
+      await toPreview()
+      fireEvent.click(screen.getByRole('button', { name: he.import.confirm }))
+      expect(await screen.findByText(he.import.doneTitle)).toBeInTheDocument()
+      expect(db.removed).toEqual([['p1/a.jpg']])
       expect(toast.error).not.toHaveBeenCalled()
     })
 

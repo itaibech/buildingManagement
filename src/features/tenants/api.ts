@@ -5,6 +5,7 @@ import type { Database } from '../../lib/db.types'
 import { fetchAll } from '../../lib/fetchAll'
 import { he } from '../../lib/he'
 import { supabase } from '../../lib/supabase'
+import { sweepProofs } from '../finance/proofSweep'
 import { sourceOf, type AptPayment } from './aptData'
 
 type Tables = Database['public']['Tables']
@@ -237,6 +238,8 @@ export function useDeleteApartmentCascade() {
     const byBucket = new Map<string, string[]>()
     for (const p of toPaths(data)) byBucket.set(p.bucket, [...(byBucket.get(p.bucket) ?? []), p.path])
     await Promise.all([...byBucket].map(([bucket, paths]) => supabase.storage.from(bucket).remove(paths)))
+    // The payments' proofs were queued by 0037.
+    await sweepProofs()
   })
 }
 

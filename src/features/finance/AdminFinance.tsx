@@ -5,6 +5,7 @@ import { Link, Navigate, useSearchParams } from 'react-router'
 import { he } from '../../lib/he'
 import { PageHeader } from '../../ui'
 import { useExportAction } from '../export/useExport'
+import { sweepProofs } from './api'
 import { BalancesTab } from './BalancesTab'
 import { BudgetTab } from './BudgetTab'
 import { ChargesTab, FeesTab } from './ChargesTab'
@@ -68,6 +69,8 @@ export function AdminFinance() {
   const [source, setSource] = useState<ExportSource | null>(null)
   const exportAction = useExportAction(source?.fileName ?? '', source?.getRows ?? (() => []), !!source?.ready, source?.hint)
   const listRef = useTabScroll(tab)
+  // Proof files left behind by deletes the app didn't make (an import, an RPC, cron): remove them on open.
+  useEffect(() => { void sweepProofs() }, [])
   const onOpen = source?.onOpen
   const secondary = exportAction && onOpen ? { ...exportAction, onClick: onOpen } : exportAction
   if (raw === 'ev') return <Navigate to="/ev" replace />

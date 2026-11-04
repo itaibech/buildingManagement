@@ -5,7 +5,7 @@ import { monthOf } from '../finance/ledger'
 import { useApartments } from '../tenants/api'
 import { useChargers, useEvPayments, useMainEvCharges } from './api'
 import {
-  buildEvPayload, derivePayments, deriveRates, deriveReadings, mainReplacement, paymentKey, summarizeEv, type ChargerPlan, type EvPaymentRow, type MainRow,
+  buildEvPayload, derivePayments, evProofsLost, deriveRates, deriveReadings, mainReplacement, paymentKey, summarizeEv, type ChargerPlan, type EvPaymentRow, type MainRow,
 } from './buildEvImport'
 import { formatKwh } from '../../lib/format'
 import { he } from '../../lib/he'
@@ -18,14 +18,20 @@ export function useEvImportState() {
   const [includePayments, setIncludePayments] = useState(true)
   const [importOverlaps, setImportOverlaps] = useState(false)
   const [replaceMain, setReplaceMain] = useState(true)
+  // Confirmed for this many proofs to be deleted (another count asks again).
+  const [proofsAckedFor, setProofsAckedFor] = useState(-1)
   const load = (s: EvSheet): void => {
     setSheet(s)
     setRates(null)
     setIncludePayments(true)
     setImportOverlaps(false)
     setReplaceMain(true)
+    setProofsAckedFor(-1)
   }
-  return { sheet, load, ratesEdit, setRates, includePayments, setIncludePayments, importOverlaps, setImportOverlaps, replaceMain, setReplaceMain }
+  return {
+    sheet, load, ratesEdit, setRates, includePayments, setIncludePayments, importOverlaps, setImportOverlaps, replaceMain, setReplaceMain,
+    proofsAckedFor, setProofsAckedFor,
+  }
 }
 export type EvImportState = ReturnType<typeof useEvImportState>
 
@@ -52,6 +58,7 @@ export function useEvImportContext() {
       mainPaymentRows: pays.filter((p) => p.source === 'import')
         .map((p): MainRow => ({ apartment: numberOf.get(p.apartment_id) ?? 0, month: `${p.paid_on.slice(0, 7)}-01`, amount: p.amount })),
       mainChargeRows: (mainCharges.data ?? []).map((c): MainRow => ({ apartment: numberOf.get(c.apartment_id) ?? 0, month: c.month, amount: c.amount })),
+      proofRows: pays.filter((p) => p.proof_path).map((p) => ({ apartment: numberOf.get(p.apartment_id) ?? 0, month: p.paid_on, source: p.source })),
       loading: chargers.isLoading || apartments.isLoading || (ids.length > 0 && (payments.isLoading || mainCharges.isLoading)),
     }
   }, [chargers.data, apartments.data, payments.data, mainCharges.data, ids.length, chargers.isLoading, apartments.isLoading, payments.isLoading, mainCharges.isLoading])
@@ -93,7 +100,8 @@ export function useEvDerived(st: EvImportState, ctx: EvImportContext) {
     const payload = buildEvPayload(readings.chargers, rates, payments, { includePayments: st.includePayments, skipPayments: skip, replaceMain })
     const missing = uncoveredMonth(rates, readings.chargers.flatMap((c) => c.readings.map((r) => r.month)))
     const warnings = [...initialWarnings(readings.chargers, ctx.initial), ...readings.warnings]
-    return { ...readings, warnings, rates, payments, overlaps, payload, missing, replacement, summary: summarizeEv(readings.chargers, rates) }
+    const proofsLost = evProofsLost(payload, ctx.proofRows)
+    return { ...readings, warnings, rates, payments, overlaps, payload, missing, replacement, proofsLost, summary: summarizeEv(readings.chargers, rates) }
   }, [st.sheet, st.ratesEdit, st.includePayments, st.importOverlaps, st.replaceMain, ctx])
 }
 export type EvDerived = NonNullable<ReturnType<typeof useEvDerived>>

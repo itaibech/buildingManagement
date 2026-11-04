@@ -2207,6 +2207,9 @@ isOneToOne: false
 "publish_meeting":
 { Args: { "p_meeting": string }; Returns: string
                            },
+"queue_payment_proof":
+{ Args: { "p_path": string }; Returns: undefined
+                           },
 "quick_start_meeting":
 { Args: { "p_chair": string,"p_meeting": string,"p_override_quorum"?: boolean,"p_secretary": string }; Returns: undefined
                            },

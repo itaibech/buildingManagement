@@ -52,7 +52,7 @@ export function ProofField({ file, onChange }: { file: File | null; onChange: (f
         </Group>
       ) : (
         <FileButton accept={PROOF_ACCEPT} onChange={pick}>
-          {(props) => <Button variant="default" leftSection={<IconPaperclip {...ICON} />} {...props}>{P.attach}</Button>}
+          {(props) => <Button variant="default" mih={44} leftSection={<IconPaperclip {...ICON} />} {...props}>{P.attach}</Button>}
         </FileButton>
       )}
       <Text size="xs" c={error ? 'debt.7' : 'dimmed'} role={error ? 'alert' : undefined}>{error ?? P.hint}</Text>
@@ -80,16 +80,25 @@ function ProofChip({ busy, onView, onReplace, onRemove }: ChipProps) {
           leftSection={<IconPaperclip {...ICON} aria-hidden="true" />}>{P.chip}</Button>
       </Menu.Target>
       <Menu.Dropdown>
-        <Menu.Item leftSection={<IconEye {...ICON} />} onClick={onView}>{P.view}</Menu.Item>
-        <Menu.Item leftSection={<IconReplace {...ICON} />} onClick={onReplace}>{P.replace}</Menu.Item>
-        <Menu.Item color="debt" leftSection={<IconTrash {...ICON} />} onClick={onRemove}>{P.remove}</Menu.Item>
+        <Menu.Item mih={44} leftSection={<IconEye {...ICON} />} onClick={onView}>{P.view}</Menu.Item>
+        <Menu.Item mih={44} leftSection={<IconReplace {...ICON} />} onClick={onReplace}>{P.replace}</Menu.Item>
+        <Menu.Item mih={44} color="debt" leftSection={<IconTrash {...ICON} />} onClick={onRemove}>{P.remove}</Menu.Item>
       </Menu.Dropdown>
     </Menu>
   )
 }
 
-/** Admin: a payment row's proof. Add (camera, gallery or file), view, replace or remove. */
-export function ProofControl({ payment }: { payment: Pick<Payment, 'id' | 'proof_path'> }) {
+type ProofRow = Pick<Payment, 'id' | 'proof_path'> & { source?: string }
+
+/**
+ * Admin: a payment row's proof. Add (camera, gallery or file), view, replace or remove. None on standing-order
+ * ('auto') payments: the sync replaces them, and 0037 refuses a proof on them.
+ */
+export function ProofControl({ payment }: { payment: ProofRow }) {
+  return payment.source === 'auto' ? null : <EditProof payment={payment} />
+}
+
+function EditProof({ payment }: { payment: ProofRow }) {
   const input = useRef<HTMLInputElement>(null)
   const [confirming, setConfirming] = useState(false)
   const set = useSetProof()

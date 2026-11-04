@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildEvPayload, coveredKeys, derivePayments, mainReplacement, deriveRates, deriveReadings, paymentKey, summarizeEv } from './buildEvImport'
+import { buildEvPayload, coveredKeys, derivePayments, evProofsLost, mainReplacement, deriveRates, deriveReadings, paymentKey, summarizeEv } from './buildEvImport'
 import { evFixtureRows } from './fixture'
 import { parseEvSheet } from './parseEvWorkbook'
 
@@ -93,5 +93,26 @@ describe('mainReplacement', () => {
     const r = mainReplacement(chargers, rates, [{ apartment: 46, paid_on: '2020-02-01', amount: 15 }],
       ['2020-01-01', '2020-02-01', '2020-03-01', '2020-06-01'].map(main), [main('2020-02-01'), main('2020-03-01')])
     expect(r).toEqual({ charges: 3, chargesAmount: 300, from: '2020-01-01', to: '2020-03-01', meterCount: 3, meterAmount: 40, paymentsRemoved: 1, paymentsKept: 1 })
+  })
+})
+
+describe('evProofsLost', () => {
+  const payload = {
+    chargers: [{ apartment: 4, initial_reading: 0, readings: [{ month: '2026-03-01', reading: 10 }] }],
+    rates: [], payments: [{ apartment: 4, paid_on: '2026-04-01', amount: 50 }], replace_main_ev: false,
+  }
+  const proofs = [
+    { apartment: 4, month: '2026-03-10', source: 'ev-import' }, // a covered reading month
+    { apartment: 4, month: '2026-04-02', source: 'ev-import' }, // a covered payment month
+    { apartment: 4, month: '2026-05-01', source: 'ev-import' }, // not covered
+    { apartment: 5, month: '2026-03-01', source: 'ev-import' }, // another apartment
+    { apartment: 4, month: '2026-04-20', source: 'import' }, // main import: only when replacing
+    { apartment: 4, month: '2026-03-01', source: 'manual' }, // never deleted
+  ]
+  it('counts the ev-import proofs in the covered apartment-months', () => {
+    expect(evProofsLost(payload, proofs)).toBe(2)
+  })
+  it('replacing the main import also counts its EV payments in the months sent', () => {
+    expect(evProofsLost({ ...payload, replace_main_ev: true }, proofs)).toBe(3)
   })
 })

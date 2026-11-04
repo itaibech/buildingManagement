@@ -7,6 +7,9 @@
 --   * Old files: deleting a payment, or replacing / removing its proof, queues the old path in payment_proof_trash
 --     (whichever way the row went: the app, an RPC like undo_special_charge, an import, an apartment delete). The admin
 --     client removes the queued objects through the Storage API (SQL can't delete stored files) and clears the queue.
+--   * Standing-order payments (source 'auto') are system-managed: apply_standing_orders deletes and re-inserts them,
+--     so they never carry a proof (check below; the app hides the control). Imports replace their own payments
+--     ('import', 'ev-import'); the import dialogs warn before a re-import deletes proofs and ask to confirm.
 --   No new permission key.
 
 -- ---------------------------------------------------------------- file paths
@@ -32,6 +35,7 @@ grant execute on function public.is_payment_proof_file_path(text, uuid) to authe
 -- Unique: one object belongs to one payment (and the read rule looks it up by path).
 alter table public.payments add column proof_path text unique
   check (proof_path is null or public.is_payment_proof_file_path(proof_path, id));
+alter table public.payments add constraint payments_auto_no_proof check (proof_path is null or source <> 'auto');
 
 -- ---------------------------------------------------------------- objects to remove
 create table public.payment_proof_trash (
@@ -64,6 +68,23 @@ revoke execute on function public.payments_queue_proof() from public, anon, auth
 create trigger payments_queue_proof after delete or update of proof_path on public.payments
   for each row execute function public.payments_queue_proof();
 
+-- Admin: queue an object whose link failed and whose cleanup remove failed too, so the next sweep removes it.
+create function public.queue_payment_proof(p_path text) returns void
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'admin only' using errcode = '42501';
+  end if;
+  if not public.is_payment_proof_storage_path(p_path) then
+    raise exception 'not a payment proof path' using errcode = '22023';
+  end if;
+  insert into public.payment_proof_trash (path) values (p_path) on conflict do nothing;
+end;
+$$;
+revoke execute on function public.queue_payment_proof(text) from public, anon;
+grant execute on function public.queue_payment_proof(text) to authenticated;
+
 -- ---------------------------------------------------------------- storage
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('payment-proofs', 'payment-proofs', false, 10485760, array[
@@ -85,6 +106,8 @@ $$;
 revoke execute on function public.payment_proof_readable(text) from public, anon;
 grant execute on function public.payment_proof_readable(text) to authenticated;
 
+-- The read rule depends on each object's name, so it can't be hoisted into a once-per-statement (select ...); the
+-- cheap bucket_id test runs first and the helper is one indexed lookup (proof_path is unique).
 -- No update policy: overwriting a file (update, or an upsert hitting an existing name) is refused for everyone.
 create policy payment_proofs_read on storage.objects for select to authenticated
   using (bucket_id = 'payment-proofs' and public.payment_proof_readable(name));

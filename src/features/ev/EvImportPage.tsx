@@ -44,6 +44,7 @@ interface BodiesProps {
 
 function stepBodies({ st, d, ctx, go, upload, save, confirm, counts, again }: BodiesProps): Record<(typeof STEPS)[number], ReactNode> {
   const ratesOk = !!d && ratesValid(d.rates) && !d.missing
+  const proofsOk = !!d && (d.proofsLost === 0 || st.proofsAckedFor === d.proofsLost)
   return {
     upload: <UploadStep {...upload} intro={T.intro} hint={T.fileHint} />,
     chargers: d && (ctx.loading ? <ListSkeleton /> : <>
@@ -59,8 +60,9 @@ function stepBodies({ st, d, ctx, go, upload, save, confirm, counts, again }: Bo
       <StepNav onBack={go(2)} onNext={go(4)} nextLabel={he.import.next} disabled={false} />
     </>,
     preview: d && <>
-      <EvPreviewStep d={d} error={save.isError ? T.errors.failed : ''} replaceMain={st.replaceMain} onReplaceMain={st.setReplaceMain} />
-      <StepNav onBack={go(3)} onNext={confirm} nextLabel={T.confirm} loading={save.isPending} disabled={!ratesOk || ctx.loading} />
+      <EvPreviewStep d={d} error={save.isError ? T.errors.failed : ''} replaceMain={st.replaceMain} onReplaceMain={st.setReplaceMain}
+        proofsAck={proofsOk} onProofsAck={(v) => st.setProofsAckedFor(v ? d.proofsLost : -1)} />
+      <StepNav onBack={go(3)} onNext={confirm} nextLabel={T.confirm} loading={save.isPending} disabled={!ratesOk || !proofsOk || ctx.loading} />
     </>,
     done: <EvDoneStep counts={counts} onAgain={again} />,
   }

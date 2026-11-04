@@ -8,6 +8,7 @@ import { notifyError } from '../../ui/notify'
 import { billingOf, useApartmentBilling, useApartments, useResidents } from '../tenants/api'
 import { isBudgetSource, type BudgetPayload, type BudgetSource, type BudgetSummary } from './budget'
 import type { TimelineRow } from './feeTimeline'
+import { sweepProofs } from './proofSweep'
 import { PROOF_BUCKET, proofMime, proofPath, RECEIPT_BUCKET, receiptMime, receiptPath, shiftMonth, sortBalances, type LedgerRow } from './ledger'
 
 // 'standing_order' is written only by apply_standing_orders (automatic payments); the payment form offers the rest.
@@ -34,6 +35,8 @@ export interface ApartmentBalance {
 }
 export interface Payment {
   id: string; apartment_id: string; paid_on: string; amount: number; method: PaymentMethod; note: string; is_special?: boolean | null
+  /** 'manual', 'import', 'ev-import' or 'auto' (standing order, system-managed). */
+  source?: string
   /** The transfer proof ("אסמכתת העברה") in the payment-proofs bucket, or null. */
   proof_path?: string | null
 }
@@ -283,7 +286,7 @@ export function usePayments(month: string) {
   return useQuery({
     queryKey: [...KEY, 'payments', month],
     queryFn: async (): Promise<Payment[]> =>
-      (await fetchAll((f, t) => supabase.from('payments').select('id, apartment_id, paid_on, amount, method, note, is_special, proof_path')
+      (await fetchAll((f, t) => supabase.from('payments').select('id, apartment_id, paid_on, amount, method, note, is_special, source, proof_path')
         .gte('paid_on', month).lt('paid_on', shiftMonth(month, 1))
         .order('paid_on', { ascending: false }).order('created_at', { ascending: false }).order('id').range(f, t)))
         .map((p) => ({ ...p, amount: num(p.amount), method: p.method as PaymentMethod })),
@@ -574,6 +577,8 @@ export function useDeleteExpense() {
 
 // ---------------------------------------------------------------- payment proofs ("אסמכתת העברה", 0037)
 
+export { sweepProofs }
+
 type PutObject = (path: string) => Promise<{ error: { message: string } | null }>
 
 /** Stores the object at `path` and links it to the payment; the object is removed again when the link fails. */
@@ -581,8 +586,14 @@ async function linkProof(paymentId: string, path: string, put: PutObject): Promi
   if ((await put(path)).error) return false
   // .single(): an update that matched no row (deleted meanwhile, or RLS) is a failure too.
   const { error } = await supabase.from('payments').update({ proof_path: path }).eq('id', paymentId).select('id').single()
-  if (error) await supabase.storage.from(PROOF_BUCKET).remove([path])
+  if (error) await dropUnlinked(path)
   return !error
+}
+
+/** Removes an upload whose link failed; when that fails too, queues it so the next sweep removes it. */
+async function dropUnlinked(path: string): Promise<void> {
+  const { data, error } = await supabase.storage.from(PROOF_BUCKET).remove([path])
+  if (error || (data?.length ?? 0) === 0) await supabase.rpc('queue_payment_proof', { p_path: path })
 }
 
 /** Uploads the proof for the first payment and copies it to the others (a settlement's months); true when all are linked. */
@@ -604,22 +615,6 @@ async function attachProofs(ids: readonly string[], file: File): Promise<boolean
 async function attachSettlementProof(settlementId: string, file: File): Promise<boolean> {
   const rows = await fetchAll((f, t) => supabase.from('payments').select('id').eq('settlement_id', settlementId).order('for_month').order('id').range(f, t))
   return attachProofs(rows.map((r) => r.id), file)
-}
-
-/**
- * Removes the proof objects 0037 queued (deleted payments, replaced or removed proofs) and clears them from the queue.
- * True when some stayed behind (they stay queued for the next sweep). Non-admins see an empty queue.
- */
-export async function sweepProofs(): Promise<boolean> {
-  try {
-    const queued = must(await supabase.from('payment_proof_trash').select('path').limit(100)).map((r) => r.path)
-    if (queued.length === 0) return false
-    if ((await supabase.storage.from(PROOF_BUCKET).remove(queued)).error) return true
-    fail((await supabase.from('payment_proof_trash').delete().in('path', queued)).error)
-    return false
-  } catch {
-    return true
-  }
 }
 
 type ProofOwner = Pick<Payment, 'id'>
