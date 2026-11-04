@@ -11,6 +11,7 @@ import { FeeTimelineSheet } from '../finance/ApartmentFees'
 import { LoadFailed } from '../finance/cards'
 import { YearStepper } from '../finance/fields'
 import { useApartmentFees } from '../finance/hooks'
+import { ProofControl } from '../finance/ProofControl'
 import { useApartmentLog, useApartmentMeetings, useApartmentPayments, useApartmentTickets } from './api'
 import { isTicketStatus, paymentYears, paymentsOfYear, totalOf, type AptPayment } from './aptData'
 
@@ -38,10 +39,10 @@ function PaymentLine({ p }: { p: AptPayment }) {
     p.for_month ? P.forMonth(monthLabel(p.for_month)) : null, p.note || null].filter((x): x is string => !!x)
   // A standing-order row says "הוראת קבע" as method, source and note: once is enough.
   const meta = [...new Set(parts)].join(' · ')
-  return <Line title={formatDate(p.paid_on)} meta={meta} end={<Money amount={p.amount} tone="neutral" />} />
+  return <Line title={formatDate(p.paid_on)} meta={meta} end={<><Money amount={p.amount} tone="neutral" /><ProofControl payment={p} /></>} />
 }
 
-/** "תשלומים": every payment, by year, with the year's count and total. */
+/** "תשלומים": every payment, by year, with the year's count and total; each with its transfer proof (admin page). */
 export function PaymentsSection({ apartmentId }: { apartmentId: string }) {
   const q = useApartmentPayments(apartmentId)
   const [picked, setPicked] = useState<number | null>(null)

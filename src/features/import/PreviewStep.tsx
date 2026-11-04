@@ -189,6 +189,17 @@ export function ReceiptsNotice({ count }: { count: number }) {
   return <Alert color="signal" title={he.import.receiptsDeleted(count)}><Text size="sm">{he.import.receiptsDeletedBody}</Text></Alert>
 }
 
+/** Imported payments being replaced carry transfer proofs: they go with them, so the admin confirms first. */
+export function ProofsNotice({ count, ack, onAck }: { count: number; ack: boolean; onAck: (v: boolean) => void }) {
+  if (count === 0) return null
+  return (
+    <Alert color="debt" title={he.import.proofsLost(count)}>
+      <Text size="sm">{he.import.proofsLostBody}</Text>
+      <Toggle label={he.import.proofsLostAck} checked={ack} onChange={onAck} />
+    </Alert>
+  )
+}
+
 /** The year has debt settlements: a re-import can reopen or over-credit those months (README, הסדרת חוב). */
 export function SettledNotice({ count }: { count: number }) {
   if (count === 0) return null

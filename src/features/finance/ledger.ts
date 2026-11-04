@@ -184,6 +184,39 @@ export function receiptPath(expenseId: string, mime: string, id: string = crypto
   return ext ? `${expenseId}/${id}.${ext}` : null
 }
 
+export const PROOF_BUCKET = 'payment-proofs'
+
+/** Transfer-proof mimetypes ("אסמכתת העברה") and their extensions: 0037's path rule whitelists the same set. */
+export const PROOF_EXT: Readonly<Record<string, string>> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/heic': 'heic',
+  'image/heif': 'heif',
+  'application/pdf': 'pdf',
+}
+
+/** The picker's `accept`: on a phone it offers the camera and the gallery as well as files. */
+export const PROOF_ACCEPT = 'image/*,application/pdf'
+
+/** The whitelisted proof mimetype (by type, else by extension, like receipts), or null. */
+export function proofMime(file: Pick<File, 'name' | 'type'>): string | null {
+  const mime = receiptMime(file)
+  return mime && Object.hasOwn(PROOF_EXT, mime) ? mime : null
+}
+
+/** `<payment_id>/<uuid>.<ext>` inside the payment-proofs bucket, or null for a mimetype we don't accept. */
+export function proofPath(paymentId: string, mime: string, id: string = crypto.randomUUID()): string | null {
+  const ext = Object.hasOwn(PROOF_EXT, mime) ? PROOF_EXT[mime] : undefined
+  return ext ? `${paymentId}/${id}.${ext}` : null
+}
+
+/** Hebrew error for a proof we won't accept (type, then size), or null. */
+export function proofError(file: File): string | null {
+  if (!proofMime(file)) return he.finance.proof.errors.type
+  return file.size > MAX_RECEIPT_BYTES ? he.finance.proof.errors.size : null
+}
+
 /** "הכול שולם" / "יתרה לתשלום ₪X" / "זיכוי ₪X". */
 export function balanceSentence(balance: number): string {
   const state = balanceState(balance)

@@ -5,6 +5,7 @@ import type { Database } from '../../lib/db.types'
 import { fetchAll } from '../../lib/fetchAll'
 import { he } from '../../lib/he'
 import { supabase } from '../../lib/supabase'
+import { sweepProofs } from '../finance/proofSweep'
 import { sourceOf, type AptPayment } from './aptData'
 
 type Tables = Database['public']['Tables']
@@ -237,6 +238,8 @@ export function useDeleteApartmentCascade() {
     const byBucket = new Map<string, string[]>()
     for (const p of toPaths(data)) byBucket.set(p.bucket, [...(byBucket.get(p.bucket) ?? []), p.path])
     await Promise.all([...byBucket].map(([bucket, paths]) => supabase.storage.from(bucket).remove(paths)))
+    // The payments' proofs were queued by 0037.
+    await sweepProofs()
   })
 }
 
@@ -338,9 +341,9 @@ export function useApartmentPayments(apartmentId: string, enabled = true) {
     queryKey: ['finance', 'apartment-payments', apartmentId],
     enabled,
     queryFn: async (): Promise<AptPayment[]> => {
-      const data = await fetchAll((f, t) => supabase.from('payments').select('id, paid_on, for_month, amount, method, note, source, settlement_id, special_id')
+      const data = await fetchAll((f, t) => supabase.from('payments').select('id, paid_on, for_month, amount, method, note, source, settlement_id, special_id, proof_path')
         .eq('apartment_id', apartmentId).order('paid_on', { ascending: false }).order('id').range(f, t))
-      return data.map((p) => ({ id: p.id, paid_on: p.paid_on, for_month: p.for_month, amount: Number(p.amount), method: p.method, note: p.note, source: sourceOf(p) }))
+      return data.map((p) => ({ id: p.id, paid_on: p.paid_on, for_month: p.for_month, amount: Number(p.amount), method: p.method, note: p.note, source: sourceOf(p), proof_path: p.proof_path }))
     },
   })
 }

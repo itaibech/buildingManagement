@@ -63,10 +63,14 @@ describe('special charges in exports', () => {
     const info = new Map([['a2', { number: 2, names: 'יוסי כהן' }]])
     const payments = paymentsRows([
       { id: 'p1', apartment_id: 'a2', paid_on: '2026-09-01', amount: 2006, method: 'transfer', note: 'תיקון נזק', is_special: true },
-      { id: 'p2', apartment_id: 'a2', paid_on: '2026-09-10', amount: 330, method: 'transfer', note: 'ספטמבר', is_special: false },
+      { id: 'p2', apartment_id: 'a2', paid_on: '2026-09-10', amount: 330, method: 'transfer', note: 'ספטמבר', is_special: false,
+        proof_path: 'p2/0b9a54c4-3e1f-4b8e-9f0a-2c6d1e7f8a90.jpg' },
     ], info)
-    expect(payments[0]?.at(-1)).toBe(he.finance.special.exportColumn)
-    expect(payments.slice(1).map((r) => r.at(-1))).toEqual(['תיקון נזק', ''])
+    expect(payments[0]?.at(-2)).toBe(he.finance.special.exportColumn)
+    expect(payments.slice(1).map((r) => r.at(-2))).toEqual(['תיקון נזק', ''])
+    // "יש אסמכתה": yes / no, never a link (signed URLs expire).
+    expect(payments[0]?.at(-1)).toBe(he.finance.proof.exportColumn)
+    expect(payments.slice(1).map((r) => r.at(-1))).toEqual([he.finance.proof.no, he.finance.proof.yes])
     const expenses = expensesRows([{ id: 'e1', category_id: 'c', category: 'שונות', spent_on: '2026-09-01', amount: 2006, vendor: '', note: 'תיקון נזק',
       receipt_path: null, source: 'manual', template_id: null, special_id: 'sp1' }])
     expect(expenses[1]?.[3]).toBe('תיקון נזק')

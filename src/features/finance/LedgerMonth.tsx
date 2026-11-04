@@ -6,6 +6,7 @@ import { useState } from 'react'
 import type { MonthAllocation } from './allocation'
 import type { ApartmentCharge, SpecialPayment } from './api'
 import { monthName } from './ledger'
+import { ProofButton } from './ProofControl'
 import { UndoSpecialDialog, UndoWriteOffDialog } from './UndoConfirms'
 
 /** One month of an apartment's ledger, as the grid shows it. */
@@ -23,6 +24,8 @@ export interface MonthView {
   specialPayments: SpecialPayment[]
   /** How the month's charge was covered (allocation: paid in the month, credit from other months, still open). */
   alloc?: MonthAllocation
+  /** Transfer proofs of the month's payments (each a 📎 that opens it). */
+  proofs?: string[]
 }
 
 const kwhOf = (v: MonthView): number => v.charges.reduce((t, c) => t + (c.kwh ?? 0), 0)
@@ -126,7 +129,7 @@ function MonthName({ v, admin, allCharges }: { v: MonthView; admin: boolean; all
   )
 }
 
-/** The month name (tap for its charges when it has any), EV kWh, a write-off marker and the open amount. */
+/** The month name (tap for its charges when it has any), EV kWh, transfer proofs, a write-off marker and the open amount. */
 export function MonthCell({ v, admin, allCharges = [] }: { v: MonthView; admin: boolean; allCharges?: readonly ApartmentCharge[] }) {
   const kwh = kwhOf(v)
   return (
@@ -142,6 +145,7 @@ export function MonthCell({ v, admin, allCharges = [] }: { v: MonthView; admin: 
           {he.finance.special.chip(c.label)}
         </Badge>
       ))}
+      {v.proofs && v.proofs.length > 0 && <Group gap={0}>{v.proofs.map((p) => <ProofButton key={p} path={p} />)}</Group>}
       {v.adjusted < 0 && <Text size="xs" c="stone.7" className="bm-num">{he.finance.writtenOff(formatILS(-v.adjusted))}</Text>}
       {v.open > 0 && <Text size="xs" c="debt.6" fw={600} className="bm-num">{he.finance.openAmount(formatILS(v.open))}</Text>}
     </Stack>

@@ -1163,16 +1163,30 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"payments": {
+                },"payment_proof_trash": {
                   Row: {
-                    "amount": number,"apartment_id": string,"building_id": string,"created_at": string,"for_month": string | null,"id": string,"is_special": boolean | null,"method": string,"note": string,"paid_on": string,"settlement_id": string | null,"source": string,"special_id": string | null
+                    "path": string,"queued_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount": number,"apartment_id": string,"building_id"?: string,"created_at"?: string,"for_month"?: string | null,"id"?: string,"is_special"?: never,"method": string,"note"?: string,"paid_on"?: string,"settlement_id"?: string | null,"source"?: string,"special_id"?: string | null
+                    "path": string,"queued_at"?: string
                   }
                   Update: {
-                    "amount"?: number,"apartment_id"?: string,"building_id"?: string,"created_at"?: string,"for_month"?: string | null,"id"?: string,"is_special"?: never,"method"?: string,"note"?: string,"paid_on"?: string,"settlement_id"?: string | null,"source"?: string,"special_id"?: string | null
+                    "path"?: string,"queued_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"payments": {
+                  Row: {
+                    "amount": number,"apartment_id": string,"building_id": string,"created_at": string,"for_month": string | null,"id": string,"is_special": boolean | null,"method": string,"note": string,"paid_on": string,"proof_path": string | null,"settlement_id": string | null,"source": string,"special_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount": number,"apartment_id": string,"building_id"?: string,"created_at"?: string,"for_month"?: string | null,"id"?: string,"is_special"?: never,"method": string,"note"?: string,"paid_on"?: string,"proof_path"?: string | null,"settlement_id"?: string | null,"source"?: string,"special_id"?: string | null
+                  }
+                  Update: {
+                    "amount"?: number,"apartment_id"?: string,"building_id"?: string,"created_at"?: string,"for_month"?: string | null,"id"?: string,"is_special"?: never,"method"?: string,"note"?: string,"paid_on"?: string,"proof_path"?: string | null,"settlement_id"?: string | null,"source"?: string,"special_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -2028,6 +2042,12 @@ isOneToOne: false
 "is_building_doc_storage_path":
 { Args: { "p_name": string }; Returns: boolean
                            },
+"is_payment_proof_file_path":
+{ Args: { "p_name": string,"p_payment": string }; Returns: boolean
+                           },
+"is_payment_proof_storage_path":
+{ Args: { "p_name": string }; Returns: boolean
+                           },
 "is_meeting_file_path":
 { Args: { "p_meeting": string,"p_name": string }; Returns: boolean
                            },
@@ -2135,6 +2155,9 @@ isOneToOne: false
 "open_poll":
 { Args: { "p_poll": string }; Returns: string
                            },
+"payment_proof_readable":
+{ Args: { "p_name": string }; Returns: boolean
+                           },
 "poll_announcement_body":
 { Args: { "p_poll": string }; Returns: string
                            },
@@ -2183,6 +2206,9 @@ isOneToOne: false
                            },
 "publish_meeting":
 { Args: { "p_meeting": string }; Returns: string
+                           },
+"queue_payment_proof":
+{ Args: { "p_path": string }; Returns: undefined
                            },
 "quick_start_meeting":
 { Args: { "p_chair": string,"p_meeting": string,"p_override_quorum"?: boolean,"p_secretary": string }; Returns: undefined

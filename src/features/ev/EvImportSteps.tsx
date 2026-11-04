@@ -5,7 +5,7 @@ import { formatILS, formatKwh, monthLabel } from '../../lib/format'
 import { he } from '../../lib/he'
 import { AptPlate } from '../../ui'
 import { DeleteButton, MonthField } from '../finance/fields'
-import { Warnings } from '../import/PreviewStep'
+import { ProofsNotice, Warnings } from '../import/PreviewStep'
 import type { EvImportCounts } from './api'
 import type { MainReplacement } from './buildEvImport'
 import type { Rate } from './evMath'
@@ -102,7 +102,12 @@ export function PaymentsStep({ d, include, onInclude, overlapsIn, onOverlaps }: 
   )
 }
 
-export function EvPreviewStep({ d, error, replaceMain, onReplaceMain }: { d: EvDerived; error: string; replaceMain: boolean; onReplaceMain: (v: boolean) => void }) {
+interface EvPreviewProps {
+  d: EvDerived; error: string; replaceMain: boolean; onReplaceMain: (v: boolean) => void
+  proofsAck: boolean; onProofsAck: (v: boolean) => void
+}
+
+export function EvPreviewStep({ d, error, replaceMain, onReplaceMain, proofsAck, onProofsAck }: EvPreviewProps) {
   const kwh = money(d.summary.reduce((t, s) => t + s.kwh, 0))
   const amount = money(d.summary.reduce((t, s) => t + s.amount, 0))
   return (
@@ -128,6 +133,7 @@ export function EvPreviewStep({ d, error, replaceMain, onReplaceMain }: { d: EvD
           <Toggle label={T.replaceMainToggle} checked={replaceMain} onChange={onReplaceMain} />
         </Alert>
       )}
+      <ProofsNotice count={d.proofsLost} ack={proofsAck} onAck={onProofsAck} />
       <Warnings items={d.warnings} />
       {error && <Alert color="debt">{error}</Alert>}
     </Stack>

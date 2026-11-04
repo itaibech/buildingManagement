@@ -26,6 +26,8 @@ export interface ImportContext {
   settled: number
   /** Imported expenses of the import year that have a receipt: the re-import deletes them, and their files. */
   receipts: number
+  /** Imported payments of the import year that have a transfer proof: the re-import deletes them, and their files. */
+  proofs: number
   loading: boolean
 }
 
@@ -46,6 +48,7 @@ export function useImportContext(year: number, budgetYear: number): ImportContex
     payments: money.data?.payments ?? [],
     charges: money.data?.charges ?? [],
     settled: money.data?.settled ?? 0,
+    proofs: money.data?.proofs ?? 0,
     receipts: (expenses.data ?? []).filter((e) => e.source === 'import' && e.receipt_path).length,
     loading: fees.isLoading || budgets.isLoading || expenses.isLoading || categories.isLoading || chargers.isLoading || money.isLoading,
   }), [fees.data, budgets.data, expenses.data, categories.data, chargers.data, money.data, fees.isLoading, budgets.isLoading, expenses.isLoading, categories.isLoading, chargers.isLoading, money.isLoading])

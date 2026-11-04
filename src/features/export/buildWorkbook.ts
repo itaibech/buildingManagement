@@ -103,6 +103,7 @@ export function paymentsRows(payments: Payment[], info: ReadonlyMap<string, { nu
     { header: H.notes, value: (p) => p.note },
     // A special charge's payment carries its label as the note.
     { header: he.finance.special.exportColumn, value: (p) => (p.is_special ? p.note : '') },
+    { header: he.finance.proof.exportColumn, value: (p) => (p.proof_path ? he.finance.proof.yes : he.finance.proof.no) },
   ])
 }
 

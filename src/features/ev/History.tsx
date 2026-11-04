@@ -5,6 +5,7 @@ import { formatILS, formatKwh, formatRate, HEBREW_MONTHS } from '../../lib/forma
 import { he } from '../../lib/he'
 import { DeleteButton } from '../finance/fields'
 import { useDesktop } from '../finance/hooks'
+import { ProofButton } from '../finance/ProofControl'
 import type { HistoryRow } from './evMath'
 
 export interface HistoryProps { rows: HistoryRow[]; onEdit: (id: string) => void; onDelete: (id: string) => void }
@@ -22,7 +23,7 @@ function EditButton({ label, onClick }: { label: string; onClick: () => void }) 
   )
 }
 
-/** Mobile row: month and amount on top, then the sheet's numbers on two full-width lines; tap to edit. */
+/** Mobile row: month and amount on top, then the sheet's numbers on two full-width lines; tap to edit. 📎 opens a proof. */
 function MobileRow({ r, onEdit, onDelete }: { r: HistoryRow; onEdit: () => void; onDelete: () => void }) {
   return (
     <Group gap={0} wrap="nowrap" mih={56} px="md" py={6}>
@@ -38,6 +39,7 @@ function MobileRow({ r, onEdit, onDelete }: { r: HistoryRow; onEdit: () => void;
           {`${he.ev.paid} ${formatILS(r.paid)} · `}<Text span inherit c={diffColor(r.diff)}>{`${he.ev.diff} ${signed(r.diff)}`}</Text>
         </Text>
       </UnstyledButton>
+      {r.proofs.map((p) => <ProofButton key={p} path={p} />)}
       <DeleteButton label={he.ev.deleteReading(monthName(r.month))} onClick={onDelete} />
     </Group>
   )
@@ -77,7 +79,9 @@ function DesktopTable({ rows, onEdit, onDelete }: HistoryProps) {
               <Table.Td ta="end">{dash(r.kwh, formatKwh)}</Table.Td>
               <Table.Td ta="end">{dash(r.rate, formatRate)}</Table.Td>
               <Table.Td ta="end">{dash(r.amount, formatILS)}</Table.Td>
-              <Table.Td ta="end">{formatILS(r.paid)}</Table.Td>
+              <Table.Td ta="end">
+                <Group gap={0} wrap="nowrap" justify="flex-end">{r.proofs.map((p) => <ProofButton key={p} path={p} />)}{formatILS(r.paid)}</Group>
+              </Table.Td>
               <Table.Td ta="end" c={diffColor(r.diff)}>{signed(r.diff)}</Table.Td>
               <Table.Td>
                 <Group gap={0} wrap="nowrap" justify="flex-end">

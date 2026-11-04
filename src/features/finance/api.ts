@@ -8,7 +8,8 @@ import { notifyError } from '../../ui/notify'
 import { billingOf, useApartmentBilling, useApartments, useResidents } from '../tenants/api'
 import { isBudgetSource, type BudgetPayload, type BudgetSource, type BudgetSummary } from './budget'
 import type { TimelineRow } from './feeTimeline'
-import { RECEIPT_BUCKET, receiptMime, receiptPath, shiftMonth, sortBalances, type LedgerRow } from './ledger'
+import { sweepProofs } from './proofSweep'
+import { PROOF_BUCKET, proofMime, proofPath, RECEIPT_BUCKET, receiptMime, receiptPath, shiftMonth, sortBalances, type LedgerRow } from './ledger'
 
 // 'standing_order' is written only by apply_standing_orders (automatic payments); the payment form offers the rest.
 export type PaymentMethod = 'cash' | 'transfer' | 'cheque' | 'app' | 'other' | 'standing_order'
@@ -32,7 +33,13 @@ export interface ApartmentBalance {
   /** The monthly fee is collected by standing order ("הוראת קבע"). */
   standingOrder: boolean
 }
-export interface Payment { id: string; apartment_id: string; paid_on: string; amount: number; method: PaymentMethod; note: string; is_special?: boolean | null }
+export interface Payment {
+  id: string; apartment_id: string; paid_on: string; amount: number; method: PaymentMethod; note: string; is_special?: boolean | null
+  /** 'manual', 'import', 'ev-import' or 'auto' (standing order, system-managed). */
+  source?: string
+  /** The transfer proof ("אסמכתת העברה") in the payment-proofs bucket, or null. */
+  proof_path?: string | null
+}
 export interface PaymentInput { apartment_id: string; paid_on: string; amount: number; method: PaymentMethod; note: string }
 export interface Charge { id: string; apartment_id: string; month: string; amount: number; kind: ChargeKind; label: string; ev_reading_id: string | null; special_id?: string | null }
 export interface ChargeInput { apartment_ids: string[]; month: string; amount: number; kind: ChargeKind; label: string }
@@ -51,8 +58,10 @@ export interface SpecialInput {
 }
 export interface SettleInput {
   apartmentId: string; months: string[]; mode: SettleMode; method: PaymentMethod; dateMode: 'debt_month' | 'today'; note: string
+  /** The transfer proof, attached to each payment the settlement records ('pay' only). */
+  proof?: File | null
 }
-export interface SettleResult { months: number; total: number }
+export interface SettleResult { months: number; total: number; proofFailed: boolean }
 export interface Fee { id: string; effective_from: string; amount: number }
 export interface FeeChange { apartment_id: string; effective_from: string; mode: FeeMode; amount: number | null }
 export interface Expense {
@@ -277,15 +286,19 @@ export function usePayments(month: string) {
   return useQuery({
     queryKey: [...KEY, 'payments', month],
     queryFn: async (): Promise<Payment[]> =>
-      (await fetchAll((f, t) => supabase.from('payments').select('id, apartment_id, paid_on, amount, method, note, is_special')
+      (await fetchAll((f, t) => supabase.from('payments').select('id, apartment_id, paid_on, amount, method, note, is_special, source, proof_path')
         .gte('paid_on', month).lt('paid_on', shiftMonth(month, 1))
         .order('paid_on', { ascending: false }).order('created_at', { ascending: false }).order('id').range(f, t)))
         .map((p) => ({ ...p, amount: num(p.amount), method: p.method as PaymentMethod })),
   })
 }
 
+/** Records a payment, then its optional proof. `proofFailed` is true when the proof didn't make it (the payment stays). */
 export function useSavePayment() {
-  return useFinanceMutation(async (values: PaymentInput) => fail((await supabase.from('payments').insert(values)).error))
+  return useFinanceMutation(async ({ values, proof }: { values: PaymentInput; proof?: File | null }) => {
+    const { id } = must<{ id: string }>(await supabase.from('payments').insert(values).select('id').single())
+    return { id, proofFailed: proof ? !(await attachProofs([id], proof).catch(() => false)) : false }
+  })
 }
 
 /** rpc('settle_debt'): the server works out each month's open amount; the client only sends the months. */
@@ -296,7 +309,9 @@ export function useSettleDebt() {
     })
     fail(error)
     const r = data !== null && typeof data === 'object' && !Array.isArray(data) ? data : {}
-    return { months: num(Number(r.months ?? 0)), total: num(Number(r.total ?? 0)) }
+    const settlement = typeof r.settlement_id === 'string' ? r.settlement_id : null
+    const proofFailed = v.proof && v.mode === 'pay' && settlement ? !(await attachSettlementProof(settlement, v.proof).catch(() => false)) : false
+    return { months: num(Number(r.months ?? 0)), total: num(Number(r.total ?? 0)), proofFailed }
   })
 }
 
@@ -305,8 +320,13 @@ export function useUndoSettlement() {
   return useFinanceMutation(async (settlementId: string) => fail((await supabase.rpc('undo_settlement', { p_settlement_id: settlementId })).error))
 }
 
+/** Deletes the payment row first; 0037 queues its proof, which the sweep then removes. */
 export function useDeletePayment() {
-  return useFinanceMutation(async (id: string) => fail((await supabase.from('payments').delete().eq('id', id)).error))
+  return useFinanceMutation(async (id: string) => {
+    fail((await supabase.from('payments').delete().eq('id', id)).error)
+    // The payment is gone either way; only tell the admin that its proof file stayed behind.
+    if (await sweepProofs()) notifyError(he.finance.proof.fileStayed)
+  })
 }
 
 // ---------------------------------------------------------------- charges, building fees, apartment fee timeline
@@ -390,6 +410,8 @@ export function useUndoSpecialCharge() {
     fail(error)
     // The rows are gone either way; only tell the admin that the receipt file stayed behind.
     if (await removeReceiptFiles(receiptsOf(data))) notifyError(he.finance.receiptRemoveFailed)
+    // A proof on the special charge's payment was queued by its delete.
+    void sweepProofs()
   })
 }
 
@@ -550,6 +572,87 @@ export function useDeleteExpense() {
     fail((await supabase.from('expenses').delete().eq('id', expense.id)).error)
     // The expense is gone either way; only tell the admin that its receipt file stayed behind.
     if (await removeReceiptFile(expense.receipt_path)) notifyError(he.finance.receiptRemoveFailed)
+  })
+}
+
+// ---------------------------------------------------------------- payment proofs ("אסמכתת העברה", 0037)
+
+export { sweepProofs }
+
+type PutObject = (path: string) => Promise<{ error: { message: string } | null }>
+
+/** Stores the object at `path` and links it to the payment; the object is removed again when the link fails. */
+async function linkProof(paymentId: string, path: string, put: PutObject): Promise<boolean> {
+  if ((await put(path)).error) return false
+  // .single(): an update that matched no row (deleted meanwhile, or RLS) is a failure too.
+  const { error } = await supabase.from('payments').update({ proof_path: path }).eq('id', paymentId).select('id').single()
+  if (error) await dropUnlinked(path)
+  return !error
+}
+
+/** Removes an upload whose link failed; when that fails too, queues it so the next sweep removes it. */
+async function dropUnlinked(path: string): Promise<void> {
+  const { data, error } = await supabase.storage.from(PROOF_BUCKET).remove([path])
+  if (error || (data?.length ?? 0) === 0) await supabase.rpc('queue_payment_proof', { p_path: path })
+}
+
+/** Uploads the proof for the first payment and copies it to the others (a settlement's months); true when all are linked. */
+async function attachProofs(ids: readonly string[], file: File): Promise<boolean> {
+  const mime = proofMime(file)
+  const [first, ...rest] = ids
+  const path = mime && first ? proofPath(first, mime) : null
+  if (!mime || !first || !path) return false
+  const bucket = supabase.storage.from(PROOF_BUCKET)
+  if (!(await linkProof(first, path, (p) => bucket.upload(p, file, { contentType: mime })))) return false
+  const copies = await Promise.all(rest.map((id) => {
+    const to = proofPath(id, mime)
+    return to ? linkProof(id, to, (p) => bucket.copy(path, p)) : Promise.resolve(false)
+  }))
+  return copies.every(Boolean)
+}
+
+/** The payments one settle_debt call recorded, oldest month first, each with the proof. */
+async function attachSettlementProof(settlementId: string, file: File): Promise<boolean> {
+  const rows = await fetchAll((f, t) => supabase.from('payments').select('id').eq('settlement_id', settlementId).order('for_month').order('id').range(f, t))
+  return attachProofs(rows.map((r) => r.id), file)
+}
+
+type ProofOwner = Pick<Payment, 'id'>
+
+/** Attaches a proof to a payment, or replaces it: the old object is removed only after the new one is linked. */
+export function useSetProof() {
+  return useFinanceMutation(async ({ payment, file }: { payment: ProofOwner; file: File }) => {
+    if (!(await attachProofs([payment.id], file))) throw new Error('Proof upload failed')
+    return { oldStayed: await sweepProofs() }
+  })
+}
+
+/** Unlinks a payment's proof, then removes the file. `fileStayed` is true when the file couldn't be removed yet. */
+export function useRemoveProof() {
+  return useFinanceMutation(async (payment: ProofOwner) => {
+    fail((await supabase.from('payments').update({ proof_path: null }).eq('id', payment.id)).error)
+    return { fileStayed: await sweepProofs() }
+  })
+}
+
+/** A 60-second link to a private proof, made when it's tapped. */
+export async function proofUrl(path: string): Promise<string> {
+  const { data, error } = await supabase.storage.from(PROOF_BUCKET).createSignedUrl(path, 60)
+  fail(error)
+  if (!data) throw new Error('No URL')
+  return data.signedUrl
+}
+
+export interface ProofPayment { id: string; month: string; paidOn: string; amount: number; path: string }
+
+/** One apartment's payments that carry a proof, in the ledger month they land in (for_month, else paid_on's month). */
+export function useApartmentProofs(apartmentId: string) {
+  return useQuery({
+    queryKey: [...KEY, 'proofs', apartmentId],
+    queryFn: async (): Promise<ProofPayment[]> =>
+      (await fetchAll((f, t) => supabase.from('payments').select('id, paid_on, for_month, amount, proof_path').eq('apartment_id', apartmentId)
+        .not('proof_path', 'is', null).order('paid_on').order('id').range(f, t)))
+        .flatMap((p) => (p.proof_path ? [{ id: p.id, month: p.for_month ?? `${p.paid_on.slice(0, 7)}-01`, paidOn: p.paid_on, amount: num(p.amount), path: p.proof_path }] : [])),
   })
 }
 

@@ -6,7 +6,7 @@ import { useImportYear, type ImportCounts } from './api'
 import { columnsReady, feesReady, summarize, yearValid } from './buildImport'
 import { CategoriesStep, ColumnsStep, FeesStep } from './MappingSteps'
 import { ImportError } from './parseWorkbook'
-import { AutoSkippedNote, DoneStep, EvNotice, ExemptNotice, LevyNotice, OverlapNotice, PaidNotice, PreviewStep, PriorNotice, ReceiptsNotice, ReplaceNotes, SettledNotice, UploadStep } from './PreviewStep'
+import { AutoSkippedNote, DoneStep, EvNotice, ExemptNotice, LevyNotice, OverlapNotice, PaidNotice, PreviewStep, PriorNotice, ProofsNotice, ReceiptsNotice, ReplaceNotes, SettledNotice, UploadStep } from './PreviewStep'
 import { readWorkbook, type ReadResult } from './readWorkbook'
 import { WizardSteps } from './WizardSteps'
 import { useDerived, useImportContext, useImportState, type Derived, type ImportContext, type ImportState } from './useImportFlow'
@@ -41,8 +41,12 @@ function useUpload(load: (r: ReadResult) => void, next: () => void) {
 interface PreviewBodyProps { st: ImportState; d: Derived; ctx: ImportContext; save: ReturnType<typeof useImportYear>; back: () => void; confirm: () => void }
 
 function PreviewBody({ st, d, ctx, save, back, confirm }: PreviewBodyProps) {
+  // Confirmed for this many proofs: a different year (another count) asks again.
+  const [ackedFor, setAckedFor] = useState(-1)
+  const ackProofs = ackedFor === ctx.proofs
   if (!st.read || !d.payload) return null
   const ready = columnsReady(st.columns) && feesReady(d.fees) && yearValid(st.year) && yearValid(st.budgetYear) && !ctx.loading
+    && (ctx.proofs === 0 || ackProofs)
   const setLevy = (col: number, amount: number): void => st.setColumns(st.columns.map((c) =>
     c.col === col && c.proposal.kind === 'levy' ? { ...c, proposal: { ...c.proposal, amount } } : c))
   return (
@@ -59,6 +63,7 @@ function PreviewBody({ st, d, ctx, save, back, confirm }: PreviewBodyProps) {
         <ReplaceNotes fees={d.feesReplaced} budgets={d.budgetsUpdated} />
         <SettledNotice count={ctx.settled} />
         <ReceiptsNotice count={ctx.receipts} />
+        <ProofsNotice count={ctx.proofs} ack={ackProofs} onAck={(v) => setAckedFor(v ? ctx.proofs : -1)} />
       </PreviewStep>
       <StepNav onBack={back} onNext={confirm} nextLabel={he.import.confirm} loading={save.isPending} disabled={!ready} />
     </>

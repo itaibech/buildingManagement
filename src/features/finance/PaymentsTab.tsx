@@ -13,8 +13,9 @@ import { DeleteButton, MonthStepper, Row } from './fields'
 import { useApartmentInfo } from './hooks'
 import { monthOf, paymentMeta } from './ledger'
 import { PaymentForm } from './PaymentForm'
+import { ProofControl } from './ProofControl'
 
-/** Admin "תשלומים": the month's payments with a total; add via the page FAB, remove a mistaken one. */
+/** Admin "תשלומים": the month's payments with a total and their transfer proofs; add via the page FAB, remove a mistaken one. */
 export function PaymentsTab({ adding, onAdd, onAddingClose }: { adding: boolean; onAdd: () => void; onAddingClose: () => void }) {
   const [month, setMonth] = useState(() => monthOf(todayISO()))
   const q = usePayments(month)
@@ -41,7 +42,7 @@ export function PaymentsTab({ adding, onAdd, onAddingClose }: { adding: boolean;
           <Fragment key={p.id}>
             <Divider color="stone.1" />
             <Row plate={info.get(p.apartment_id)?.number} title={info.get(p.apartment_id)?.names || he.finance.noResidents} meta={paymentMeta(p)}
-              end={<Money amount={p.amount} tone="neutral" />} trailing={<DeleteButton label={he.finance.deletePayment} onClick={() => setRemoving(p)} />} />
+              end={<Money amount={p.amount} tone="neutral" />} trailing={<Group gap={0} wrap="nowrap"><ProofControl payment={p} /><DeleteButton label={he.finance.deletePayment} onClick={() => setRemoving(p)} /></Group>} />
           </Fragment>
         ))}
       </Card>

@@ -6,7 +6,7 @@ import { formatILS } from '../../lib/format'
 import { he } from '../../lib/he'
 import { AptPlate, ListSkeleton, Money } from '../../ui'
 import { DebtReminderForm } from '../email/DebtReminder'
-import type { ApartmentBalance, ApartmentCharge } from './api'
+import { useApartmentProofs, type ApartmentBalance, type ApartmentCharge } from './api'
 import { BalanceBadges, LoadFailed } from './cards'
 import { YearStepper } from './fields'
 import { useApartmentFinance } from './hooks'
@@ -22,9 +22,11 @@ const yearOf = (month: string): number => Number(month.slice(0, 4))
 /**
  * The year grid for one apartment (only that apartment's rows are requested). Opens on the year of the oldest open
  * debt, with a "חוב פתוח מ-YYYY" chip back to it. `admin`: write-offs can be undone from a month's details.
+ * A month with transfer proofs shows a 📎 for each (residents: their own apartment, by RLS and the storage rule).
  */
 export function ApartmentYear({ apartmentId, admin = false }: { apartmentId: string; admin?: boolean }) {
   const fin = useApartmentFinance(apartmentId)
+  const proofs = useApartmentProofs(apartmentId)
   const thisYear = yearOf(todayISO())
   const oldest = fin.open[0] ? yearOf(fin.open[0].month) : null
   const [picked, setPicked] = useState<number | null>(null)
@@ -39,7 +41,8 @@ export function ApartmentYear({ apartmentId, admin = false }: { apartmentId: str
       )}
       {fin.isLoading && <ListSkeleton rows={4} />}
       {fin.isError && <LoadFailed onRetry={fin.refetch} />}
-      {fin.ready && <LedgerGrid year={year} rows={fin.rows} charges={fin.charges} specialPayments={fin.specialPayments} open={fin.open} admin={admin} />}
+      {fin.ready && <LedgerGrid year={year} rows={fin.rows} charges={fin.charges} specialPayments={fin.specialPayments}
+        proofs={proofs.data} open={fin.open} admin={admin} />}
     </Stack>
   )
 }
