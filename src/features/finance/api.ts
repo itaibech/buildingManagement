@@ -602,7 +602,7 @@ async function attachProofs(ids: readonly string[], file: File): Promise<boolean
 
 /** The payments one settle_debt call recorded, oldest month first, each with the proof. */
 async function attachSettlementProof(settlementId: string, file: File): Promise<boolean> {
-  const rows = must(await supabase.from('payments').select('id').eq('settlement_id', settlementId).order('for_month'))
+  const rows = await fetchAll((f, t) => supabase.from('payments').select('id').eq('settlement_id', settlementId).order('for_month').order('id').range(f, t))
   return attachProofs(rows.map((r) => r.id), file)
 }
 
@@ -655,8 +655,8 @@ export function useApartmentProofs(apartmentId: string) {
   return useQuery({
     queryKey: [...KEY, 'proofs', apartmentId],
     queryFn: async (): Promise<ProofPayment[]> =>
-      must(await supabase.from('payments').select('id, paid_on, for_month, amount, proof_path').eq('apartment_id', apartmentId)
-        .not('proof_path', 'is', null).order('paid_on'))
+      (await fetchAll((f, t) => supabase.from('payments').select('id, paid_on, for_month, amount, proof_path').eq('apartment_id', apartmentId)
+        .not('proof_path', 'is', null).order('paid_on').order('id').range(f, t)))
         .flatMap((p) => (p.proof_path ? [{ id: p.id, month: p.for_month ?? `${p.paid_on.slice(0, 7)}-01`, paidOn: p.paid_on, amount: num(p.amount), path: p.proof_path }] : [])),
   })
 }

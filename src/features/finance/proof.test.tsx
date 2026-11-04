@@ -23,7 +23,7 @@ const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 
 function builder(table: string) {
   const chain: Record<string, unknown> = {}
-  for (const op of ['select', 'eq', 'lt', 'gte', 'order', 'in', 'limit', 'not']) chain[op] = () => chain
+  for (const op of ['select', 'eq', 'lt', 'gte', 'order', 'in', 'limit', 'not', 'range']) chain[op] = () => chain
   chain.insert = () => { db.log.push(`insert:${table}`); return chain }
   chain.delete = () => { db.log.push(`delete:${table}`); return chain }
   chain.update = (values: unknown) => { db.log.push(`update:${JSON.stringify(values)}`); return chain }
