@@ -23,7 +23,7 @@ vi.mock('../../lib/supabase', () => {
   return {
     supabase: {
       functions: { invoke: () => Promise.resolve({ data: { preview: true, recipients: 1, skipped: [], dryRun: false, remainingToday: 90 }, error: null }) },
-      from: (table: string) => (table === 'email_log' ? log : {
+      from: (table: string) => (table === 'email_log' || table === 'maintenance_reminders_log' ? log : {
         ...read,
         update: (patch: unknown) => ({ eq: () => { db.updates.push(patch); return Promise.resolve({ error: null }) } }),
       }),

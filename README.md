@@ -314,6 +314,36 @@ Secrets take effect on the next call; no redeploy is needed.
   one gets the "remaining today" message instead of sending).
 - Debt reminders skip apartments that owe nothing (the dialog lists them) and residents without an email address.
 
+### Automatic maintenance reminders (תזכורות תחזוקה במייל)
+
+Every morning at 08:00 Israel time the committee (the building's approved admins) gets **one digest email** that
+lists the maintenance tasks / inspections due in 7 days and in 1 day, those due today, and those that became overdue
+yesterday, plus supplier contracts ending in 7 days, in 1 day or today. Each item shows its title, the linked
+supplier's name and phone, the due date and a link into the app. Admins change the days (or turn it off) in
+**הגדרות → תזכורות תחזוקה במייל**, which also shows the last 30 reminders; the maintenance page says when the next
+ones go out. On by default: no setup is needed beyond the email setup above (without it the job runs as a dry run).
+
+How it runs, with no person clicking and no secret handled by a person (migration 0038):
+1. `pg_cron` runs `public.maintenance_reminders_cron()` every hour at :10 UTC. It acts only during the 08:00 hour in
+   Israel, so summer and winter time need no second schedule.
+2. It POSTs to the `cron-reminders` Edge Function with `pg_net` (`net.http_post`), sending an `x-cron-secret`
+   header. The secret was generated inside the database by the migration (`gen_random_bytes`) and lives in
+   `private.cron_config`, a schema the Data API doesn't expose, with no grants to `anon` or `authenticated`.
+3. The function has `verify_jwt = false` (`pg_cron` has no JWT). It reads the expected secret with the service role
+   it gets from the platform (`cron_reminders_secret()`, callable by the service role only), compares in constant
+   time, and answers 401 to anything else.
+4. It re-reads the due dates at send time (a task marked done meanwhile has moved on and is skipped), claims each
+   (item, due date, offset) in `maintenance_reminders_log` (a unique index: sent at most once), and sends through the
+   same transport and template as `send-email`, inside the daily cap minus the committee's reserved 40.
+5. The function URL contains the project ref, which the database can't know: the deploy workflow sets
+   `private.cron_config.functions_url` after `db push` (`supabase db query --linked`). While it is null (local and CI
+   databases) the job does nothing.
+
+To reuse the path for another scheduled email, add a function next to `cron-reminders` that checks the same header,
+and call it from a cron function the same way. Check it in the SQL editor: `select jobname, schedule from cron.job;`
+lists `maintenance-reminders`; `select functions_url from private.cron_config;` shows the URL; recent calls are in
+`net._http_response` and the function's logs (Edge Functions → `cron-reminders` → Logs).
+
 ### Troubleshooting
 
 - **Every call returns 401 after deploy** (even the test email, while signed in as an admin): the platform's JWT check
@@ -388,7 +418,8 @@ Before pushing: `npm test && npm run lint && npm run typecheck && npm run build 
 2. Merge the stack down into `main`. A push to `main` runs `deploy.yml`: it first runs the whole CI
    (`ci.yml` as a reusable workflow, pgTAP included); only when that passes does it build with the repo
    variables, apply new migrations in `supabase/migrations` to the hosted project (`supabase db push`),
-   deploy the `send-email` and `admin-delete-user` Edge Functions (`supabase functions deploy`, JWT verification on), and publish
+   deploy the Edge Functions (`supabase functions deploy`: `send-email`, `admin-delete-user` and `admin-invite-user` with
+   JWT verification on, `cron-reminders` with its own secret check), point the cron job at them, and publish
    GitHub Pages.
 3. Migrations are forward-only: fix a bad one with a new migration, never by editing an applied one.
    Protect `main` (Settings → Branches) so it only takes PRs with a green CI.

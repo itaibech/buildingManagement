@@ -10,6 +10,7 @@ import { tasksRows } from '../export/buildWorkbook'
 import { useExportAction } from '../export/useExport'
 import { fetchLastDone, useDeleteTask, useTasks, type Task } from './api'
 import { DoneForm } from './DoneForm'
+import { ReminderLine } from './ReminderSettingsCard'
 import { taskBucket, type DueBucket } from './nextDue'
 import { TaskDetail } from './TaskDetail'
 import { TaskForm } from './TaskForm'
@@ -74,6 +75,7 @@ export default function MaintenancePage() {
   return (
     <Stack gap="lg">
       <PageHeader title={he.nav.maintenance} action={add} secondaryAction={exportAction} />
+      {isAdmin && <ReminderLine />}
       {list.isError && <Text c="debt.7">{he.maintenance.errors.load}</Text>}
       {list.isLoading && <ListSkeleton rows={4} />}
       {list.data?.length === 0 && <EmptyState title={he.maintenance.empty} body={he.maintenance.emptyBody} action={add} />}

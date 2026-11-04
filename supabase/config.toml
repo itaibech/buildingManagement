@@ -452,3 +452,7 @@ verify_jwt = true
 
 [functions.admin-invite-user]
 verify_jwt = true
+
+# Called by pg_cron (0038), which has no JWT: the function checks the x-cron-secret header itself.
+[functions.cron-reminders]
+verify_jwt = false

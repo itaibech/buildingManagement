@@ -8,6 +8,7 @@ import { EmailSettings } from '../email/EmailSettings'
 import { LoadFailed } from '../finance/cards'
 import { OnlinePaySettingsCard } from '../finance/OnlinePay'
 import { FollowupSettingsCard } from '../followup/FollowupSettingsCard'
+import { ReminderSettingsCard } from '../maintenance/ReminderSettingsCard'
 import { useBuilding, useSaveBuilding, type Building } from './api'
 
 const MAX_INSTRUCTIONS = 1000
@@ -78,7 +79,7 @@ const permissionsLink = (
   </Button>
 )
 
-/** Admin "הגדרות בניין": building name and address, the "how to pay" text residents see, email (test + history) and the automatic debt follow-up. */
+/** Admin "הגדרות בניין": building name and address, the "how to pay" text residents see, email (test + history), the automatic debt follow-up and the maintenance email reminders. */
 export default function SettingsPage() {
   const q = useBuilding()
   return (
@@ -91,6 +92,7 @@ export default function SettingsPage() {
         <EmailSettings />
         <OnlinePaySettingsCard />
         <FollowupSettingsCard />
+        <ReminderSettingsCard />
       </Stack>
     </>
   )

@@ -9,10 +9,15 @@ export interface EmailContent {
   paragraphs: string[]
   /** Label/value rows (e.g. the open months of a debt). */
   lines?: { label: string; value: string }[]
+  /** Headed lists after the lines (e.g. a digest's "היום" / "באיחור"), each item with its own details and link. */
+  sections?: EmailSection[]
   /** Paragraphs after the lines. */
   after?: string[]
   link?: { href: string; label: string }
 }
+
+export interface EmailSectionItem { title: string; details: string[]; link?: { href: string; label: string } }
+export interface EmailSection { heading: string; items: EmailSectionItem[] }
 
 export interface Rendered { subject: string; html: string; text: string }
 
@@ -36,6 +41,19 @@ function linesHtml(lines: EmailContent['lines']): string {
   return `<table role="presentation" style="width:100%;border-collapse:collapse;margin:0 0 12px">${rows}</table>`
 }
 
+const sectionItemHtml = (i: EmailSectionItem): string => `<li style="margin:0 0 10px">`
+  + `<strong>${escapeHtml(i.title)}</strong>`
+  + i.details.map((d) => `<br><span style="color:${STONE}">${escapeHtml(d)}</span>`).join('')
+  + (i.link ? `<br><a href="${escapeHtml(i.link.href)}" style="color:${ENAMEL}">${escapeHtml(i.link.label)}</a>` : '')
+  + `</li>`
+
+const sectionsHtml = (sections: EmailContent['sections']): string => (sections ?? []).map((s) =>
+  `<h2 style="margin:16px 0 8px;font-size:17px;color:${ENAMEL}">${escapeHtml(s.heading)}</h2>`
+  + `<ul style="margin:0 0 12px;padding:0 20px 0 0">${s.items.map(sectionItemHtml).join('')}</ul>`).join('')
+
+const sectionsText = (sections: EmailContent['sections']): string[] => (sections ?? []).flatMap((s) => ['', `${s.heading}:`,
+  ...s.items.flatMap((i) => [`- ${[i.title, ...i.details].join(' · ')}`, ...(i.link ? [`  ${i.link.label}: ${i.link.href}`] : [])])])
+
 const button = (link: EmailContent['link']): string => link
   ? `<p style="margin:16px 0"><a href="${escapeHtml(link.href)}" style="display:inline-block;background:${ENAMEL};color:#fff;`
     + `text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">${escapeHtml(link.label)}</a></p>`
@@ -50,7 +68,7 @@ function html(b: Brand, c: EmailContent): string {
     + `<div style="padding:20px;font-size:16px;line-height:1.6">`
     + `<p style="margin:0 0 12px">${escapeHtml(c.greeting)}</p>`
     + `<h1 style="margin:0 0 12px;font-size:20px;color:${ENAMEL}">${escapeHtml(c.heading)}</h1>`
-    + c.paragraphs.map(paragraph).join('') + linesHtml(c.lines) + (c.after ?? []).map(paragraph).join('') + button(c.link)
+    + c.paragraphs.map(paragraph).join('') + linesHtml(c.lines) + sectionsHtml(c.sections) + (c.after ?? []).map(paragraph).join('') + button(c.link)
     + `</div><div style="padding:12px 20px;border-top:1px solid #e3e6ea;color:${STONE};font-size:13px">`
     + `${escapeHtml(footerText(b))} · <a href="${escapeHtml(b.appUrl)}" style="color:${ENAMEL}">${escapeHtml(b.appUrl)}</a>`
     + `</div></div></div>`
@@ -60,7 +78,7 @@ function text(b: Brand, c: EmailContent): string {
   const lines = (c.lines ?? []).map((l) => `${l.label}: ${l.value}`)
   const link = c.link ? [`${c.link.label}: ${c.link.href}`] : []
   const after = c.after?.length ? ['', ...c.after] : []
-  return [c.greeting, '', c.heading, '', ...c.paragraphs, ...(lines.length ? ['', ...lines] : []), ...after, '', ...link, '', '--',
+  return [c.greeting, '', c.heading, '', ...c.paragraphs, ...(lines.length ? ['', ...lines] : []), ...sectionsText(c.sections), ...after, '', ...link, '', '--',
     `${footerText(b)} · ${b.appUrl}`].join('\n')
 }
 
