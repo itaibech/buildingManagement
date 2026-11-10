@@ -68,7 +68,7 @@ export interface Expense {
   id: string; category_id: string; category: string; spent_on: string; amount: number
   vendor: string; note: string; receipt_path: string | null; receipt_name?: string | null; source: string; template_id: string | null; special_id?: string | null
 }
-export interface ExpenseInput { category_id: string; spent_on: string; amount: number; vendor: string; note: string }
+export interface ExpenseInput { category_id: string; spent_on: string; amount: number; vendor: string; note: string; ticket_id?: string }
 export interface Template { id: string; category_id: string; category: string; amount: number; vendor: string; label: string }
 export interface TemplateInput { id?: string; category_id: string; amount: number; vendor: string; label: string }
 export interface Budget { id: string; year: number; category_id: string; category: string; amount: number }

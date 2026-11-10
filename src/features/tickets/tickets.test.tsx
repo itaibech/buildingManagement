@@ -43,6 +43,15 @@ vi.mock('./api', async (orig) => ({
   useAddComment: () => mutation(m.comment),
   useDeleteTicket: () => mutation(m.remove),
 }))
+// The 0039 details and files (covered in details.test.tsx): nothing saved yet, no files.
+vi.mock('./detailsApi', () => {
+  const idle = () => ({ mutate: () => undefined, isPending: false, isError: false })
+  return {
+    useAdminDetails: () => ({ data: null, isSuccess: true }), useLinkedExpenses: () => ({ data: [] }), useActiveSuppliers: () => [],
+    useTicketFiles: () => ({ data: [] }), useThumbnails: () => ({ data: {} }), useSaveTicketDetails: idle, useUploadTicketFiles: idle,
+    useSetFileVisibility: idle, useDeleteTicketFile: idle, signTicketFile: async () => '',
+  }
+})
 vi.mock('../notifications/api', () => ({
   useMarkTicketsSeen: () => ({ mutate: m.markSeen }),
   useUnseenTicketIds: () => m.unseen,
@@ -66,13 +75,13 @@ const wrap = (node: ReactNode, path = '/') =>
 const ticket = (o: Partial<TicketListItem> = {}): TicketListItem => ({
   id: 't1', building_id: 'b', title: 'נורה שרופה', description: 'בקומה 2', location: 'לובי', status: 'open',
   opened_by: 'me', vendor: null, created_at: new Date(Date.now() - 3 * 86400_000).toISOString(), photoCount: 2,
-  updated_at: new Date(Date.now() - 3 * 86400_000).toISOString(), last_activity_by: 'me', last_activity_kind: 'created', ...o,
+  updated_at: new Date(Date.now() - 3 * 86400_000).toISOString(), last_activity_by: 'me', last_activity_kind: 'created', suggested_solution: '', fix_details: '', ...o,
 })
 const detail = (o: Partial<TicketDetail> = {}): TicketDetail => ({
   ...ticket(), openerName: 'דנה',
   comments: [
-    { id: 'c1', body: 'ראשונה', created_at: '2026-10-01T10:00:00Z', author_id: 'a', authorName: 'יוסי' },
-    { id: 'c2', body: 'שנייה', created_at: '2026-10-02T10:00:00Z', author_id: 'b', authorName: 'מיכל' },
+    { id: 'c1', body: 'ראשונה', created_at: '2026-10-01T10:00:00Z', author_id: 'a', authorName: 'יוסי', event: null },
+    { id: 'c2', body: 'שנייה', created_at: '2026-10-02T10:00:00Z', author_id: 'b', authorName: 'מיכל', event: null },
   ],
   photos: [{ id: 'p1', path: 't1/p1.jpg', url: 'https://x/p1.jpg' }],
   ...o,
@@ -201,7 +210,7 @@ describe('TicketPage seen state', () => {
     expect(m.markSeen).toHaveBeenCalledWith(['t1'])
     view.rerender(<MantineProvider theme={theme}><MemoryRouter initialEntries={['/tickets/t1']}><Routes><Route path="/tickets/:id" element={<TicketPage />} /></Routes></MemoryRouter></MantineProvider>)
     expect(m.markSeen).toHaveBeenCalledTimes(1)
-    m.detail = detail({ comments: [...detail().comments, { id: 'c3', body: 'חדשה', created_at: '2026-10-03T10:00:00Z', author_id: 'a', authorName: 'יוסי' }] })
+    m.detail = detail({ comments: [...detail().comments, { id: 'c3', body: 'חדשה', created_at: '2026-10-03T10:00:00Z', author_id: 'a', authorName: 'יוסי', event: null }] })
     view.rerender(<MantineProvider theme={theme}><MemoryRouter initialEntries={['/tickets/t1']}><Routes><Route path="/tickets/:id" element={<TicketPage />} /></Routes></MemoryRouter></MantineProvider>)
     expect(m.markSeen).toHaveBeenCalledTimes(2)
   })

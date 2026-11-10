@@ -823,14 +823,14 @@ isOneToOne: false
                   ]
                 },"expenses": {
                   Row: {
-                    "amount": number,"building_id": string,"category_id": string,"created_at": string,"id": string,"note": string,"project_id": string | null,"receipt_name": string | null,"receipt_path": string | null,"source": string,"special_id": string | null,"spent_on": string,"template_id": string | null,"vendor": string
+                    "amount": number,"building_id": string,"category_id": string,"created_at": string,"id": string,"note": string,"project_id": string | null,"receipt_name": string | null,"receipt_path": string | null,"source": string,"special_id": string | null,"spent_on": string,"template_id": string | null,"ticket_id": string | null,"vendor": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount": number,"building_id"?: string,"category_id": string,"created_at"?: string,"id"?: string,"note"?: string,"project_id"?: string | null,"receipt_name"?: string | null,"receipt_path"?: string | null,"source"?: string,"special_id"?: string | null,"spent_on"?: string,"template_id"?: string | null,"vendor"?: string
+                    "amount": number,"building_id"?: string,"category_id": string,"created_at"?: string,"id"?: string,"note"?: string,"project_id"?: string | null,"receipt_name"?: string | null,"receipt_path"?: string | null,"source"?: string,"special_id"?: string | null,"spent_on"?: string,"template_id"?: string | null,"ticket_id"?: string | null,"vendor"?: string
                   }
                   Update: {
-                    "amount"?: number,"building_id"?: string,"category_id"?: string,"created_at"?: string,"id"?: string,"note"?: string,"project_id"?: string | null,"receipt_name"?: string | null,"receipt_path"?: string | null,"source"?: string,"special_id"?: string | null,"spent_on"?: string,"template_id"?: string | null,"vendor"?: string
+                    "amount"?: number,"building_id"?: string,"category_id"?: string,"created_at"?: string,"id"?: string,"note"?: string,"project_id"?: string | null,"receipt_name"?: string | null,"receipt_path"?: string | null,"source"?: string,"special_id"?: string | null,"spent_on"?: string,"template_id"?: string | null,"ticket_id"?: string | null,"vendor"?: string
                   }
                   Relationships: [
                     {
@@ -862,6 +862,12 @@ isOneToOne: false
       columns: ["template_id"]
 isOneToOne: false
       referencedRelation: "expense_templates"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "expenses_ticket_id_fkey"
+      columns: ["ticket_id"]
+isOneToOne: false
+      referencedRelation: "tickets"
       referencedColumns: ["id"]
     }
                   ]
@@ -1627,16 +1633,54 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"ticket_comments": {
+                },"ticket_admin_details": {
                   Row: {
-                    "author_id": string | null,"body": string,"building_id": string,"created_at": string,"id": string,"ticket_id": string
+                    "building_id": string,"cost": number | null,"supplier_id": string | null,"ticket_id": string,"updated_at": string,"updated_by": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "author_id"?: string | null,"body": string,"building_id"?: string,"created_at"?: string,"id"?: string,"ticket_id": string
+                    "building_id"?: string,"cost"?: number | null,"supplier_id"?: string | null,"ticket_id": string,"updated_at"?: string,"updated_by"?: string | null
                   }
                   Update: {
-                    "author_id"?: string | null,"body"?: string,"building_id"?: string,"created_at"?: string,"id"?: string,"ticket_id"?: string
+                    "building_id"?: string,"cost"?: number | null,"supplier_id"?: string | null,"ticket_id"?: string,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "ticket_admin_details_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "ticket_admin_details_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "ticket_admin_details_supplier_id_fkey"
+      columns: ["supplier_id"]
+isOneToOne: false
+      referencedRelation: "suppliers"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "ticket_admin_details_ticket_id_fkey"
+      columns: ["ticket_id"]
+isOneToOne: true
+      referencedRelation: "tickets"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"ticket_comments": {
+                  Row: {
+                    "author_id": string | null,"body": string,"building_id": string,"created_at": string,"event": string | null,"id": string,"ticket_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "author_id"?: string | null,"body": string,"building_id"?: string,"created_at"?: string,"event"?: string | null,"id"?: string,"ticket_id": string
+                  }
+                  Update: {
+                    "author_id"?: string | null,"body"?: string,"building_id"?: string,"created_at"?: string,"event"?: string | null,"id"?: string,"ticket_id"?: string
                   }
                   Relationships: [
                     {
@@ -1653,6 +1697,50 @@ isOneToOne: false
       referencedColumns: ["id"]
     },{
       foreignKeyName: "ticket_comments_ticket_id_fkey"
+      columns: ["ticket_id"]
+isOneToOne: false
+      referencedRelation: "tickets"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"ticket_file_trash": {
+                  Row: {
+                    "path": string,"queued_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "path": string,"queued_at"?: string
+                  }
+                  Update: {
+                    "path"?: string,"queued_at"?: string
+                  }
+                  Relationships: []
+                },"ticket_files": {
+                  Row: {
+                    "building_id": string,"created_at": string,"created_by": string | null,"file_name": string,"id": string,"path": string,"size_bytes": number,"ticket_id": string,"visible_to_residents": boolean
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "building_id"?: string,"created_at"?: string,"created_by"?: string | null,"file_name": string,"id"?: string,"path": string,"size_bytes": number,"ticket_id": string,"visible_to_residents"?: boolean
+                  }
+                  Update: {
+                    "building_id"?: string,"created_at"?: string,"created_by"?: string | null,"file_name"?: string,"id"?: string,"path"?: string,"size_bytes"?: number,"ticket_id"?: string,"visible_to_residents"?: boolean
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "ticket_files_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "building_cash"
+      referencedColumns: ["building_id"]
+    },{
+      foreignKeyName: "ticket_files_building_id_fkey"
+      columns: ["building_id"]
+isOneToOne: false
+      referencedRelation: "buildings"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "ticket_files_ticket_id_fkey"
       columns: ["ticket_id"]
 isOneToOne: false
       referencedRelation: "tickets"
@@ -1713,14 +1801,14 @@ isOneToOne: false
                   ]
                 },"tickets": {
                   Row: {
-                    "building_id": string,"created_at": string,"description": string,"id": string,"last_activity_by": string | null,"last_activity_kind": string,"location": string,"opened_by": string | null,"status": string,"title": string,"updated_at": string,"vendor": string | null
+                    "building_id": string,"created_at": string,"description": string,"fix_details": string,"id": string,"last_activity_by": string | null,"last_activity_kind": string,"location": string,"opened_by": string | null,"status": string,"suggested_solution": string,"title": string,"updated_at": string,"vendor": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "building_id"?: string,"created_at"?: string,"description"?: string,"id"?: string,"last_activity_by"?: string | null,"last_activity_kind"?: string,"location"?: string,"opened_by"?: string | null,"status"?: string,"title": string,"updated_at"?: string,"vendor"?: string | null
+                    "building_id"?: string,"created_at"?: string,"description"?: string,"fix_details"?: string,"id"?: string,"last_activity_by"?: string | null,"last_activity_kind"?: string,"location"?: string,"opened_by"?: string | null,"status"?: string,"suggested_solution"?: string,"title": string,"updated_at"?: string,"vendor"?: string | null
                   }
                   Update: {
-                    "building_id"?: string,"created_at"?: string,"description"?: string,"id"?: string,"last_activity_by"?: string | null,"last_activity_kind"?: string,"location"?: string,"opened_by"?: string | null,"status"?: string,"title"?: string,"updated_at"?: string,"vendor"?: string | null
+                    "building_id"?: string,"created_at"?: string,"description"?: string,"fix_details"?: string,"id"?: string,"last_activity_by"?: string | null,"last_activity_kind"?: string,"location"?: string,"opened_by"?: string | null,"status"?: string,"suggested_solution"?: string,"title"?: string,"updated_at"?: string,"vendor"?: string | null
                   }
                   Relationships: [
                     {
@@ -2282,6 +2370,9 @@ isOneToOne: false
 "queue_payment_proof":
 { Args: { "p_path": string }; Returns: undefined
                            },
+"queue_ticket_file":
+{ Args: { "p_path": string }; Returns: undefined
+                           },
 "quick_start_meeting":
 { Args: { "p_chair": string,"p_meeting": string,"p_override_quorum"?: boolean,"p_secretary": string }; Returns: undefined
                            },
@@ -2303,6 +2394,9 @@ isOneToOne: false
 "restore_apartment":
 { Args: { "p_id": string }; Returns: undefined
                            },
+"is_ticket_file_path":
+{ Args: { "p_name": string }; Returns: boolean
+                           },
 "restore_fee_gap":
 { Args: { "p_apartment": string,"p_archived_at": string,"p_building": string }; Returns: undefined
                            },
@@ -2320,6 +2414,9 @@ isOneToOne: false
                            },
 "save_poll":
 { Args: { "p_apartments"?: (string)[],"p_closes_at": string,"p_description": string,"p_kind": string,"p_majority": string,"p_majority_base": string,"p_majority_percent"?: number,"p_opens_at": string,"p_options": (string)[],"p_poll"?: string,"p_question": string,"p_results_visibility": string,"p_scope": string }; Returns: string
+                           },
+"save_ticket_details":
+{ Args: { "p_cost"?: number,"p_description"?: string,"p_fix_details": string,"p_location"?: string,"p_suggested_solution": string,"p_supplier_id"?: string,"p_ticket_id": string,"p_title"?: string,"p_vendor": string }; Returns: undefined
                            },
 "seed_common_suppliers":
 { Args: Record<PropertyKey, never>; Returns: number
@@ -2356,6 +2453,9 @@ isOneToOne: false
 { Args: Record<PropertyKey, never>; Returns: {
               "category": string,"contact_name": string,"email": string,"id": string,"name": string,"phone": string
             }[]
+                           },
+"ticket_file_readable":
+{ Args: { "p_name": string }; Returns: boolean
                            },
 "undo_settlement":
 { Args: { "p_settlement_id": string }; Returns: Json

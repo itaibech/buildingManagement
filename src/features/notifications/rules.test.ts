@@ -74,6 +74,12 @@ describe('qualify: service calls for residents', () => {
     expect(qualify(comment('admin'), RES, ref({ opened_by: 'x' }), TODAY)).toBeNull()
     expect(qualify(comment('admin'), RES, null, TODAY)).toBeNull()
   })
+
+  it('a timeline status line (0039) is not a second notice; a details line is', () => {
+    const line = (event: string): ChangeEvent => ({ table: 'ticket_comments', row: { id: 'c1', ticket_id: 't1', author_id: 'admin', event } })
+    expect(qualify(line('status'), RES, ref(), TODAY)).toBeNull()
+    expect(qualify(line('details'), RES, ref(), TODAY)).toMatchObject({ kind: 'ticketComment' })
+  })
 })
 
 describe('needsTicketRef', () => {

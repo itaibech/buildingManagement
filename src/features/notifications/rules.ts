@@ -7,7 +7,8 @@ import type { PermissionKey } from '../../lib/permissions'
 type Tables = Database['public']['Tables']
 export type AnnouncementRowLite = Pick<Tables['announcements']['Row'], 'id' | 'title' | 'author_id' | 'expires_at'>
 export type TicketRowLite = Pick<Tables['tickets']['Row'], 'id' | 'title' | 'status' | 'opened_by' | 'last_activity_by' | 'last_activity_kind'>
-export type CommentRowLite = Pick<Tables['ticket_comments']['Row'], 'id' | 'ticket_id' | 'author_id'>
+export type CommentRowLite = Pick<Tables['ticket_comments']['Row'], 'id' | 'ticket_id' | 'author_id'> &
+  Partial<Pick<Tables['ticket_comments']['Row'], 'event'>>
 export type MessageRowLite = Pick<Tables['committee_messages']['Row'], 'id' | 'subject' | 'sender_id' | 'apartment_number'>
 export type CommunityCommentRowLite = Pick<Tables['community_comments']['Row'], 'id' | 'post_id' | 'author_id' | 'post_author_id'>
 
@@ -75,7 +76,8 @@ function forTicket(type: 'INSERT' | 'UPDATE', row: TicketRowLite, viewer: Viewer
 
 /** Admins: any comment by someone else. Residents: a comment by someone else on a call they opened. */
 function forComment(row: CommentRowLite, viewer: Viewer, ticket: TicketRef | null): Notice | null {
-  if (row.author_id === viewer.userId || !ticket) return null
+  // A status line (0039) repeats the call's own status change, which already notifies.
+  if (row.author_id === viewer.userId || !ticket || row.event === 'status') return null
   if (!viewer.isAdmin && ticket.opened_by !== viewer.userId) return null
   return { kind: 'ticketComment', text: he.notifications.newComment(ticket.title), path: ticketPath(row.ticket_id) }
 }

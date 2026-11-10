@@ -12,8 +12,9 @@ import { ConfirmDialog, FormModal } from '../tenants/dialogs'
 import { AdminControls } from './AdminControls'
 import { useDeleteTicket, useTicket, type TicketDetail } from './api'
 import { TicketComments } from './TicketComments'
-import { TicketForm } from './TicketForm'
+import { AdminTicketEdit, TicketForm } from './TicketForm'
 import { TicketPhotos } from './TicketPhotos'
+import { TreatmentCard } from './TreatmentCard'
 
 type Dialog = 'edit' | 'delete' | 'email' | null
 const ICON = { size: 18, stroke: 1.75 } as const
@@ -58,7 +59,8 @@ function Summary({ ticket, menu }: { ticket: TicketDetail; menu: ReactNode }) {
   )
 }
 
-function Dialogs({ ticket, dialog, close }: { ticket: TicketDetail; dialog: Dialog; close: () => void }) {
+/** admin: the edit dialog also holds the repair details and files. */
+function Dialogs({ ticket, dialog, close, admin }: { ticket: TicketDetail; dialog: Dialog; close: () => void; admin: boolean }) {
   const navigate = useNavigate()
   const del = useDeleteTicket()
   const onDelete = () =>
@@ -68,7 +70,7 @@ function Dialogs({ ticket, dialog, close }: { ticket: TicketDetail; dialog: Dial
   return (
     <>
       <FormModal opened={dialog === 'edit'} title={he.tickets.edit} onClose={close}>
-        {dialog === 'edit' && <TicketForm ticket={ticket} onDone={close} />}
+        {dialog === 'edit' && (admin ? <AdminTicketEdit ticket={ticket} onDone={close} /> : <TicketForm ticket={ticket} onDone={close} />)}
       </FormModal>
       <ConfirmDialog opened={dialog === 'delete'} title={he.tickets.deleteConfirm(ticket.title)} body={he.tickets.deleteBody}
         confirmLabel={he.tickets.delete} loading={del.isPending} failed={del.isError} onClose={close} onConfirm={onDelete} />
@@ -103,9 +105,9 @@ export default function TicketPage() {
     <Stack gap="md">
       <BackLink to="/tickets" label={he.tickets.back} />
       <Summary ticket={ticket} menu={menu} />
-      {isAdmin && <AdminControls key={`${ticket.id}-${ticket.vendor ?? ''}`} ticket={ticket} />}
+      {isAdmin ? <AdminControls key={ticket.id} ticket={ticket} /> : <TreatmentCard ticket={ticket} />}
       <TicketComments ticketId={ticket.id} comments={ticket.comments} />
-      <Dialogs ticket={ticket} dialog={dialog} close={() => setDialog(null)} />
+      <Dialogs ticket={ticket} dialog={dialog} close={() => setDialog(null)} admin={isAdmin} />
     </Stack>
   )
 }
