@@ -8,10 +8,13 @@ const T = he.ticketDetails
 const MAX_SOLUTION = 3000
 const MAX_FIX = 5000
 
-export interface RepairValues { suggested: string; fix: string; cost: number | string }
+export interface RepairValues { vendor: string; supplierId: string | null; suggested: string; fix: string; cost: number | string }
 
-export const repairInitial = (ticket: Ticket, details: AdminDetails | null): RepairValues =>
-  ({ suggested: ticket.suggested_solution, fix: ticket.fix_details, cost: details?.cost ?? '' })
+/** From the latest ticket and details (both forms mount on fresh query data, so nothing stale is sent back). */
+export const repairInitial = (ticket: Ticket, details: AdminDetails | null): RepairValues => ({
+  vendor: ticket.vendor ?? '', supplierId: details?.supplier_id ?? null,
+  suggested: ticket.suggested_solution, fix: ticket.fix_details, cost: details?.cost ?? '',
+})
 
 const maxLen = (max: number) => (v: string): string | null => (v.length > max ? T.errors.tooLong(max) : null)
 export const repairValidate = {
@@ -20,6 +23,8 @@ export const repairValidate = {
   cost: (v: number | string): string | null => (v === '' || (typeof v === 'number' && v >= 0) ? null : T.errors.cost),
 }
 
-/** The save RPC's input for the repair part. An empty cost is stored as null. */
-export const repairInput = (v: RepairValues): Pick<DetailsInput, 'suggestedSolution' | 'fixDetails' | 'cost'> =>
-  ({ suggestedSolution: v.suggested.trimEnd(), fixDetails: v.fix.trimEnd(), cost: typeof v.cost === 'number' ? v.cost : null })
+/** The save RPC's input from the form's own values. An empty cost is stored as null. */
+export const repairInput = (ticketId: string, v: RepairValues): DetailsInput => ({
+  ticketId, vendor: v.vendor, supplierId: v.supplierId, suggestedSolution: v.suggested.trimEnd(), fixDetails: v.fix.trimEnd(),
+  cost: typeof v.cost === 'number' ? v.cost : null,
+})

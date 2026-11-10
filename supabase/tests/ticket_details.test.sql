@@ -4,7 +4,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(46);
+select plan(56);
 
 -- ---------------------------------------------------------------- fixtures (as postgres)
 insert into auth.users (id, email, aud, role) values
@@ -22,8 +22,10 @@ insert into public.user_groups (id, name) values ('a3900000-0000-0000-0000-00000
 insert into public.group_permissions (group_id, permission) values ('a3900000-0000-0000-0000-0000000000a2', 'tickets');
 update public.profiles set group_id = 'a3900000-0000-0000-0000-0000000000a2' where user_id = 'a3900000-0000-0000-0000-000000000002';
 insert into public.expense_categories (id, name) values ('a3900000-0000-0000-0000-0000000000c1', 'תיקונים td');
-insert into public.tickets (id, title, opened_by) values
-  ('e3900000-0000-0000-0000-000000000001', 'נזילה', 'a3900000-0000-0000-0000-000000000002');
+-- The ticket sits in a second building, so building_id provably comes from the ticket, not the default.
+insert into public.buildings (id, name) values ('b3900000-0000-0000-0000-000000000001', 'בניין בדיקה td');
+insert into public.tickets (id, title, opened_by, building_id) values
+  ('e3900000-0000-0000-0000-000000000001', 'נזילה', 'a3900000-0000-0000-0000-000000000002', 'b3900000-0000-0000-0000-000000000001');
 
 create temp table p (k text primary key, v text) on commit drop;
 insert into p values
@@ -56,6 +58,16 @@ select is((select cost from public.ticket_admin_details where ticket_id = 'e3900
   450.50::numeric, 'admin: cost saved');
 select is((select count(*) from public.ticket_comments where ticket_id = 'e3900000-0000-0000-0000-000000000001'
   and event = 'details'), 1::bigint, 'timeline: one details line for a save that changed text and cost');
+select is((select building_id from public.ticket_admin_details where ticket_id = 'e3900000-0000-0000-0000-000000000001'),
+  'b3900000-0000-0000-0000-000000000001'::uuid, 'admin details: building is the ticket''s');
+select lives_ok($$select public.save_ticket_details('e3900000-0000-0000-0000-000000000001', 'אינסטלטור',
+  'להחליף צינור', 'הוחלף צינור במטבח', null, 600)$$, 'admin: changes only the cost');
+select is((select count(*) from public.ticket_comments where ticket_id = 'e3900000-0000-0000-0000-000000000001'
+  and event = 'details'), 1::bigint, 'timeline: a cost-only change writes no line');
+select lives_ok($$select public.save_ticket_details('e3900000-0000-0000-0000-000000000001', 'אינסטלטור',
+  'להחליף צינור', 'הוחלף צינור במטבח', null, 600, ' נזילה גדולה ', 'במטבח', 'קומה 1')$$, 'admin: the edit dialog in one call');
+select is((select row(title, description, location)::text from public.tickets where id = 'e3900000-0000-0000-0000-000000000001'),
+  '("נזילה גדולה",במטבח,"קומה 1")', 'admin: title, description and location saved with the details');
 select throws_ok($$select public.save_ticket_details('e3900000-0000-0000-0000-000000000001', '', '', '', null, -1)$$,
   '23514', null, 'admin: a negative cost is refused');
 update public.tickets set status = 'in_progress' where id = 'e3900000-0000-0000-0000-000000000001';
@@ -73,8 +85,8 @@ select lives_ok($$insert into public.ticket_files (ticket_id, path, file_name, s
   select 'e3900000-0000-0000-0000-000000000001', v, 'photo.jpg', 1000, true from p where k = 'img'$$, 'admin: adds a visible image');
 select lives_ok($$insert into public.ticket_files (ticket_id, path, file_name, size_bytes)
   select 'e3900000-0000-0000-0000-000000000001', v, 'quote.pdf', 1000 from p where k = 'pdf'$$, 'admin: adds a committee PDF');
-select is((select created_by from public.ticket_files where path = (select v from p where k = 'img')),
-  'a3900000-0000-0000-0000-000000000001'::uuid, 'files: author is the caller');
+select is((select row(created_by, building_id)::text from public.ticket_files where path = (select v from p where k = 'img')),
+  '(a3900000-0000-0000-0000-000000000001,b3900000-0000-0000-0000-000000000001)', 'files: author is the caller, building the ticket''s');
 select throws_ok($$insert into public.ticket_files (ticket_id, path, file_name, size_bytes)
   values ('e3900000-0000-0000-0000-000000000001', 'e3900000-0000-0000-0000-000000000001/3b9a54c4-3e1f-4b8e-9f0a-2c6d1e7f8a90.pdf', 'big.pdf', 10485761)$$,
   '23514', null, 'files: over 10 MB is refused');
@@ -88,6 +100,10 @@ select lives_ok($$insert into public.expenses (category_id, amount, vendor, tick
 set local request.jwt.claims = '{"sub":"a3900000-0000-0000-0000-000000000002","role":"authenticated"}';
 select is((select fix_details from public.tickets where id = 'e3900000-0000-0000-0000-000000000001'),
   'הוחלף צינור במטבח', 'resident: reads the fix details');
+select is((select activity_kind from public.my_ticket_activity() where ticket_id = 'e3900000-0000-0000-0000-000000000001'),
+  'status', 'activity: a status change wins over its same-time timeline line');
+select throws_ok($$select public.queue_ticket_file((select v from p where k = 'img'))$$, '42501', null,
+  'resident: cannot queue a file for removal');
 select is((select count(*) from public.ticket_admin_details), 0::bigint, 'resident: never reads the cost');
 select is((select count(*) from public.expenses where ticket_id is not null), 0::bigint, 'resident: no linked expense');
 select is((select array_agg(file_name) from public.ticket_files), array['photo.jpg'], 'resident: only the visible file row');
@@ -141,7 +157,12 @@ from generate_series(1, 8);
 select throws_ok($$insert into public.ticket_files (ticket_id, path, file_name, size_bytes)
   values ('e3900000-0000-0000-0000-000000000001', 'e3900000-0000-0000-0000-000000000001/' || gen_random_uuid() || '.pdf', 'f.pdf', 10)$$,
   '23514', null, 'files: at most 10 per ticket');
+delete from public.ticket_files where path = (select v from p where k = 'pdf');
+select is((select array_agg(path) from public.ticket_file_trash), array[(select v from p where k = 'pdf')],
+  'trash: deleting a file row queues its object');
+select lives_ok($$select public.queue_ticket_file((select v from p where k = 'orphan'))$$, 'admin: queues a failed upload');
 delete from public.tickets where id = 'e3900000-0000-0000-0000-000000000001';
+select is((select count(*) from public.ticket_file_trash), 11::bigint, 'trash: the ticket''s cascade queues every file');
 select is((select count(*) from public.expenses where amount = 450.5 and vendor = 'אינסטלטור' and ticket_id is null), 1::bigint,
   'delete: the linked expense stays, ticket_id set null');
 select is((select count(*) from public.ticket_files) + (select count(*) from public.ticket_admin_details), 0::bigint,

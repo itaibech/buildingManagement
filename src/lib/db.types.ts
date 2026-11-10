@@ -1703,6 +1703,18 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"ticket_file_trash": {
+                  Row: {
+                    "path": string,"queued_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "path": string,"queued_at"?: string
+                  }
+                  Update: {
+                    "path"?: string,"queued_at"?: string
+                  }
+                  Relationships: []
                 },"ticket_files": {
                   Row: {
                     "building_id": string,"created_at": string,"created_by": string | null,"file_name": string,"id": string,"path": string,"size_bytes": number,"ticket_id": string,"visible_to_residents": boolean
@@ -2358,6 +2370,9 @@ isOneToOne: false
 "queue_payment_proof":
 { Args: { "p_path": string }; Returns: undefined
                            },
+"queue_ticket_file":
+{ Args: { "p_path": string }; Returns: undefined
+                           },
 "quick_start_meeting":
 { Args: { "p_chair": string,"p_meeting": string,"p_override_quorum"?: boolean,"p_secretary": string }; Returns: undefined
                            },
@@ -2401,7 +2416,7 @@ isOneToOne: false
 { Args: { "p_apartments"?: (string)[],"p_closes_at": string,"p_description": string,"p_kind": string,"p_majority": string,"p_majority_base": string,"p_majority_percent"?: number,"p_opens_at": string,"p_options": (string)[],"p_poll"?: string,"p_question": string,"p_results_visibility": string,"p_scope": string }; Returns: string
                            },
 "save_ticket_details":
-{ Args: { "p_cost"?: number,"p_fix_details": string,"p_suggested_solution": string,"p_supplier_id"?: string,"p_ticket_id": string,"p_vendor": string }; Returns: undefined
+{ Args: { "p_cost"?: number,"p_description"?: string,"p_fix_details": string,"p_location"?: string,"p_suggested_solution": string,"p_supplier_id"?: string,"p_ticket_id": string,"p_title"?: string,"p_vendor": string }; Returns: undefined
                            },
 "seed_common_suppliers":
 { Args: Record<PropertyKey, never>; Returns: number

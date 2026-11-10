@@ -3,7 +3,7 @@ import type { Database } from '../../lib/db.types'
 import { fetchAll } from '../../lib/fetchAll'
 import { supabase } from '../../lib/supabase'
 import { notifyCommitteeOfTicket } from '../committee/api'
-import { FILE_BUCKET } from './files'
+import { sweepTicketFiles } from './fileSweep'
 import { PHOTO_BUCKET, photoMime, photoPath } from './photos'
 
 type Row = Database['public']['Tables']['tickets']['Row']
@@ -168,14 +168,17 @@ async function removeFolder(bucket: string, ticketId: string): Promise<void> {
   if (paths.length > 0) fail((await supabase.storage.from(bucket).remove(paths)).error)
 }
 
-/** Admin: deletes the ticket (comments, photo and file rows cascade), then its photos and files. */
+/**
+ * Admin: deletes the ticket (comments, photo and file rows cascade), then its photo folder. Its files were queued by
+ * the cascade (0039) and are swept; any left stay queued for the next sweep.
+ */
 export function useDeleteTicket() {
   const client = useQueryClient()
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from('tickets').delete().eq('id', id)
       fail(error)
-      await Promise.all([removeFolder(PHOTO_BUCKET, id), removeFolder(FILE_BUCKET, id)])
+      await Promise.all([removeFolder(PHOTO_BUCKET, id), sweepTicketFiles()])
     },
     onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
   })

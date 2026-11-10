@@ -214,22 +214,42 @@ const openEdit = async () => {
 }
 
 describe('עריכת התקלה dialog', () => {
-  it('admin: holds the repair fields and files, and one save writes the text, then the details', async () => {
-    m.update.mockImplementation((_v, o) => o?.onSuccess?.(undefined))
+  it('admin: holds supplier, repair fields and files; one call saves the text and the details', async () => {
     m.save.mockImplementation((_v, o) => o?.onSuccess?.(undefined))
     m.details = { cost: 450.5, supplier_id: 's1', updated_at: '2026-10-02T10:00:00Z' }
+    m.suppliers = [{ id: 's1', name: 'אינסטלטור', category: '', expense_category_id: null, is_draft: false },
+      { id: 's2', name: 'חשמלאי', category: '', expense_category_id: null, is_draft: false }]
     show()
     const dialog = await openEdit()
     expect(within(dialog).getByLabelText(T.suggestedSolution)).toHaveValue('להחליף צינור')
+    expect(within(dialog).getByLabelText(he.tickets.vendor)).toHaveValue('אינסטלטור')
     expect(within(dialog).getByRole('button', { name: T.addFiles })).toBeInTheDocument()
+    const select = within(dialog).getByLabelText(T.supplier)
+    fireEvent.click(select)
+    const listbox = await waitFor(() => {
+      const el = document.getElementById(select.getAttribute('aria-controls') ?? '')
+      if (!el) throw new Error('listbox not open')
+      return el
+    })
+    fireEvent.click(within(listbox).getByRole('option', { name: 'חשמלאי', hidden: true }))
+    expect(within(dialog).getByLabelText(he.tickets.vendor)).toHaveValue('חשמלאי')
     fireEvent.change(within(dialog).getByLabelText(he.tickets.title, { exact: false }), { target: { value: ' נזילה גדולה ' } })
     fireEvent.change(within(dialog).getByLabelText(T.fixDetails), { target: { value: 'הוחלף צינור ראשי' } })
     fireEvent.click(within(dialog).getByRole('button', { name: he.tickets.save }))
-    await waitFor(() => expect(m.save).toHaveBeenCalled())
-    expect(m.update).toHaveBeenCalledWith({ id: 't1', patch: { title: 'נזילה גדולה', description: '', location: 'לובי' } }, expect.anything())
-    expect(m.save).toHaveBeenCalledWith({ ticketId: 't1', vendor: 'אינסטלטור', supplierId: 's1', suggestedSolution: 'להחליף צינור',
-      fixDetails: 'הוחלף צינור ראשי', cost: 450.5 }, expect.anything())
+    await waitFor(() => expect(m.save).toHaveBeenCalledTimes(1))
+    expect(m.update).not.toHaveBeenCalled()
+    expect(m.save).toHaveBeenCalledWith({ ticketId: 't1', vendor: 'חשמלאי', supplierId: 's2', suggestedSolution: 'להחליף צינור',
+      fixDetails: 'הוחלף צינור ראשי', cost: 450.5, text: { title: 'נזילה גדולה', description: '', location: 'לובי' } }, expect.anything())
     expect(m.success).toHaveBeenCalledWith(he.tickets.updated)
+  })
+
+  it('admin: the dialog sends the vendor it shows, not the prop it opened with', async () => {
+    m.save.mockImplementation((_v, o) => o?.onSuccess?.(undefined))
+    show()
+    const dialog = await openEdit()
+    fireEvent.change(within(dialog).getByLabelText(he.tickets.vendor), { target: { value: 'קבלן חדש' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: he.tickets.save }))
+    await waitFor(() => expect(m.save).toHaveBeenCalledWith(expect.objectContaining({ vendor: 'קבלן חדש' }), expect.anything()))
   })
 
   it('admin: a screenshot pasted inside the dialog is attached', async () => {

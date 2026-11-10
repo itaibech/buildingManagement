@@ -6,7 +6,9 @@
 --     admin-only table rather than column privileges on tickets: tickets is read with `select *` and is in the
 --     supabase_realtime publication, and a hidden column there would either break those reads or leak through them.
 --     A table no resident policy ever matches can't leak through any path.
---   * save_ticket_details(): vendor, supplier, treatment and cost in one transaction (security invoker: RLS decides).
+--   * save_ticket_details(): vendor, supplier, treatment and cost (and, from the edit dialog, title / description /
+--     location) in one transaction (security invoker: RLS decides). building_id of the new rows is the ticket's.
+--   * ticket_file_trash: objects of deleted file rows (and failed uploads) waiting for the admin client to remove them.
 --   * ticket_files: attachments (images, PDF, Word), up to 10 per call, 10 MB each. visible_to_residents decides
 --     whether everyone with 'tickets' may read the file; admins read all. Only that flag can be updated.
 --   * Storage: a new private bucket 'ticket-files' (`<ticket_id>/<uuid>.<ext>`). Not the ticket-photos bucket:
@@ -15,7 +17,8 @@
 --     by a resident even with its path. Admin-only upload and delete, no update (files are never overwritten).
 --   * expenses.ticket_id: the expense recorded for a call ("רישום כהוצאה"); set null when the call is deleted.
 --   * Timeline: ticket_comments.event marks automatic lines (status change, "עודכנו פרטי התיקון"), written by
---     triggers. Residents and admins can't insert them directly. One details line per transaction at most.
+--     a trigger on tickets. Residents and admins can't insert them directly. A cost- or supplier-only change writes
+--     none. my_ticket_activity() prefers the status kind over its same-time line.
 
 -- ---------------------------------------------------------------- tickets: the treatment
 alter table public.tickets
@@ -43,14 +46,36 @@ create index ticket_admin_details_building_idx on public.ticket_admin_details (b
 create index ticket_admin_details_supplier_idx on public.ticket_admin_details (supplier_id);
 create index ticket_admin_details_updated_by_idx on public.ticket_admin_details (updated_by);
 
+-- The building is the ticket's, the ticket never changes, "last edited" follows every write (author: the API caller).
+create function public.ticket_admin_details_stamp() returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  if tg_op = 'UPDATE' then
+    new.ticket_id := old.ticket_id;
+  end if;
+  new.building_id := (select t.building_id from public.tickets t where t.id = new.ticket_id);
+  new.updated_at := now();
+  if current_user in ('authenticated', 'anon') then
+    new.updated_by := auth.uid();
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function public.ticket_admin_details_stamp() from public, anon, authenticated;
+create trigger ticket_admin_details_stamp before insert or update on public.ticket_admin_details
+  for each row execute function public.ticket_admin_details_stamp();
+
 alter table public.ticket_admin_details enable row level security;
 revoke all on public.ticket_admin_details from anon;
 create policy ticket_admin_details_admin on public.ticket_admin_details for all to authenticated
   using ((select public.is_admin())) with check ((select public.is_admin()));
 
--- Admin: the "ניהול התקלה" form in one go. An empty supplier/vendor is stored as null.
+-- Admin: the "ניהול התקלה" form, or the whole "עריכת התקלה" dialog (with p_title: title, description and location
+-- too), in one transaction. An empty supplier/vendor is stored as null; a null description/location keeps the old one.
 create function public.save_ticket_details(p_ticket_id uuid, p_vendor text, p_suggested_solution text,
-  p_fix_details text, p_supplier_id uuid default null, p_cost numeric default null)
+  p_fix_details text, p_supplier_id uuid default null, p_cost numeric default null,
+  p_title text default null, p_description text default null, p_location text default null)
 returns void
 language plpgsql set search_path = ''
 as $$
@@ -61,19 +86,21 @@ begin
   update public.tickets
     set vendor = nullif(trim(coalesce(p_vendor, '')), ''),
         suggested_solution = coalesce(p_suggested_solution, ''),
-        fix_details = coalesce(p_fix_details, '')
+        fix_details = coalesce(p_fix_details, ''),
+        title = coalesce(trim(p_title), title),
+        description = coalesce(trim(p_description), description),
+        location = coalesce(trim(p_location), location)
     where id = p_ticket_id;
   if not found then
     raise exception 'Ticket not found' using errcode = 'P0002';
   end if;
   insert into public.ticket_admin_details (ticket_id, cost, supplier_id)
   values (p_ticket_id, p_cost, p_supplier_id)
-  on conflict (ticket_id) do update
-    set cost = excluded.cost, supplier_id = excluded.supplier_id, updated_by = auth.uid(), updated_at = now();
+  on conflict (ticket_id) do update set cost = excluded.cost, supplier_id = excluded.supplier_id;
 end;
 $$;
-revoke execute on function public.save_ticket_details(uuid, text, text, text, uuid, numeric) from public, anon;
-grant execute on function public.save_ticket_details(uuid, text, text, text, uuid, numeric) to authenticated;
+revoke execute on function public.save_ticket_details(uuid, text, text, text, uuid, numeric, text, text, text) from public, anon;
+grant execute on function public.save_ticket_details(uuid, text, text, text, uuid, numeric, text, text, text) to authenticated;
 
 -- ---------------------------------------------------------------- expenses link
 alter table public.expenses add column ticket_id uuid references public.tickets on delete set null;
@@ -91,30 +118,19 @@ drop policy if exists ticket_comments_insert on public.ticket_comments;
 create policy ticket_comments_insert on public.ticket_comments for insert to authenticated
   with check ((select public.has_permission('tickets')) and author_id = (select auth.uid()) and event is null);
 
--- One automatic line. A details line is written once per transaction (a save that changes both text and cost).
-create function public.ticket_log_event(p_ticket_id uuid, p_event text, p_body text) returns void
-language plpgsql security definer set search_path = ''
-as $$
-begin
-  if p_event = 'details' and exists (select 1 from public.ticket_comments
-      where ticket_id = p_ticket_id and event = 'details' and created_at = now()) then
-    return;
-  end if;
-  insert into public.ticket_comments (ticket_id, building_id, author_id, body, event)
-  select t.id, t.building_id, auth.uid(), p_body, p_event from public.tickets t where t.id = p_ticket_id;
-end;
-$$;
-revoke execute on function public.ticket_log_event(uuid, text, text) from public, anon, authenticated;
-
+-- The lines: a status change, and a change of what residents can read (suggested solution / fix details). Cost and
+-- supplier are the committee's: changing only them writes no line, so the reporter hears nothing about them.
 create function public.tickets_log_changes() returns trigger
 language plpgsql security definer set search_path = ''
 as $$
 begin
   if new.status is distinct from old.status then
-    perform public.ticket_log_event(new.id, 'status', new.status);
+    insert into public.ticket_comments (ticket_id, building_id, author_id, body, event)
+    values (new.id, new.building_id, auth.uid(), new.status, 'status');
   end if;
   if (new.suggested_solution, new.fix_details) is distinct from (old.suggested_solution, old.fix_details) then
-    perform public.ticket_log_event(new.id, 'details', 'details');
+    insert into public.ticket_comments (ticket_id, building_id, author_id, body, event)
+    values (new.id, new.building_id, auth.uid(), 'details', 'details');
   end if;
   return null;
 end;
@@ -123,19 +139,43 @@ revoke execute on function public.tickets_log_changes() from public, anon, authe
 create trigger tickets_log_changes after update on public.tickets
   for each row execute function public.tickets_log_changes();
 
-create function public.ticket_admin_details_log() returns trigger
-language plpgsql security definer set search_path = ''
+-- my_ticket_activity (0015) with one change: when the call's own change and a comment have the same time (a status
+-- change and its timeline line are written together), the call's status kind wins over 'comment'.
+create or replace function public.my_ticket_activity()
+returns table (
+  ticket_id uuid, title text, status text, opened_by uuid, apartment_number integer,
+  activity_at timestamptz, activity_by uuid, activity_kind text, unseen boolean
+)
+language sql stable set search_path = ''
 as $$
-begin
-  if (tg_op = 'INSERT' and new.cost is not null) or (tg_op = 'UPDATE' and new.cost is distinct from old.cost) then
-    perform public.ticket_log_event(new.ticket_id, 'details', 'details');
-  end if;
-  return null;
-end;
+  with me as (
+    select auth.uid() as id, public.is_admin() as admin,
+      (select coalesce(p.approved_at, p.created_at) from public.profiles p where p.user_id = auth.uid()) as joined
+  )
+  select t.id, t.title, t.status, t.opened_by, a.number,
+    x.at, x.by, x.kind,
+    coalesce(x.at > coalesce(s.seen_at, me.joined, '-infinity'::timestamptz), false)
+  from me
+  join public.tickets t on me.admin or t.opened_by = me.id
+  left join public.ticket_seen s on s.ticket_id = t.id and s.user_id = me.id
+  left join lateral (
+    select c.created_at, c.author_id from public.ticket_comments c
+    where c.ticket_id = t.id and c.author_id is distinct from me.id
+    order by c.created_at desc limit 1
+  ) lc on true
+  left join lateral (
+    select v.at, v.by, v.kind from (values
+      (case when t.last_activity_by is distinct from me.id then t.updated_at end, t.last_activity_by, t.last_activity_kind,
+        case when t.last_activity_kind = 'status' then 2 else 0 end),
+      (lc.created_at, lc.author_id, 'comment', 1)
+    ) v(at, by, kind, pri)
+    where v.at is not null order by v.at desc, v.pri desc limit 1
+  ) x on true
+  left join public.profiles p on p.user_id = t.opened_by
+  left join public.residents r on r.id = p.resident_id
+  left join public.apartments a on a.id = r.apartment_id
+  where me.id is not null;
 $$;
-revoke execute on function public.ticket_admin_details_log() from public, anon, authenticated;
-create trigger ticket_admin_details_log after insert or update on public.ticket_admin_details
-  for each row execute function public.ticket_admin_details_log();
 
 -- ---------------------------------------------------------------- attachments
 -- `<ticket_id>/<uuid>.<ext>`, lower-case uuids (gen_random_uuid / crypto.randomUUID).
@@ -163,12 +203,13 @@ create index ticket_files_ticket_idx on public.ticket_files (ticket_id, created_
 create index ticket_files_building_idx on public.ticket_files (building_id);
 create index ticket_files_created_by_idx on public.ticket_files (created_by);
 
--- At most 10 per call (the call's row is locked, so two parallel uploads can't both slip in). The author is the caller.
+-- At most 10 per call (the call's row is locked, so two parallel uploads can't both slip in). The building is the
+-- ticket's; the author is the caller.
 create function public.ticket_files_guard() returns trigger
 language plpgsql security definer set search_path = ''
 as $$
 begin
-  perform 1 from public.tickets where id = new.ticket_id for update;
+  new.building_id := (select t.building_id from public.tickets t where t.id = new.ticket_id for update);
   if (select count(*) from public.ticket_files where ticket_id = new.ticket_id) >= 10 then
     raise exception 'A ticket has at most 10 files' using errcode = '23514';
   end if;
@@ -191,6 +232,50 @@ create policy ticket_files_admin on public.ticket_files for all to authenticated
   using ((select public.is_admin())) with check ((select public.is_admin()));
 create policy ticket_files_select on public.ticket_files for select to authenticated
   using ((select public.has_permission('tickets')) and visible_to_residents);
+
+-- ---------------------------------------------------------------- objects to remove (as payment_proof_trash, 0037)
+-- Deleting a file row, one by one or through the ticket's cascade, queues its object; so does an upload whose row
+-- was refused and whose cleanup failed (queue_ticket_file). The admin client removes queued objects through the
+-- Storage API (SQL can't delete stored files) and clears the queue.
+create table public.ticket_file_trash (
+  path text primary key check (public.is_ticket_file_path(path)),
+  queued_at timestamptz not null default now()
+);
+alter table public.ticket_file_trash enable row level security;
+revoke all on public.ticket_file_trash from anon;
+revoke insert, update on public.ticket_file_trash from authenticated;
+create policy ticket_file_trash_select on public.ticket_file_trash for select to authenticated
+  using ((select public.is_admin()));
+create policy ticket_file_trash_delete on public.ticket_file_trash for delete to authenticated
+  using ((select public.is_admin()));
+
+create function public.ticket_files_queue() returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  insert into public.ticket_file_trash (path) values (old.path) on conflict do nothing;
+  return null;
+end;
+$$;
+revoke execute on function public.ticket_files_queue() from public, anon, authenticated;
+create trigger ticket_files_queue after delete on public.ticket_files
+  for each row execute function public.ticket_files_queue();
+
+create function public.queue_ticket_file(p_path text) returns void
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'admin only' using errcode = '42501';
+  end if;
+  if not public.is_ticket_file_path(p_path) then
+    raise exception 'not a ticket file path' using errcode = '22023';
+  end if;
+  insert into public.ticket_file_trash (path) values (p_path) on conflict do nothing;
+end;
+$$;
+revoke execute on function public.queue_ticket_file(text) from public, anon;
+grant execute on function public.queue_ticket_file(text) to authenticated;
 
 -- ---------------------------------------------------------------- storage
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)

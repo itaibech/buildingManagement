@@ -1,7 +1,7 @@
-import { Anchor, Button, Card, Group, Input, SegmentedControl, Select, Stack, Text, TextInput, Title } from '@mantine/core'
+import { Anchor, Button, Card, Group, Input, SegmentedControl, Stack, Text, Title } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { IconReceipt } from '@tabler/icons-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { formatILS, relativeDate } from '../../lib/format'
 import { he } from '../../lib/he'
@@ -11,6 +11,7 @@ import type { Supplier } from '../suppliers/api'
 import { ConfirmDialog, FormModal } from '../tenants/dialogs'
 import { TICKET_STATUSES, useUpdateTicket, type Ticket } from './api'
 import { useActiveSuppliers, useAdminDetails, useLinkedExpenses, useSaveTicketDetails, useTicketFiles, type AdminDetails } from './detailsApi'
+import { sweepTicketFiles } from './fileSweep'
 import { expensePrefill } from './files'
 import { repairInitial, repairInput, repairValidate, type RepairValues } from './repair'
 import { RepairFields } from './RepairFields'
@@ -34,36 +35,19 @@ function StatusControl({ ticket }: { ticket: Ticket }) {
   )
 }
 
-interface DetailsValues extends RepairValues { vendor: string; supplierId: string | null }
-
 interface DetailsFormProps { ticket: Ticket; details: AdminDetails | null; suppliers: Supplier[] }
 
 /** Supplier, suggested solution, what was done and the cost, saved together. */
 function DetailsForm({ ticket, details, suppliers }: DetailsFormProps) {
   const save = useSaveTicketDetails()
-  const form = useForm<DetailsValues>({
-    initialValues: { vendor: ticket.vendor ?? '', supplierId: details?.supplier_id ?? null, ...repairInitial(ticket, details) },
-    validate: repairValidate,
-  })
-  const pickSupplier = (id: string | null) => {
-    form.setFieldValue('supplierId', id)
-    const name = suppliers.find((s) => s.id === id)?.name
-    if (name) form.setFieldValue('vendor', name)
-  }
+  const form = useForm<RepairValues>({ initialValues: repairInitial(ticket, details), validate: repairValidate })
   const submit = form.onSubmit((v) => {
-    save.mutate({ ticketId: ticket.id, vendor: v.vendor, supplierId: v.supplierId, ...repairInput(v) },
-      { onSuccess: () => notifySuccess(T.saved), onError: () => notifyError(he.toast.failed) })
+    save.mutate(repairInput(ticket.id, v), { onSuccess: () => notifySuccess(T.saved), onError: () => notifyError(he.toast.failed) })
   }, focusFirstError)
-  const supplierData = suppliers.map((s) => ({ value: s.id, label: s.category ? `${s.name} · ${s.category}` : s.name }))
   return (
     <form onSubmit={submit} noValidate>
       <Stack gap="sm">
-        {supplierData.length > 0 && (
-          <Select label={T.supplier} placeholder={T.supplierPlaceholder} data={supplierData} searchable clearable
-            value={form.values.supplierId} onChange={pickSupplier} />
-        )}
-        <TextInput label={he.tickets.vendor} placeholder={he.tickets.vendorPlaceholder} maxLength={200} {...form.getInputProps('vendor')} />
-        <RepairFields inputProps={form.getInputProps} />
+        <RepairFields inputProps={form.getInputProps} suppliers={suppliers} supplierId={form.values.supplierId} onChange={form.setValues} />
         <Group justify="space-between" align="center">
           <Text size="sm" c="dimmed">{details?.updated_at ? T.lastEdited(relativeDate(details.updated_at)) : ''}</Text>
           <Button type="submit" mih={44} loading={save.isPending}>{T.save}</Button>
@@ -114,6 +98,8 @@ export function AdminControls({ ticket }: { ticket: Ticket }) {
   const suppliers = useActiveSuppliers(true)
   const files = useTicketFiles(ticket.id).data ?? []
   const loaded = details.isSuccess
+  // Objects left behind by deletes (a failed remove, a cascade): removed on open, as the finance page does for proofs.
+  useEffect(() => { void sweepTicketFiles() }, [])
   return (
     <Card padding="md">
       <Stack gap="md">

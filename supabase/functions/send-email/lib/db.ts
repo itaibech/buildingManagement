@@ -54,7 +54,8 @@ async function ticket(db: SupabaseClient, id: string, buildingId: string): Promi
   const t = maybe<{ id: string; title: string; status: string; location: string; opened_by: string | null }>(await db.from('tickets')
     .select('id, title, status, location, opened_by').eq('id', id).eq('building_id', buildingId).maybeSingle())
   if (!t) return null
-  const comments = must<{ body: string }[]>(await db.from('ticket_comments').select('body').eq('ticket_id', id)
+  // The latest real comment: automatic timeline lines (0039, event set) carry a code, not text.
+  const comments = must<{ body: string }[]>(await db.from('ticket_comments').select('body').eq('ticket_id', id).is('event', null)
     .order('created_at', { ascending: false }).limit(1))
   return { id: t.id, title: t.title, status: t.status, location: t.location, latestComment: comments[0]?.body ?? null,
     openerApartmentId: await openerApartment(db, t.opened_by) }

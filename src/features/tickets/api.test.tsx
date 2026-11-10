@@ -52,6 +52,9 @@ vi.mock('../../lib/supabase', () => ({
   },
 }))
 
+const sweep = vi.hoisted(() => vi.fn(async () => false))
+vi.mock('./fileSweep', () => ({ sweepTicketFiles: sweep, queueTicketFile: vi.fn() }))
+
 const wrapper = ({ children }: { children: ReactNode }) => (
   <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>
 )
@@ -100,16 +103,13 @@ describe('useCreateTicket: committee email', () => {
 })
 
 describe('useDeleteTicket', () => {
-  it('deletes the row first, then every object listed under the ticket folder, photos and files', async () => {
+  it('deletes the row first, then every photo listed under the ticket folder, and sweeps the queued files', async () => {
     db.listed = [{ name: 'a.jpg' }, { name: 'orphan.png' }]
     const { result } = renderHook(() => useDeleteTicket(), { wrapper })
     await act(async () => {
       await result.current.mutateAsync('t1')
     })
-    expect(db.calls[0]).toBe('delete:tickets')
-    expect([...db.calls.slice(1)].sort()).toEqual([
-      'list:ticket-files:t1', 'list:ticket-photos:t1',
-      'remove:ticket-files:t1/a.jpg,t1/orphan.png', 'remove:ticket-photos:t1/a.jpg,t1/orphan.png',
-    ])
+    expect(db.calls).toEqual(['delete:tickets', 'list:ticket-photos:t1', 'remove:ticket-photos:t1/a.jpg,t1/orphan.png'])
+    expect(sweep).toHaveBeenCalledTimes(1)
   })
 })

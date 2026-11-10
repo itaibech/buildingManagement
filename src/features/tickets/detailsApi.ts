@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Database } from '../../lib/db.types'
 import { supabase } from '../../lib/supabase'
 import { useSuppliers } from '../suppliers/api'
+import { queueTicketFile, sweepTicketFiles } from './fileSweep'
 import { FILE_BUCKET, fileType, filePath, isImagePath, MAX_FILES } from './files'
 
 type Tables = Database['public']['Tables']
@@ -17,6 +18,8 @@ export interface DetailsInput {
   suggestedSolution: string
   fixDetails: string
   cost: number | null
+  /** The edit dialog also saves the text, in the same call. */
+  text?: { title: string; description: string; location: string }
 }
 
 const KEY = ['tickets'] as const
@@ -65,6 +68,7 @@ export function useSaveTicketDetails() {
       const { error } = await supabase.rpc('save_ticket_details', {
         p_ticket_id: v.ticketId, p_vendor: v.vendor, p_suggested_solution: v.suggestedSolution, p_fix_details: v.fixDetails,
         p_supplier_id: v.supplierId ?? undefined, p_cost: v.cost ?? undefined,
+        p_title: v.text?.title, p_description: v.text?.description, p_location: v.text?.location,
       })
       fail(error)
     },
@@ -110,14 +114,17 @@ export async function signTicketFile(file: Pick<TicketFile, 'path' | 'file_name'
 
 export interface PickedFile { file: File; visible: boolean }
 
-/** Uploads one file and records its row; the object is removed again when the row is refused. */
+/** Uploads one file and records its row. A refused row's object is removed again, or queued when that fails too. */
 async function uploadOne(ticketId: string, { file, visible }: PickedFile): Promise<boolean> {
   const path = filePath(ticketId, file)
   const bucket = supabase.storage.from(FILE_BUCKET)
   if ((await bucket.upload(path, file, { contentType: fileType(file) ?? file.type })).error) return false
   const { error } = await supabase.from('ticket_files')
     .insert({ ticket_id: ticketId, path, file_name: file.name.slice(0, 200), size_bytes: file.size, visible_to_residents: visible })
-  if (error) await bucket.remove([path])
+  if (error) {
+    const removed = await bucket.remove([path])
+    if (removed.error || (removed.data?.length ?? 0) === 0) await queueTicketFile(path)
+  }
   return !error
 }
 
@@ -146,13 +153,13 @@ export function useSetFileVisibility() {
   })
 }
 
-/** Admin: removes the row (so no one can read it any more), then the object. */
+/** Admin: removes the row (so no one can read it any more; the DB queues its object), then sweeps the queue. */
 export function useDeleteTicketFile() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: async (file: Pick<TicketFile, 'id' | 'path'>) => {
+    mutationFn: async (file: Pick<TicketFile, 'id'>) => {
       fail((await supabase.from('ticket_files').delete().eq('id', file.id)).error)
-      fail((await supabase.storage.from(FILE_BUCKET).remove([file.path])).error)
+      await sweepTicketFiles()
     },
     onSettled: () => client.invalidateQueries({ queryKey: KEY }),
   })
