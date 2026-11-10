@@ -1,4 +1,4 @@
-import { Anchor, Button, Card, Group, Input, SegmentedControl, Select, Stack, Text, Textarea, TextInput, Title } from '@mantine/core'
+import { Anchor, Button, Card, Group, Input, SegmentedControl, Select, Stack, Text, TextInput, Title } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { IconReceipt } from '@tabler/icons-react'
 import { useState } from 'react'
@@ -7,18 +7,17 @@ import { formatILS, relativeDate } from '../../lib/format'
 import { he } from '../../lib/he'
 import { focusFirstError, notifyError, notifySuccess } from '../../ui'
 import { ExpenseForm } from '../finance/ExpenseForms'
-import { MoneyInput } from '../finance/fields'
 import type { Supplier } from '../suppliers/api'
 import { ConfirmDialog, FormModal } from '../tenants/dialogs'
 import { TICKET_STATUSES, useUpdateTicket, type Ticket } from './api'
 import { useActiveSuppliers, useAdminDetails, useLinkedExpenses, useSaveTicketDetails, useTicketFiles, type AdminDetails } from './detailsApi'
 import { expensePrefill } from './files'
+import { repairInitial, repairInput, repairValidate, type RepairValues } from './repair'
+import { RepairFields } from './RepairFields'
 import { TicketFiles } from './TicketFiles'
 
 const T = he.ticketDetails
 const STATUS_OPTIONS = TICKET_STATUSES.map((s) => ({ value: s, label: he.ticketStatus[s] }))
-const MAX_SOLUTION = 3000
-const MAX_FIX = 5000
 
 /** Status: saved as soon as it changes. */
 function StatusControl({ ticket }: { ticket: Ticket }) {
@@ -35,10 +34,7 @@ function StatusControl({ ticket }: { ticket: Ticket }) {
   )
 }
 
-interface DetailsValues { vendor: string; supplierId: string | null; suggested: string; fix: string; cost: number | string }
-
-const maxLen = (max: number) => (v: string): string | null => (v.length > max ? T.errors.tooLong(max) : null)
-const costError = (v: number | string): string | null => (v === '' || (typeof v === 'number' && v >= 0) ? null : T.errors.cost)
+interface DetailsValues extends RepairValues { vendor: string; supplierId: string | null }
 
 interface DetailsFormProps { ticket: Ticket; details: AdminDetails | null; suppliers: Supplier[] }
 
@@ -46,9 +42,8 @@ interface DetailsFormProps { ticket: Ticket; details: AdminDetails | null; suppl
 function DetailsForm({ ticket, details, suppliers }: DetailsFormProps) {
   const save = useSaveTicketDetails()
   const form = useForm<DetailsValues>({
-    initialValues: { vendor: ticket.vendor ?? '', supplierId: details?.supplier_id ?? null, suggested: ticket.suggested_solution,
-      fix: ticket.fix_details, cost: details?.cost ?? '' },
-    validate: { suggested: maxLen(MAX_SOLUTION), fix: maxLen(MAX_FIX), cost: costError },
+    initialValues: { vendor: ticket.vendor ?? '', supplierId: details?.supplier_id ?? null, ...repairInitial(ticket, details) },
+    validate: repairValidate,
   })
   const pickSupplier = (id: string | null) => {
     form.setFieldValue('supplierId', id)
@@ -56,9 +51,8 @@ function DetailsForm({ ticket, details, suppliers }: DetailsFormProps) {
     if (name) form.setFieldValue('vendor', name)
   }
   const submit = form.onSubmit((v) => {
-    save.mutate({ ticketId: ticket.id, vendor: v.vendor, supplierId: v.supplierId, suggestedSolution: v.suggested.trimEnd(),
-      fixDetails: v.fix.trimEnd(), cost: typeof v.cost === 'number' ? v.cost : null },
-    { onSuccess: () => notifySuccess(T.saved), onError: () => notifyError(he.toast.failed) })
+    save.mutate({ ticketId: ticket.id, vendor: v.vendor, supplierId: v.supplierId, ...repairInput(v) },
+      { onSuccess: () => notifySuccess(T.saved), onError: () => notifyError(he.toast.failed) })
   }, focusFirstError)
   const supplierData = suppliers.map((s) => ({ value: s.id, label: s.category ? `${s.name} · ${s.category}` : s.name }))
   return (
@@ -69,9 +63,7 @@ function DetailsForm({ ticket, details, suppliers }: DetailsFormProps) {
             value={form.values.supplierId} onChange={pickSupplier} />
         )}
         <TextInput label={he.tickets.vendor} placeholder={he.tickets.vendorPlaceholder} maxLength={200} {...form.getInputProps('vendor')} />
-        <Textarea label={T.suggestedSolution} placeholder={T.suggestedPlaceholder} autosize minRows={2} maxRows={10} {...form.getInputProps('suggested')} />
-        <Textarea label={T.fixDetails} placeholder={T.fixPlaceholder} autosize minRows={3} maxRows={14} {...form.getInputProps('fix')} />
-        <MoneyInput label={T.cost} description={T.costHint} min={0} maw={240} {...form.getInputProps('cost')} />
+        <RepairFields inputProps={form.getInputProps} />
         <Group justify="space-between" align="center">
           <Text size="sm" c="dimmed">{details?.updated_at ? T.lastEdited(relativeDate(details.updated_at)) : ''}</Text>
           <Button type="submit" mih={44} loading={save.isPending}>{T.save}</Button>

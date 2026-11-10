@@ -23,6 +23,7 @@ const m = vi.hoisted(() => ({
   adminDetailsCalls: vi.fn(),
   linkedCalls: vi.fn(),
   save: vi.fn(),
+  update: vi.fn(),
   upload: vi.fn(),
   saveExpense: vi.fn(),
   success: vi.fn(),
@@ -35,7 +36,8 @@ vi.mock('../../lib/supabase', () => ({ supabase: {} }))
 vi.mock('./api', async (orig) => ({
   ...(await orig<typeof import('./api')>()),
   useTicket: () => ({ data: m.detail, isLoading: false, isError: false }),
-  useUpdateTicket: () => mutation(vi.fn()),
+  useUpdateTicket: () => mutation(m.update),
+  useCreateTicket: () => mutation(vi.fn()),
   useAddComment: () => mutation(vi.fn()),
   useDeleteTicket: () => mutation(vi.fn()),
 }))
@@ -202,6 +204,51 @@ describe('ניהול התקלה (admin)', () => {
   it('shows a status change as a timeline line', () => {
     show()
     expect(screen.getByTestId('ticket-event')).toHaveTextContent(T.event.status(he.ticketStatus.in_progress))
+  })
+})
+
+const openEdit = async () => {
+  fireEvent.click(screen.getByRole('button', { name: he.tickets.actions }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: he.tickets.edit }))
+  return screen.findByRole('dialog')
+}
+
+describe('עריכת התקלה dialog', () => {
+  it('admin: holds the repair fields and files, and one save writes the text, then the details', async () => {
+    m.update.mockImplementation((_v, o) => o?.onSuccess?.(undefined))
+    m.save.mockImplementation((_v, o) => o?.onSuccess?.(undefined))
+    m.details = { cost: 450.5, supplier_id: 's1', updated_at: '2026-10-02T10:00:00Z' }
+    show()
+    const dialog = await openEdit()
+    expect(within(dialog).getByLabelText(T.suggestedSolution)).toHaveValue('להחליף צינור')
+    expect(within(dialog).getByRole('button', { name: T.addFiles })).toBeInTheDocument()
+    fireEvent.change(within(dialog).getByLabelText(he.tickets.title, { exact: false }), { target: { value: ' נזילה גדולה ' } })
+    fireEvent.change(within(dialog).getByLabelText(T.fixDetails), { target: { value: 'הוחלף צינור ראשי' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: he.tickets.save }))
+    await waitFor(() => expect(m.save).toHaveBeenCalled())
+    expect(m.update).toHaveBeenCalledWith({ id: 't1', patch: { title: 'נזילה גדולה', description: '', location: 'לובי' } }, expect.anything())
+    expect(m.save).toHaveBeenCalledWith({ ticketId: 't1', vendor: 'אינסטלטור', supplierId: 's1', suggestedSolution: 'להחליף צינור',
+      fixDetails: 'הוחלף צינור ראשי', cost: 450.5 }, expect.anything())
+    expect(m.success).toHaveBeenCalledWith(he.tickets.updated)
+  })
+
+  it('admin: a screenshot pasted inside the dialog is attached', async () => {
+    show()
+    const dialog = await openEdit()
+    paste(within(dialog).getByLabelText(T.fixDetails), { files: [blob('image.png', 'image/png')] })
+    expect(m.upload).toHaveBeenCalledTimes(1)
+    expect(m.upload).toHaveBeenCalledWith({ ticketId: 't1', files: [{ file: expect.any(File), visible: true }] }, expect.anything())
+  })
+
+  it('the opener editing their own ticket sees only the three original fields', async () => {
+    m.isAdmin = false
+    m.detail = detail({ status: 'open', opened_by: 'me' })
+    show()
+    const dialog = await openEdit()
+    expect(within(dialog).getByLabelText(he.tickets.description)).toBeInTheDocument()
+    expect(within(dialog).queryByLabelText(T.fixDetails)).not.toBeInTheDocument()
+    expect(within(dialog).queryByLabelText(T.cost, { exact: false })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: T.addFiles })).not.toBeInTheDocument()
   })
 })
 
