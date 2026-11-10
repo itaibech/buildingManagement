@@ -49,20 +49,28 @@ function ReceiptField({ file, onChange }: { file: File | null; onChange: (f: Fil
   )
 }
 
-interface ExpenseValues { categoryId: string | null; spentOn: string; amount: number | string; vendor: string; note: string }
+export interface ExpenseValues { categoryId: string | null; spentOn: string; amount: number | string; vendor: string; note: string }
+
+export interface ExpenseFormProps {
+  onDone: () => void
+  /** Prefilled fields (a ticket's repair: amount, vendor, note, the supplier's category). */
+  initial?: Partial<ExpenseValues>
+  /** The ticket the expense is recorded for (expenses.ticket_id). */
+  ticketId?: string
+}
 
 /** "הוצאה חדשה": category, date (today), amount, vendor, note and an optional receipt (image, PDF or Word). */
-export function ExpenseForm({ onDone }: { onDone: () => void }) {
+export function ExpenseForm({ onDone, initial, ticketId }: ExpenseFormProps) {
   const save = useSaveExpense()
   const categories = useCategoryData()
   const [file, setFile] = useState<File | null>(null)
   const form = useForm<ExpenseValues>({
-    initialValues: { categoryId: null, spentOn: todayISO(), amount: '', vendor: '', note: '' },
+    initialValues: { categoryId: null, spentOn: todayISO(), amount: '', vendor: '', note: '', ...initial },
     validate: { categoryId: required, spentOn: required, amount: positive },
   })
   const submit = form.onSubmit((v) => {
     if (!v.categoryId || typeof v.amount !== 'number') return
-    const values = { category_id: v.categoryId, spent_on: v.spentOn, amount: v.amount, vendor: v.vendor.trim(), note: v.note.trim() }
+    const values = { category_id: v.categoryId, spent_on: v.spentOn, amount: v.amount, vendor: v.vendor.trim(), note: v.note.trim(), ...(ticketId ? { ticket_id: ticketId } : {}) }
     save.mutate({ values, file }, {
       onSuccess: ({ receiptFailed }) => { (receiptFailed ? notifyError : notifySuccess)(receiptFailed ? he.finance.receiptFailed : he.finance.expenseSaved); onDone() },
     })

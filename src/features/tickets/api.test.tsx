@@ -37,14 +37,14 @@ vi.mock('../../lib/supabase', () => ({
       },
     },
     storage: {
-      from: () => ({
+      from: (bucket: string) => ({
         upload: (_path: string, f: File) => Promise.resolve({ error: db.failUpload.has(f.name) ? { message: 'boom' } : null }),
         list: (prefix: string) => {
-          db.calls.push(`list:${prefix}`)
+          db.calls.push(`list:${bucket}:${prefix}`)
           return Promise.resolve({ data: db.listed, error: null })
         },
         remove: (paths: string[]) => {
-          db.calls.push(`remove:${paths.join(',')}`)
+          db.calls.push(`remove:${bucket}:${paths.join(',')}`)
           return Promise.resolve({ error: null })
         },
       }),
@@ -100,12 +100,16 @@ describe('useCreateTicket: committee email', () => {
 })
 
 describe('useDeleteTicket', () => {
-  it('deletes the row first, then every object listed under the ticket folder', async () => {
+  it('deletes the row first, then every object listed under the ticket folder, photos and files', async () => {
     db.listed = [{ name: 'a.jpg' }, { name: 'orphan.png' }]
     const { result } = renderHook(() => useDeleteTicket(), { wrapper })
     await act(async () => {
       await result.current.mutateAsync('t1')
     })
-    expect(db.calls).toEqual(['delete:tickets', 'list:t1', 'remove:t1/a.jpg,t1/orphan.png'])
+    expect(db.calls[0]).toBe('delete:tickets')
+    expect([...db.calls.slice(1)].sort()).toEqual([
+      'list:ticket-files:t1', 'list:ticket-photos:t1',
+      'remove:ticket-files:t1/a.jpg,t1/orphan.png', 'remove:ticket-photos:t1/a.jpg,t1/orphan.png',
+    ])
   })
 })

@@ -3,6 +3,7 @@ import type { Database } from '../../lib/db.types'
 import { fetchAll } from '../../lib/fetchAll'
 import { supabase } from '../../lib/supabase'
 import { notifyCommitteeOfTicket } from '../committee/api'
+import { FILE_BUCKET } from './files'
 import { PHOTO_BUCKET, photoMime, photoPath } from './photos'
 
 type Row = Database['public']['Tables']['tickets']['Row']
@@ -17,6 +18,8 @@ export interface TicketComment {
   created_at: string
   author_id: string | null
   authorName: string | null
+  /** An automatic timeline line (0039): 'status' (body = the new status) or 'details'. */
+  event: string | null
 }
 export interface TicketPhoto {
   id: string
@@ -74,7 +77,7 @@ async function signedUrls(paths: string[]): Promise<Map<string, string>> {
 async function fetchTicket(id: string): Promise<TicketDetail | null> {
   const { data, error } = await supabase
     .from('tickets')
-    .select('*, ticket_photos(id, path, created_at), ticket_comments(id, body, created_at, author_id)')
+    .select('*, ticket_photos(id, path, created_at), ticket_comments(id, body, created_at, author_id, event)')
     .eq('id', id)
     .maybeSingle()
   fail(error)
@@ -157,22 +160,22 @@ export function useAddComment() {
   })
 }
 
-/** Every object under the ticket's folder, including any that never got a photo row. */
-async function folderPaths(ticketId: string): Promise<string[]> {
-  const { data, error } = await supabase.storage.from(PHOTO_BUCKET).list(ticketId)
+/** Removes every object under the ticket's folder in `bucket`, including any that never got a row. */
+async function removeFolder(bucket: string, ticketId: string): Promise<void> {
+  const { data, error } = await supabase.storage.from(bucket).list(ticketId)
   fail(error)
-  return (data ?? []).map((o) => `${ticketId}/${o.name}`)
+  const paths = (data ?? []).map((o) => `${ticketId}/${o.name}`)
+  if (paths.length > 0) fail((await supabase.storage.from(bucket).remove(paths)).error)
 }
 
-/** Admin: deletes the ticket (comments and photo rows cascade), then its storage folder. */
+/** Admin: deletes the ticket (comments, photo and file rows cascade), then its photos and files. */
 export function useDeleteTicket() {
   const client = useQueryClient()
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from('tickets').delete().eq('id', id)
       fail(error)
-      const paths = await folderPaths(id)
-      if (paths.length > 0) fail((await supabase.storage.from(PHOTO_BUCKET).remove(paths)).error)
+      await Promise.all([removeFolder(PHOTO_BUCKET, id), removeFolder(FILE_BUCKET, id)])
     },
     onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
   })

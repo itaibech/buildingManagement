@@ -14,6 +14,7 @@ import { useDeleteTicket, useTicket, type TicketDetail } from './api'
 import { TicketComments } from './TicketComments'
 import { TicketForm } from './TicketForm'
 import { TicketPhotos } from './TicketPhotos'
+import { TreatmentCard } from './TreatmentCard'
 
 type Dialog = 'edit' | 'delete' | 'email' | null
 const ICON = { size: 18, stroke: 1.75 } as const
@@ -103,7 +104,7 @@ export default function TicketPage() {
     <Stack gap="md">
       <BackLink to="/tickets" label={he.tickets.back} />
       <Summary ticket={ticket} menu={menu} />
-      {isAdmin && <AdminControls key={`${ticket.id}-${ticket.vendor ?? ''}`} ticket={ticket} />}
+      {isAdmin ? <AdminControls key={ticket.id} ticket={ticket} /> : <TreatmentCard ticket={ticket} />}
       <TicketComments ticketId={ticket.id} comments={ticket.comments} />
       <Dialogs ticket={ticket} dialog={dialog} close={() => setDialog(null)} />
     </Stack>

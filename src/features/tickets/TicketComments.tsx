@@ -4,9 +4,25 @@ import { useState } from 'react'
 import { formatDate } from '../../lib/format'
 import { he } from '../../lib/he'
 import { notifyError } from '../../ui'
-import { useAddComment, type TicketComment } from './api'
+import { TICKET_STATUSES, useAddComment, type TicketComment } from './api'
+
+const eventText = (c: TicketComment): string => {
+  const status = TICKET_STATUSES.find((s) => s === c.body)
+  return c.event === 'status' && status ? he.ticketDetails.event.status(he.ticketStatus[status]) : he.ticketDetails.event.details
+}
+
+/** An automatic line: "<name> · <what changed>" with the date, quieter than a comment. */
+function EventItem({ c }: { c: TicketComment }) {
+  return (
+    <Group py="xs" gap="xs" justify="space-between" wrap="nowrap" data-testid="ticket-event">
+      <Text size="sm" c="dimmed">{`${c.authorName ?? he.tickets.someone} · ${eventText(c)}`}</Text>
+      <Text size="sm" c="dimmed" className="bm-num">{formatDate(c.created_at)}</Text>
+    </Group>
+  )
+}
 
 function CommentItem({ c }: { c: TicketComment }) {
+  if (c.event) return <EventItem c={c} />
   return (
     <Box py="xs">
       <Group gap="xs" justify="space-between" wrap="nowrap">
