@@ -26,12 +26,12 @@ export const validEmail = (v: string | null | undefined): string | null => {
   return EMAIL.test(e) ? e : null
 }
 
-/** One email per address: the given admins with a valid email, except the caller (never emailed about their own act). */
-function adminTargets(admins: readonly Admin[], callerId: string): { email: string; name: string }[] {
+/** One email per address: the given admins with a valid email, except `skipId` (null = everyone, e.g. a copy to the reporter). */
+function adminTargets(admins: readonly Admin[], skipId: string | null): { email: string; name: string }[] {
   const seen = new Map<string, { email: string; name: string }>()
   for (const a of admins) {
     const email = validEmail(a.email)
-    if (!email || a.userId === callerId || seen.has(email)) continue
+    if (!email || a.userId === skipId || seen.has(email)) continue
     seen.set(email, { email, name: a.name.trim() })
   }
   return [...seen.values()]
@@ -54,7 +54,8 @@ export async function planTicketNew({ req, caller, ctx, data, brand, now }: Scop
   if (sent >= MAX_TICKET_NEW_PER_DAY) return fail(429, `אפשר לעדכן את הוועד במייל על עד ${MAX_TICKET_NEW_PER_DAY} תקלות ביממה`)
   const [admins, apartment] = await Promise.all([data.admins(ctx.building.id), data.apartmentNumber(caller.userId)])
   const reporter: Sender = { name: ctx.name, apartment, resident: !caller.isAdmin }
-  const messages = adminTargets(admins, caller.userId)
+  // A committee member who opens a ticket gets the same email too, as their copy.
+  const messages = adminTargets(admins, null)
     .map((r) => ({ to: r.email, ...render(brand, ticketNewContent(t, reporter, r.name, brand.appUrl)) }))
   return plan(messages)
 }

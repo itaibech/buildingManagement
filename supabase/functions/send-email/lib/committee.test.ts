@@ -96,10 +96,10 @@ describe('ticket_new: authorization', () => {
     const pending = setup({ caller: { userId: RES, isAdmin: false, permissions: [] } })
     expect((await handle({ kind: 'ticket_new', id: T1 }, pending.deps)).status).toBe(403)
   })
-  it('an admin reporter is not emailed about their own ticket', async () => {
+  it('an admin reporter also gets the email, as their copy', async () => {
     const s = setup({ ticket: ticket({ openedBy: ADMIN_A }), caller: { userId: ADMIN_A, isAdmin: true, permissions: ['home'] } })
     await handle({ kind: 'ticket_new', id: T1 }, s.deps)
-    expect(s.sent.map((m) => m.to)).toEqual(['batya@example.test'])
+    expect(s.sent.map((m) => m.to).sort()).toEqual(['avi@example.test', 'batya@example.test'])
     expect(s.sent[0].text).not.toContain('(דייר/ת)')
   })
   it(`at most ${MAX_TICKET_NEW_PER_DAY} ticket_new per user in 24 hours → 429`, async () => {
