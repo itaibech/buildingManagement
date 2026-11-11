@@ -29,6 +29,8 @@ const db = vi.hoisted(() => ({
   fail: new Set<string>(),
   /** Storage answers a remove with an error (e.g. RLS). */
   removeError: false,
+  /** Paths Storage leaves out of a remove's answer (not removed). */
+  removeKeeps: [] as string[],
 }))
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 
@@ -41,7 +43,8 @@ function builder(table: string) {
   const ops: string[] = []
   let inserted: Record<string, unknown> = {}
   const chain: Record<string, unknown> = {}
-  for (const op of ['select', 'eq', 'lt', 'gte', 'order', 'in', 'limit', 'range']) chain[op] = () => { ops.push(op); return chain }
+  for (const op of ['select', 'eq', 'lt', 'gte', 'order', 'limit', 'range']) chain[op] = () => { ops.push(op); return chain }
+  chain.in = (_col: string, values: unknown[]) => { ops.push('in'); if (ops.includes('delete')) db.log.push(`in:${values.join(',')}`); return chain }
   chain.insert = (values: Record<string, unknown>) => {
     ops.push('insert')
     inserted = values
@@ -66,7 +69,11 @@ function builder(table: string) {
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: (table: string) => builder(table),
-    rpc: (fn: string, args: unknown) => { db.log.push(`rpc:${fn}:${JSON.stringify(args)}`); return Promise.resolve({ data: null, error: null }) },
+    rpc: (fn: string, args: unknown) => {
+      if (fn === 'default_building_id') return Promise.resolve({ data: 'b1', error: null })
+      db.log.push(`rpc:${fn}:${JSON.stringify(args)}`)
+      return Promise.resolve({ data: null, error: null })
+    },
     storage: {
       from: (bucket: string) => ({
         upload: (path: string) => { db.log.push(`upload:${path}`); return Promise.resolve({ error: db.uploadError }) },
@@ -76,7 +83,9 @@ vi.mock('../../lib/supabase', () => ({
         },
         remove: (paths: string[]) => {
           db.log.push(`remove:${paths.join(',')}`)
-          return Promise.resolve(db.removeError ? { data: null, error: { message: 'refused' } } : { data: paths.map((name) => ({ name })), error: null })
+          const kept = new Set(db.removeKeeps)
+          return Promise.resolve(db.removeError ? { data: null, error: { message: 'refused' } }
+            : { data: paths.filter((name) => !kept.has(name)).map((name) => ({ name })), error: null })
         },
         createSignedUrl: () => Promise.resolve({ data: { signedUrl: 'https://signed.example.test/r' }, error: null }),
         createSignedUrls: () => Promise.resolve({ data: [], error: null }),
@@ -132,6 +141,7 @@ beforeEach(() => {
   db.admin = true
   db.fail = new Set()
   db.removeError = false
+  db.removeKeeps = []
   toast.success.mockReset()
   toast.error.mockReset()
 })
@@ -228,7 +238,7 @@ describe('ReceiptControl (0040: several receipts per expense)', () => {
   })
 
   it('remove asks for confirmation, deletes the row, then removes the queued object', async () => {
-    db.tables.receipt_trash = [{ path: 'e1/a.pdf' }]
+    db.tables.receipt_trash_pending = [{ path: 'e1/a.pdf' }]
     wrap(<ReceiptControl expense={expense({ receipts: [receipt('e1/a.pdf', 'א.pdf'), receipt('e1/b.pdf', 'ב.pdf')] })} />)
     const sheet = await openSheet(R.open(2))
     fireEvent.click(within(sheet).getByRole('button', { name: R.removeOne('א.pdf') }))
@@ -236,11 +246,33 @@ describe('ReceiptControl (0040: several receipts per expense)', () => {
     expect(db.log).toEqual([])
     fireEvent.click(within(dialog).getByRole('button', { name: R.remove }))
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith(R.removed))
-    expect(db.log).toEqual(['delete:expense_receipts', 'remove:e1/a.pdf', 'delete:receipt_trash'])
+    expect(db.log).toEqual(['delete:expense_receipts', 'remove:e1/a.pdf', 'delete:receipt_trash', 'in:e1/a.pdf'])
+  })
+
+  it('the sweep clears only the paths Storage reports as removed; the rest stay queued', async () => {
+    db.tables.receipt_trash_pending = [{ path: 'e1/a.pdf' }, { path: 'e1/b.pdf' }]
+    db.removeKeeps = ['e1/b.pdf']
+    wrap(<ReceiptControl expense={expense({ receipts: [receipt('e1/c.pdf', 'ג.pdf')] })} />)
+    const sheet = await openSheet(R.open(1))
+    fireEvent.click(within(sheet).getByRole('button', { name: R.removeOne('ג.pdf') }))
+    fireEvent.click(within(await screen.findByRole('dialog', { name: R.removeConfirm })).getByRole('button', { name: R.remove }))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith(R.removed))
+    expect(db.log).toContain('remove:e1/a.pdf,e1/b.pdf')
+    expect(db.log).toContain('in:e1/a.pdf')
+  })
+
+  it('a refused row whose path a receipt row turns out to use: the upload is kept, never removed', async () => {
+    db.fail.add('expense_receipts.insert')
+    db.tables.expense_receipts = [{ id: 'r1' }]
+    wrap(<ReceiptControl expense={expense()} />)
+    const sheet = await openSheet(R.add)
+    pick(fileInput(sheet), pdf)
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(R.failed(['חשבונית.pdf'])))
+    expect(db.log.some((l) => l.startsWith('remove') || l.startsWith('rpc:queue_receipt'))).toBe(false)
   })
 
   it('a file storage refuses to remove counts as staying behind', async () => {
-    db.tables.receipt_trash = [{ path: 'e1/a.pdf' }]
+    db.tables.receipt_trash_pending = [{ path: 'e1/a.pdf' }]
     db.removeError = true
     wrap(<ReceiptControl expense={expense({ receipts: [receipt('e1/a.pdf', 'א.pdf')] })} />)
     const sheet = await openSheet(R.open(1))
@@ -351,7 +383,7 @@ describe('a new category from the expense dialog', () => {
     await typeCategory('  גינון  ')
     fireEvent.click(await screen.findByRole('option', { name: he.finance.newCategory('גינון'), hidden: true }))
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith(he.finance.categoryCreated('גינון')))
-    expect(db.log).toContain('insert:expense_categories:{"name":"גינון","sort_order":5}')
+    expect(db.log).toContain('insert:expense_categories:{"building_id":"b1","name":"גינון","sort_order":5}')
     await waitFor(() => expect(categoryInput()).toHaveValue('גינון'))
   })
 

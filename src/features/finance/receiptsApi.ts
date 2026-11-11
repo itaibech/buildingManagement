@@ -15,8 +15,13 @@ export interface TicketFileRef { path: string; file_name: string; size_bytes: nu
 export const sortReceipts = (rows: readonly ExpenseReceipt[]): ExpenseReceipt[] =>
   [...rows].sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id))
 
-/** Removes an upload whose row was refused; when that fails too, queues it so the next sweep removes it. */
+/**
+ * Removes an upload whose row was refused; when that fails too, queues it so the next sweep removes it. Never an
+ * object a receipt row uses (e.g. the insert went through but its answer was lost): when in doubt, keep it.
+ */
 async function dropUnlinked(path: string): Promise<void> {
+  const used = await supabase.from('expense_receipts').select('id').eq('path', path).limit(1)
+  if (used.error || (used.data?.length ?? 0) > 0) return
   const { data, error } = await supabase.storage.from(RECEIPT_BUCKET).remove([path])
   if (error || (data?.length ?? 0) === 0) await supabase.rpc('queue_receipt', { p_path: path })
 }
@@ -61,16 +66,21 @@ export async function copyTicketFiles(expenseId: string, files: readonly TicketF
 
 /**
  * Removes the receipt objects 0040 queued (removed receipts, deleted expenses, a re-import, an undone special charge)
- * and clears them from the queue. True when some stayed behind (they stay queued). Non-admins see an empty queue.
+ * and clears them from the queue. True when the removal failed (they stay queued). Non-admins see an empty queue.
  */
 export async function sweepReceipts(): Promise<boolean> {
   try {
-    const { data, error } = await supabase.from('receipt_trash').select('path').limit(100)
+    // The view leaves out queued paths a receipt row still uses (0040): those objects are never removed.
+    // Newest first: a path whose object was already gone elsewhere stays queued without blocking new ones.
+    const { data, error } = await supabase.from('receipt_trash_pending').select('path').order('queued_at', { ascending: false }).limit(100)
     if (error) return true
-    const queued = (data ?? []).map((r) => r.path)
+    const queued = (data ?? []).flatMap((r) => (r.path ? [r.path] : []))
     if (queued.length === 0) return false
-    if ((await supabase.storage.from(RECEIPT_BUCKET).remove(queued)).error) return true
-    return !!(await supabase.from('receipt_trash').delete().in('path', queued)).error
+    const removed = await supabase.storage.from(RECEIPT_BUCKET).remove(queued)
+    if (removed.error) return true
+    // Only what Storage reports as removed leaves the queue; the rest stays for the next sweep.
+    const gone = (removed.data ?? []).map((o) => o.name).filter((name) => queued.includes(name))
+    return gone.length > 0 && !!(await supabase.from('receipt_trash').delete().in('path', gone)).error
   } catch {
     return true
   }

@@ -294,7 +294,7 @@ describe('ImportPage', () => {
     })
 
     it('removes the deleted rows\' queued receipt files after a successful import', async () => {
-      db.tables.receipt_trash = [{ path: 'e1/a.pdf' }, { path: 'e2/b.jpg' }]
+      db.tables.receipt_trash_pending = [{ path: 'e1/a.pdf' }, { path: 'e2/b.jpg' }]
       await toPreview()
       fireEvent.click(screen.getByRole('button', { name: he.import.confirm }))
       expect(await screen.findByText(he.import.doneTitle)).toBeInTheDocument()
@@ -334,7 +334,7 @@ describe('ImportPage', () => {
     })
 
     it('tells the admin when the files stayed behind; no storage call when there are none', async () => {
-      db.tables.receipt_trash = [{ path: 'e1/a.pdf' }]
+      db.tables.receipt_trash_pending = [{ path: 'e1/a.pdf' }]
       db.removeNothing = true
       await toPreview()
       fireEvent.click(screen.getByRole('button', { name: he.import.confirm }))

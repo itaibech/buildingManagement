@@ -4,7 +4,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(38);
+select plan(55);
 
 -- ---------------------------------------------------------------- fixtures (as postgres)
 insert into auth.users (id, email, aud, role) values
@@ -142,6 +142,55 @@ set local request.jwt.claims = '{"sub":"a4000000-0000-0000-0000-000000000001","r
 select lives_ok($$select public.import_year((select j from empty_import))$$, 're-import: runs');
 select is((select count(*) from public.receipt_trash where path like 'e4000000-0000-0000-0000-000000000004/%'), 2::bigint,
   're-import: the deleted expense''s receipt objects are queued');
+
+-- ---------------------------------------------------------------- a referenced object is never swept
+-- (still the admin, from the re-import above)
+select lives_ok($$select public.queue_receipt(pg_temp.rp(7, 3))$$, 'queue_receipt: queues an unused path');
+select lives_ok($$insert into public.expense_receipts (expense_id, path, file_name, mime, size_bytes)
+  values ('e4000000-0000-0000-0000-000000000003', pg_temp.rp(7, 3), 'q.pdf', 'application/pdf', 1)$$,
+  'a row is recorded for the queued path');
+select is((select count(*) from public.receipt_trash where path = pg_temp.rp(7, 3)), 0::bigint,
+  'recording a queued path takes it off the queue');
+select lives_ok($$select public.queue_receipt(pg_temp.rp(7, 3))$$, 'queue_receipt: a used path ...');
+select is((select count(*) from public.receipt_trash where path = pg_temp.rp(7, 3)), 0::bigint, '... is not queued');
+reset role;
+insert into public.receipt_trash (path) values (pg_temp.rp(7, 3)), (pg_temp.rp(8, 3));
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"a4000000-0000-0000-0000-000000000001","role":"authenticated"}';
+select is((select array_agg(path) from public.receipt_trash_pending where path like 'e4000000-0000-0000-0000-000000000003/%'),
+  array[pg_temp.rp(8, 3)], 'the sweep''s view leaves out a queued path a receipt row uses');
+set local request.jwt.claims = '{"sub":"a4000000-0000-0000-0000-000000000002","role":"authenticated"}';
+select is((select count(*) from public.receipt_trash_pending), 0::bigint, 'resident: the view shows nothing');
+set local role anon;
+set local request.jwt.claims = '{"role":"anon"}';
+select throws_ok($$select count(*) from public.receipt_trash_pending$$, '42501', null, 'anon: no view');
+
+-- ---------------------------------------------------------------- rollout: an old app tab writing receipt_path
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"a4000000-0000-0000-0000-000000000001","role":"authenticated"}';
+update public.expenses set receipt_path = pg_temp.rp(9, 3), receipt_name = 'ישן.pdf'
+  where id = 'e4000000-0000-0000-0000-000000000003';
+select is((select row(file_name, mime)::text from public.expense_receipts where path = pg_temp.rp(9, 3)),
+  '(ישן.pdf,application/pdf)', 'old tab sets receipt_path: mirrored as a receipt');
+select is((select count(*) from public.expense_receipts
+  where path = 'e4000000-0000-0000-0000-000000000003/0c000000-0000-4000-8000-000000000002.png'), 0::bigint,
+  'old tab replaces it: the previous path''s row is removed ...');
+select is((select count(*) from public.receipt_trash
+  where path = 'e4000000-0000-0000-0000-000000000003/0c000000-0000-4000-8000-000000000002.png'), 1::bigint,
+  '... and its object queued');
+update public.expenses set receipt_path = null, receipt_name = null where id = 'e4000000-0000-0000-0000-000000000003';
+select is((select count(*) from public.expense_receipts where path = pg_temp.rp(9, 3)), 0::bigint,
+  'old tab clears receipt_path: the matching row is removed');
+select is((select count(*) from public.expense_receipts where path = pg_temp.rp(7, 3)), 1::bigint,
+  'the expense''s other receipts stay');
+
+-- ---------------------------------------------------------------- category names
+select throws_ok($$insert into public.expense_categories (name) values (repeat('א', 61))$$, '23514', null,
+  'category: over 60 characters is refused');
+select throws_ok($$insert into public.expense_categories (name) values ('   ')$$, '23514', null, 'category: a blank name is refused');
+select throws_ok($$insert into public.expense_categories (name) values (' קבלות ER ')$$, '23505', null,
+  'category: the same name in another case, with spaces, is a duplicate');
+select lives_ok($$insert into public.expense_categories (name) values ('קבלות er 2')$$, 'category: a new name is added');
 
 select * from finish();
 rollback;

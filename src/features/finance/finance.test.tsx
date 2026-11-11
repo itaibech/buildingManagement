@@ -269,7 +269,7 @@ describe('receipt cleanup', () => {
   )
 
   it('deleting an expense removes its queued receipt files; tells the admin when they stay (the row is already gone)', async () => {
-    db.tables.receipt_trash = [{ path: 'e1/r.pdf' }, { path: 'e1/s.pdf' }]
+    db.tables.receipt_trash_pending = [{ path: 'e1/r.pdf' }, { path: 'e1/s.pdf' }]
     db.removeError = { message: 'storage down' }
     const { result } = renderHook(() => useDeleteExpense(), { wrapper: hookWrap })
     await act(() => result.current.mutateAsync({ id: 'e1' }))
@@ -291,7 +291,7 @@ describe('receipt cleanup', () => {
 
   it('undoing a special charge removes its expense\'s queued receipt files', async () => {
     db.rpc.undo_special_charge = { charges: 1, payments: 0, expenses: 1, receipts: ['e1/r.pdf'] }
-    db.tables.receipt_trash = [{ path: 'e1/r.pdf' }]
+    db.tables.receipt_trash_pending = [{ path: 'e1/r.pdf' }]
     const { result } = renderHook(() => useUndoSpecialCharge(), { wrapper: hookWrap })
     await act(() => result.current.mutateAsync('sp1'))
     expect(db.removed[0]).toEqual(['e1/r.pdf'])
@@ -300,13 +300,13 @@ describe('receipt cleanup', () => {
   })
 
   it('a receipt that stays behind after a special undo is reported; an empty queue, no storage call', async () => {
-    db.tables.receipt_trash = [{ path: 'e1/r.pdf' }]
+    db.tables.receipt_trash_pending = [{ path: 'e1/r.pdf' }]
     db.removeError = { message: 'nope' }
     const { result } = renderHook(() => useUndoSpecialCharge(), { wrapper: hookWrap })
     await act(() => result.current.mutateAsync('sp1'))
     expect(toast.error).toHaveBeenCalledWith(he.finance.receiptRemoveFailed)
     db.removed = []
-    db.tables.receipt_trash = []
+    db.tables.receipt_trash_pending = []
     db.tables.payment_proof_trash = []
     await act(() => result.current.mutateAsync('sp2'))
     expect(db.removed).toEqual([])

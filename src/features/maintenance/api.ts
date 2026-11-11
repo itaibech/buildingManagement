@@ -130,10 +130,13 @@ export function useCreateExpenseCategory() {
   const client = useQueryClient()
   return useMutation({
     mutationFn: async (name: string): Promise<ExpenseCategory> => {
-      const last = await supabase.from('expense_categories').select('sort_order').order('sort_order', { ascending: false }).limit(1)
+      const building = await supabase.rpc('default_building_id')
+      if (building.error || !building.data) throw new Error(building.error?.message ?? 'No building')
+      const last = await supabase.from('expense_categories').select('sort_order').eq('building_id', building.data)
+        .order('sort_order', { ascending: false }).limit(1)
       if (last.error) throw new Error(last.error.message)
-      const sort_order = (last.data[0]?.sort_order ?? 0) + 1
-      const { data, error } = await supabase.from('expense_categories').insert({ name, sort_order }).select('id, name').single()
+      const row = { building_id: building.data, name, sort_order: (last.data[0]?.sort_order ?? 0) + 1 }
+      const { data, error } = await supabase.from('expense_categories').insert(row).select('id, name').single()
       if (error?.code === '23505') throw new DuplicateCategoryError(error.message)
       if (error) throw new Error(error.message)
       return data

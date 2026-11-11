@@ -1926,6 +1926,20 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"receipt_trash_pending": {
+                  Row: {
+                    "path": string | null,"queued_at": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                           "path"?: string | null,"queued_at"?: string | null
+                         }
+                        Update: {
+                           "path"?: string | null,"queued_at"?: string | null
+                         }
+                        Relationships: [
+                    
+                  ]
                 }
           }
           Functions: {
@@ -2415,6 +2429,12 @@ isOneToOne: false
                            },
 "quick_start_meeting":
 { Args: { "p_chair": string,"p_meeting": string,"p_override_quorum"?: boolean,"p_secretary": string }; Returns: undefined
+                           },
+"receipt_mime_of":
+{ Args: { "p_path": string }; Returns: string
+                           },
+"receipt_name_of":
+{ Args: { "p_name": string,"p_path": string }; Returns: string
                            },
 "record_ev_reading":
 { Args: { "p_charger_id": string,"p_month": string,"p_note"?: string,"p_read_on"?: string,"p_reading": number }; Returns: Json
