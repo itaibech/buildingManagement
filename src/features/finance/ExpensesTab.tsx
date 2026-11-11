@@ -36,7 +36,7 @@ function ReceiptCount({ items }: { items: Expense[] }) {
   return (
     <Group gap={4} wrap="nowrap" c="dimmed">
       <IconPaperclip size={14} stroke={1.75} aria-hidden="true" />
-      <Text size="xs" c="dimmed">{he.finance.receipts.count(items.filter((e) => e.receipt_path).length, items.length)}</Text>
+      <Text size="xs" c="dimmed">{he.finance.receipts.count(items.filter((e) => e.receipts.length > 0).length, items.length)}</Text>
     </Group>
   )
 }

@@ -14,7 +14,7 @@ import { ApplyTemplates } from './ExpenseForms'
 import FinancePage from './FinancePage'
 import { PaymentForm } from './PaymentForm'
 import { paymentMeta } from './ledger'
-import { receiptsOf, useDeleteExpense, useSaveExpense, useUndoSpecialCharge, type Template } from './api'
+import { useDeleteExpense, useSaveExpense, useUndoSpecialCharge, type Template } from './api'
 
 interface Call { table: string; op: string; args: unknown[] }
 const db = vi.hoisted(() => ({
@@ -268,44 +268,48 @@ describe('receipt cleanup', () => {
     <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>
   )
 
-  it('tells the admin when the receipt file could not be removed (the row is already gone)', async () => {
+  it('deleting an expense removes its queued receipt files; tells the admin when they stay (the row is already gone)', async () => {
+    db.tables.receipt_trash = [{ path: 'e1/r.pdf' }, { path: 'e1/s.pdf' }]
     db.removeError = { message: 'storage down' }
     const { result } = renderHook(() => useDeleteExpense(), { wrapper: hookWrap })
-    await act(() => result.current.mutateAsync({ id: 'e1', receipt_path: 'e1/r.pdf' }))
+    await act(() => result.current.mutateAsync({ id: 'e1' }))
     expect(db.calls.some((c) => c.table === 'expenses' && c.op === 'delete')).toBe(true)
+    expect(db.removed).toEqual([['e1/r.pdf', 'e1/s.pdf']])
     expect(toast.error).toHaveBeenCalledWith(he.finance.receiptRemoveFailed)
   })
 
-  it('removes the uploaded receipt when linking it to the expense fails', async () => {
-    db.fail.add('expenses.update')
+  it('removes the uploaded receipt when its row is refused, and reports the file by name', async () => {
+    db.fail.add('expense_receipts.insert')
     const file = new File(['%PDF'], 'r.pdf', { type: 'application/pdf' })
     const { result } = renderHook(() => useSaveExpense(), { wrapper: hookWrap })
     const values = { category_id: 'c1', spent_on: '2026-10-01', amount: 5, vendor: '', note: '' }
-    const out = await act(() => result.current.mutateAsync({ values, file }))
-    expect(out.receiptFailed).toBe(true)
+    const out = await act(() => result.current.mutateAsync({ values, files: [file] }))
+    expect(out.failed).toEqual(['r.pdf'])
     expect(db.removed).toHaveLength(1)
     expect(db.removed[0]?.[0]).toMatch(/^new\/[0-9a-f-]+\.pdf$/)
   })
 
-  it('undoing a special charge removes its expense\'s receipt file', async () => {
+  it('undoing a special charge removes its expense\'s queued receipt files', async () => {
     db.rpc.undo_special_charge = { charges: 1, payments: 0, expenses: 1, receipts: ['e1/r.pdf'] }
+    db.tables.receipt_trash = [{ path: 'e1/r.pdf' }]
     const { result } = renderHook(() => useUndoSpecialCharge(), { wrapper: hookWrap })
     await act(() => result.current.mutateAsync('sp1'))
-    expect(db.removed).toEqual([['e1/r.pdf']])
+    expect(db.removed[0]).toEqual(['e1/r.pdf'])
+    expect(db.calls.some((c) => c.table === 'receipt_trash' && c.op === 'delete')).toBe(true)
     expect(toast.error).not.toHaveBeenCalled()
   })
 
-  it('a receipt that stays behind after a special undo is reported; no receipt, no storage call', async () => {
-    db.rpc.undo_special_charge = { receipts: ['e1/r.pdf'] }
+  it('a receipt that stays behind after a special undo is reported; an empty queue, no storage call', async () => {
+    db.tables.receipt_trash = [{ path: 'e1/r.pdf' }]
     db.removeError = { message: 'nope' }
     const { result } = renderHook(() => useUndoSpecialCharge(), { wrapper: hookWrap })
     await act(() => result.current.mutateAsync('sp1'))
     expect(toast.error).toHaveBeenCalledWith(he.finance.receiptRemoveFailed)
     db.removed = []
-    db.rpc.undo_special_charge = { receipts: [] }
+    db.tables.receipt_trash = []
+    db.tables.payment_proof_trash = []
     await act(() => result.current.mutateAsync('sp2'))
     expect(db.removed).toEqual([])
-    expect(receiptsOf({ receipts: ['a', 3, null] })).toEqual(['a'])
   })
 })
 

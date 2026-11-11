@@ -121,6 +121,28 @@ export function useExpenseCategories() {
   })
 }
 
+export const MAX_CATEGORY_NAME = 60
+/** Thrown when the building already has a category by that name (unique (building_id, name)). */
+export class DuplicateCategoryError extends Error {}
+
+/** Admin: adds a category at the end of the building's order; the new row is in the cache before the refetch. */
+export function useCreateExpenseCategory() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (name: string): Promise<ExpenseCategory> => {
+      const last = await supabase.from('expense_categories').select('sort_order').order('sort_order', { ascending: false }).limit(1)
+      if (last.error) throw new Error(last.error.message)
+      const sort_order = (last.data[0]?.sort_order ?? 0) + 1
+      const { data, error } = await supabase.from('expense_categories').insert({ name, sort_order }).select('id, name').single()
+      if (error?.code === '23505') throw new DuplicateCategoryError(error.message)
+      if (error) throw new Error(error.message)
+      return data
+    },
+    onSuccess: (row) => client.setQueryData<ExpenseCategory[]>(['expense_categories'], (old) => [...(old ?? []), row]),
+    onSettled: () => client.invalidateQueries({ queryKey: ['expense_categories'] }),
+  })
+}
+
 export function useSaveTask() {
   const client = useQueryClient()
   return useMutation({

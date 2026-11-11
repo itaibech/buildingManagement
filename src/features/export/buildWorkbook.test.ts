@@ -22,9 +22,9 @@ const data: YearData = {
   ],
   categories: [{ id: 'c1', name: 'ניקיון' }, { id: 'c2', name: 'חשמל' }],
   expenses: [
-    { id: 'e1', category_id: 'c1', category: 'ניקיון', spent_on: '2026-02-10', amount: 300, vendor: '', note: '', receipt_path: null, source: 'manual', template_id: null },
-    { id: 'e2', category_id: 'c1', category: 'ניקיון', spent_on: '2026-02-20', amount: 50.25, vendor: '', note: '', receipt_path: null, source: 'manual', template_id: null },
-    { id: 'e3', category_id: 'c2', category: 'חשמל', spent_on: '2025-12-01', amount: 999, vendor: '', note: '', receipt_path: null, source: 'manual', template_id: null },
+    { id: 'e1', category_id: 'c1', category: 'ניקיון', spent_on: '2026-02-10', amount: 300, vendor: '', note: '', receipts: [], source: 'manual', template_id: null },
+    { id: 'e2', category_id: 'c1', category: 'ניקיון', spent_on: '2026-02-20', amount: 50.25, vendor: '', note: '', receipts: [], source: 'manual', template_id: null },
+    { id: 'e3', category_id: 'c2', category: 'חשמל', spent_on: '2025-12-01', amount: 999, vendor: '', note: '', receipts: [], source: 'manual', template_id: null },
   ],
   budgets: [{ id: 'b1', year: 2026, category_id: 'c1', category: 'ניקיון', amount: 4000 }],
 }
@@ -72,7 +72,7 @@ describe('special charges in exports', () => {
     expect(payments[0]?.at(-1)).toBe(he.finance.proof.exportColumn)
     expect(payments.slice(1).map((r) => r.at(-1))).toEqual([he.finance.proof.no, he.finance.proof.yes])
     const expenses = expensesRows([{ id: 'e1', category_id: 'c', category: 'שונות', spent_on: '2026-09-01', amount: 2006, vendor: '', note: 'תיקון נזק',
-      receipt_path: null, source: 'manual', template_id: null, special_id: 'sp1' }])
+      receipts: [], source: 'manual', template_id: null, special_id: 'sp1' }])
     expect(expenses[1]?.[3]).toBe('תיקון נזק')
     expect(expenses[1]?.[5]).toBe(he.finance.expenseExport.sources.special)
   })
@@ -130,11 +130,13 @@ describe('buildYearWorkbook', () => {
 
 describe('expense export (Task 22)', () => {
   const X = he.finance.expenseExport
-  const base = { category_id: 'c1', category: 'ניקיון', vendor: '', note: '', receipt_path: null, receipt_name: null, source: 'manual', template_id: null, special_id: null }
+  const base = { category_id: 'c1', category: 'ניקיון', vendor: '', note: '', receipts: [], source: 'manual', template_id: null, special_id: null }
+  const receipt = (path: string, file_name: string) => ({ id: path, path, file_name, mime: 'application/pdf', size_bytes: 1, created_at: '2026-10-01T00:00:00Z' })
   const rows = expensesRows([
-    { ...base, id: 'e2', spent_on: '2026-10-20', amount: 120.5, vendor: 'חברת ניקיון', note: 'חודשי', receipt_path: 'e2/u.pdf', receipt_name: 'חשבונית.pdf' },
+    { ...base, id: 'e2', spent_on: '2026-10-20', amount: 120.5, vendor: 'חברת ניקיון', note: 'חודשי',
+      receipts: [receipt('e2/u.pdf', 'חשבונית.pdf'), receipt('e2/v.pdf', 'תעודת משלוח.pdf')] },
     { ...base, id: 'e1', spent_on: '2026-10-03', amount: 80, source: 'import' },
-    { ...base, id: 'e3', spent_on: '2026-10-11', amount: 40, source: 'maintenance', receipt_path: 'e3/u2.jpg' },
+    { ...base, id: 'e3', spent_on: '2026-10-11', amount: 40, source: 'maintenance', receipts: [receipt('e3/u2.jpg', 'u2.jpg')] },
   ])
 
   it('has the agreed columns, oldest first, amounts as numbers', () => {
@@ -147,7 +149,8 @@ describe('expense export (Task 22)', () => {
   it('says where each expense came from and whether it has a receipt (name, never a link)', () => {
     expect(rows.slice(1).map((r) => r[5])).toEqual([X.sources.import, X.sources.maintenance, X.sources.manual])
     expect(rows.slice(1).map((r) => r[6])).toEqual([X.no, X.yes, X.yes])
-    expect(rows.slice(1).map((r) => r[7])).toEqual(['', 'u2.jpg', 'חשבונית.pdf'])
+    // Every receipt's name (0040: several per expense).
+    expect(rows.slice(1).map((r) => r[7])).toEqual(['', 'u2.jpg', 'חשבונית.pdf, תעודת משלוח.pdf'])
     expect(rows.flat().some((c) => typeof c === 'string' && c.includes('http'))).toBe(false)
   })
 

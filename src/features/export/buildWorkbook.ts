@@ -110,9 +110,9 @@ export function paymentsRows(payments: Payment[], info: ReadonlyMap<string, { nu
 const X = he.finance.expenseExport
 const SOURCES: Readonly<Record<string, string>> = X.sources
 const sourceOf = (e: Expense): string => (e.special_id ? X.sources.special : (SOURCES[e.source] ?? e.source))
-const receiptFile = (e: Expense): string => (e.receipt_path ? (e.receipt_name ?? e.receipt_path.split('/').pop() ?? '') : '')
+const receiptFile = (e: Expense): string => e.receipts.map((r) => r.file_name).join(', ')
 
-/** Expenses by date (oldest first), with where each came from and its receipt's name: no links, signed URLs expire. */
+/** Expenses by date (oldest first), with where each came from and its receipts' names: no links, signed URLs expire. */
 export function expensesRows(expenses: Expense[]): Rows {
   const sorted = [...expenses].sort((a, b) => a.spent_on.localeCompare(b.spent_on))
   return toSheetRows(sorted, [
@@ -122,7 +122,7 @@ export function expensesRows(expenses: Expense[]): Rows {
     { header: X.headers.note, value: (e) => e.note },
     { header: H.amount, value: (e) => e.amount },
     { header: X.headers.source, value: sourceOf },
-    { header: X.headers.receipt, value: (e) => (e.receipt_path ? X.yes : X.no) },
+    { header: X.headers.receipt, value: (e) => (e.receipts.length > 0 ? X.yes : X.no) },
     { header: X.headers.receiptFile, value: receiptFile },
   ])
 }

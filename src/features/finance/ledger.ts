@@ -232,6 +232,7 @@ export function heroState(balance: number): string {
 /** Hebrew error for a receipt we won't accept, or null. */
 export function receiptError(file: File): string | null {
   if (!receiptMime(file)) return he.finance.errors.receiptType
+  if (file.size === 0) return he.finance.errors.receiptEmpty
   return file.size > MAX_RECEIPT_BYTES ? he.finance.errors.receiptSize : null
 }
 
