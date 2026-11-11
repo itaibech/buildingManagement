@@ -1,52 +1,24 @@
-import { Alert, Badge, Button, CloseButton, Divider, FileButton, Group, Select, Stack, Text, TextInput } from '@mantine/core'
+import { Alert, Badge, Button, Divider, Group, Select, Stack, Text, TextInput } from '@mantine/core'
 import { useForm } from '@mantine/form'
-import { IconPaperclip } from '@tabler/icons-react'
 import { Fragment, useState } from 'react'
+import { useAuth } from '../../auth/AuthProvider'
 import { todayISO } from '../../lib/dates'
 import { formatILS, monthLabel } from '../../lib/format'
 import { he } from '../../lib/he'
-import { DateInput, focusFirstError, notifyError, notifySuccess, PasteButton, PasteHint, usePasteFile } from '../../ui'
+import { DateInput, focusFirstError, notifyError, notifySuccess } from '../../ui'
 import { useExpenseCategories } from '../maintenance/api'
+import { useTicketFiles } from '../tickets/detailsApi'
 import { useApplyTemplates, useSaveExpense, useSaveTemplate, type Template } from './api'
+import { CategorySelect } from './CategorySelect'
 import { MoneyInput } from './fields'
-import { RECEIPT_ACCEPT, receiptError } from './ledger'
+import { ReceiptsField, TicketFilesPick } from './ReceiptsField'
+import { MAX_RECEIPTS, preselected } from './receiptsApi'
 
 const positive = (v: number | string): string | null => (typeof v === 'number' && v > 0 ? null : he.finance.errors.positive)
 const required = (v: string | null): string | null => (v && v.trim() ? null : he.finance.errors.required)
 
 function useCategoryData() {
   return (useExpenseCategories().data ?? []).map((c) => ({ value: c.id, label: c.name }))
-}
-
-function ReceiptField({ file, onChange }: { file: File | null; onChange: (f: File | null) => void }) {
-  const [error, setError] = useState<string | null>(null)
-  const pick = (f: File | null) => {
-    const err = f ? receiptError(f) : null
-    setError(err)
-    onChange(err ? null : f)
-  }
-  const zone = usePasteFile({ accept: RECEIPT_ACCEPT, onFile: pick })
-  return (
-    <Stack gap={4} ref={zone}>
-      <Text size="sm" fw={600}>{he.finance.receipt}</Text>
-      {file ? (
-        <Group gap="xs" wrap="nowrap">
-          <IconPaperclip size={18} stroke={1.75} aria-hidden="true" />
-          <Text size="sm" truncate="end" style={{ flex: 1 }}>{file.name}</Text>
-          <CloseButton size={44} aria-label={he.finance.removeReceipt} onClick={() => pick(null)} />
-        </Group>
-      ) : (
-        <Group gap="xs">
-          <FileButton accept={RECEIPT_ACCEPT} onChange={pick}>
-            {(props) => <Button variant="default" mih={44} leftSection={<IconPaperclip size={18} stroke={1.75} />} {...props}>{he.finance.attachReceipt}</Button>}
-          </FileButton>
-          <PasteButton onFile={pick} />
-        </Group>
-      )}
-      <Text size="xs" c={error ? 'debt.7' : 'dimmed'}>{error ?? he.finance.receiptHint}</Text>
-      <PasteHint />
-    </Stack>
-  )
 }
 
 export interface ExpenseValues { categoryId: string | null; spentOn: string; amount: number | string; vendor: string; note: string }
@@ -59,11 +31,32 @@ export interface ExpenseFormProps {
   ticketId?: string
 }
 
-/** "הוצאה חדשה": category, date (today), amount, vendor, note and an optional receipt (image, PDF or Word). */
+/** The ticket's files ticked for copying: images and PDF by default, until the admin changes the selection. */
+function useTicketPick(ticketId: string | undefined) {
+  const files = useTicketFiles(ticketId ?? '', !!ticketId).data ?? []
+  const [chosen, setChosen] = useState<ReadonlySet<string> | null>(null)
+  const selected = chosen ?? new Set(files.filter(preselected).map((f) => f.path))
+  const toggle = (path: string, on: boolean) => {
+    const next = new Set(selected)
+    if (on) next.add(path)
+    else next.delete(path)
+    setChosen(next)
+  }
+  return { files, selected, toggle, picked: files.filter((f) => selected.has(f.path)) }
+}
+
+/** After saving: success, or which receipts didn't make it (they can be added again from the expense row). */
+function reportSaved(failed: readonly string[]): void {
+  if (failed.length > 0) notifyError(he.finance.receiptFailed([...failed]))
+  else notifySuccess(he.finance.expenseSaved)
+}
+
+/** "הוצאה חדשה": category (an admin can add one), date (today), amount, vendor, note, receipts and the ticket's files. */
 export function ExpenseForm({ onDone, initial, ticketId }: ExpenseFormProps) {
   const save = useSaveExpense()
-  const categories = useCategoryData()
-  const [file, setFile] = useState<File | null>(null)
+  const { isAdmin } = useAuth()
+  const [files, setFiles] = useState<File[]>([])
+  const ticket = useTicketPick(ticketId)
   const form = useForm<ExpenseValues>({
     initialValues: { categoryId: null, spentOn: todayISO(), amount: '', vendor: '', note: '', ...initial },
     validate: { categoryId: required, spentOn: required, amount: positive },
@@ -71,19 +64,19 @@ export function ExpenseForm({ onDone, initial, ticketId }: ExpenseFormProps) {
   const submit = form.onSubmit((v) => {
     if (!v.categoryId || typeof v.amount !== 'number') return
     const values = { category_id: v.categoryId, spent_on: v.spentOn, amount: v.amount, vendor: v.vendor.trim(), note: v.note.trim(), ...(ticketId ? { ticket_id: ticketId } : {}) }
-    save.mutate({ values, file }, {
-      onSuccess: ({ receiptFailed }) => { (receiptFailed ? notifyError : notifySuccess)(receiptFailed ? he.finance.receiptFailed : he.finance.expenseSaved); onDone() },
-    })
+    save.mutate({ values, files, ticketFiles: ticket.picked }, { onSuccess: ({ failed }) => { reportSaved(failed); onDone() } })
   }, focusFirstError)
+  const room = MAX_RECEIPTS - ticket.picked.length
   return (
     <form onSubmit={submit} noValidate>
       <Stack>
-        <Select label={he.finance.category} withAsterisk searchable data={categories} data-autofocus {...form.getInputProps('categoryId')} />
+        <CategorySelect creatable={isAdmin} data-autofocus {...form.getInputProps('categoryId')} />
         <MoneyInput label={he.finance.amount} withAsterisk min={0} {...form.getInputProps('amount')} />
         <DateInput label={he.finance.spentOn} withAsterisk {...form.getInputProps('spentOn')} />
         <TextInput label={he.finance.vendor} {...form.getInputProps('vendor')} />
         <TextInput label={he.finance.note} {...form.getInputProps('note')} />
-        <ReceiptField file={file} onChange={setFile} />
+        <TicketFilesPick files={ticket.files} selected={ticket.selected} onToggle={ticket.toggle} full={files.length >= room} />
+        <ReceiptsField files={files} onChange={setFiles} room={room} />
         <Button type="submit" fullWidth loading={save.isPending}>{he.finance.saveExpense}</Button>
       </Stack>
     </form>

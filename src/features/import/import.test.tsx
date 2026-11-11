@@ -38,7 +38,7 @@ vi.mock('../../lib/supabase', () => {
         from: () => ({
           remove: (paths: string[]) => {
             db.removed.push(paths)
-            return Promise.resolve({ data: db.removeNothing ? [] : paths.map((name) => ({ name })), error: null })
+            return Promise.resolve(db.removeNothing ? { data: null, error: { message: 'refused' } } : { data: paths.map((name) => ({ name })), error: null })
           },
         }),
       },
@@ -265,8 +265,10 @@ describe('ImportPage', () => {
   })
 
   describe('receipts on previously imported expenses (Task 22)', () => {
-    const imported = (id: string, receipt: string | null, source = 'import') =>
-      ({ id, category_id: 'c1', spent_on: '2026-03-01', amount: 10, vendor: '', note: '', receipt_path: receipt, source, template_id: null, expense_categories: { name: 'בנק' } })
+    const receipt = (path: string) => ({ id: path, path, file_name: 'r.pdf', mime: 'application/pdf', size_bytes: 1, created_at: '2026-03-01T00:00:00Z' })
+    const imported = (id: string, paths: string[], source = 'import') =>
+      ({ id, category_id: 'c1', spent_on: '2026-03-01', amount: 10, vendor: '', note: '', source, template_id: null,
+        expense_categories: { name: 'בנק' }, expense_receipts: paths.map(receipt) })
     async function toPreview(): Promise<void> {
       await upload(renderPage())
       await pick(he.import.monthFor('אוקטובר'), 'אוקטובר')
@@ -278,20 +280,21 @@ describe('ImportPage', () => {
     }
 
     it('warns before confirming that the imported expenses\' receipts will be deleted', async () => {
-      db.tables.expenses = [imported('e1', 'e1/a.pdf'), imported('e2', 'e2/b.jpg'), imported('e3', null), imported('e4', 'e4/c.pdf', 'manual')]
+      // Every receipt counts (0040: several per expense); a manual expense's receipts stay.
+      db.tables.expenses = [imported('e1', ['e1/a.pdf', 'e1/b.pdf']), imported('e2', ['e2/b.jpg']), imported('e3', []), imported('e4', ['e4/c.pdf'], 'manual')]
       await toPreview()
-      expect(screen.getByText(he.import.receiptsDeleted(2))).toBeInTheDocument()
+      expect(screen.getByText(he.import.receiptsDeleted(3))).toBeInTheDocument()
       expect(he.import.receiptsDeleted(2)).toBe('2 קבלות יימחקו')
     })
 
     it('no receipt warning when no imported expense has one', async () => {
-      db.tables.expenses = [imported('e3', null), imported('e4', 'e4/c.pdf', 'manual')]
+      db.tables.expenses = [imported('e3', []), imported('e4', ['e4/c.pdf'], 'manual')]
       await toPreview()
       expect(screen.queryByText(he.import.receiptsDeleted(1))).toBeNull()
     })
 
-    it('removes the deleted rows\' receipt files after a successful import', async () => {
-      db.rpcReceipts = ['e1/a.pdf', 'e2/b.jpg']
+    it('removes the deleted rows\' queued receipt files after a successful import', async () => {
+      db.tables.receipt_trash_pending = [{ path: 'e1/a.pdf' }, { path: 'e2/b.jpg' }]
       await toPreview()
       fireEvent.click(screen.getByRole('button', { name: he.import.confirm }))
       expect(await screen.findByText(he.import.doneTitle)).toBeInTheDocument()
@@ -331,7 +334,7 @@ describe('ImportPage', () => {
     })
 
     it('tells the admin when the files stayed behind; no storage call when there are none', async () => {
-      db.rpcReceipts = ['e1/a.pdf']
+      db.tables.receipt_trash_pending = [{ path: 'e1/a.pdf' }]
       db.removeNothing = true
       await toPreview()
       fireEvent.click(screen.getByRole('button', { name: he.import.confirm }))

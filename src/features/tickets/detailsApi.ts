@@ -77,9 +77,10 @@ export function useSaveTicketDetails() {
 }
 
 /** The ticket's files the caller may read (admins: all), oldest first. */
-export function useTicketFiles(ticketId: string) {
+export function useTicketFiles(ticketId: string, enabled = true) {
   return useQuery({
     queryKey: [...KEY, 'files', ticketId],
+    enabled,
     queryFn: async (): Promise<TicketFile[]> => {
       const { data, error } = await supabase.from('ticket_files')
         .select('id, path, file_name, size_bytes, visible_to_residents, created_at').eq('ticket_id', ticketId).order('created_at').limit(MAX_FILES)

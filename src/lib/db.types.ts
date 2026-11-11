@@ -789,6 +789,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"expense_receipts": {
+                  Row: {
+                    "created_at": string,"expense_id": string,"file_name": string,"id": string,"mime": string,"path": string,"size_bytes": number | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"expense_id": string,"file_name": string,"id"?: string,"mime": string,"path": string,"size_bytes"?: number | null
+                  }
+                  Update: {
+                    "created_at"?: string,"expense_id"?: string,"file_name"?: string,"id"?: string,"mime"?: string,"path"?: string,"size_bytes"?: number | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "expense_receipts_expense_id_fkey"
+      columns: ["expense_id"]
+isOneToOne: false
+      referencedRelation: "expenses"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"expense_templates": {
                   Row: {
                     "amount": number,"building_id": string,"category_id": string,"created_at": string,"id": string,"label": string,"vendor": string
@@ -1517,6 +1537,20 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"receipt_trash": {
+                  Row: {
+                    "path": string,"queued_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "path": string,"queued_at"?: string
+                  }
+                  Update: {
+                    "path"?: string,"queued_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"residents": {
                   Row: {
                     "apartment_id": string,"building_id": string,"created_at": string,"email": string | null,"full_name": string,"id": string,"is_owner": boolean,"phone": string | null
@@ -1892,6 +1926,20 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"receipt_trash_pending": {
+                  Row: {
+                    "path": string | null,"queued_at": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                           "path"?: string | null,"queued_at"?: string | null
+                         }
+                        Update: {
+                           "path"?: string | null,"queued_at"?: string | null
+                         }
+                        Relationships: [
+                    
+                  ]
                 }
           }
           Functions: {
@@ -2114,6 +2162,9 @@ isOneToOne: false
                            },
 "ev_validate":
 { Args: { "p": Json }; Returns: undefined
+                           },
+"expense_receipts_backfill":
+{ Args: Record<PropertyKey, never>; Returns: number
                            },
 "finish_debt_followups":
 { Args: { "p_building": string,"p_claimed": (string)[],"p_log": string,"p_sent": Json }; Returns: number
@@ -2370,11 +2421,20 @@ isOneToOne: false
 "queue_payment_proof":
 { Args: { "p_path": string }; Returns: undefined
                            },
+"queue_receipt":
+{ Args: { "p_path": string }; Returns: undefined
+                           },
 "queue_ticket_file":
 { Args: { "p_path": string }; Returns: undefined
                            },
 "quick_start_meeting":
 { Args: { "p_chair": string,"p_meeting": string,"p_override_quorum"?: boolean,"p_secretary": string }; Returns: undefined
+                           },
+"receipt_mime_of":
+{ Args: { "p_path": string }; Returns: string
+                           },
+"receipt_name_of":
+{ Args: { "p_name": string,"p_path": string }; Returns: string
                            },
 "record_ev_reading":
 { Args: { "p_charger_id": string,"p_month": string,"p_note"?: string,"p_read_on"?: string,"p_reading": number }; Returns: Json

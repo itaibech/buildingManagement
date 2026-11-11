@@ -3,7 +3,7 @@ import { fetchAll } from '../../lib/fetchAll'
 import { he } from '../../lib/he'
 import { supabase } from '../../lib/supabase'
 import { notifyError } from '../../ui'
-import { receiptsOf, removeReceiptFiles } from '../finance/api'
+import { sweepReceipts } from '../finance/receiptsApi'
 import { sweepProofs } from '../finance/proofSweep'
 import type { ExistingCharge, ExistingPayment, ImportPayload } from './buildImport'
 
@@ -22,8 +22,8 @@ function toCounts(data: unknown): ImportCounts {
 
 /**
  * rpc('import_year'): one transaction on the server; replaces that year's previously imported rows. Then removes the
- * receipt files of the imported expenses it deleted, and the proofs of the imported payments it replaced (queued by
- * 0037). The rows are gone either way; the admin hears if files stayed.
+ * receipt files of the imported expenses it deleted (queued by 0040), and the proofs of the imported payments it
+ * replaced (queued by 0037). The rows are gone either way; the admin hears if files stayed.
  */
 export function useImportYear() {
   const client = useQueryClient()
@@ -31,7 +31,7 @@ export function useImportYear() {
     mutationFn: async (payload: ImportPayload): Promise<ImportCounts> => {
       const { data, error } = await supabase.rpc('import_year', { payload })
       if (error) throw new Error(error.message)
-      if (await removeReceiptFiles(receiptsOf(data))) notifyError(he.finance.receiptRemoveFailed)
+      if (await sweepReceipts()) notifyError(he.finance.receiptRemoveFailed)
       if (await sweepProofs()) notifyError(he.finance.proof.fileStayed)
       return toCounts(data)
     },

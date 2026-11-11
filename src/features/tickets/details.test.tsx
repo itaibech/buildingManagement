@@ -60,7 +60,12 @@ vi.mock('../finance/api', async (orig) => ({
   ...(await orig<typeof import('../finance/api')>()),
   useSaveExpense: () => ({ mutate: m.saveExpense, isPending: false, isError: false }),
 }))
-vi.mock('../maintenance/api', () => ({ useExpenseCategories: () => ({ data: [{ id: 'cat1', name: 'תיקונים' }] }) }))
+vi.mock('../maintenance/api', () => ({
+  useExpenseCategories: () => ({ data: [{ id: 'cat1', name: 'תיקונים' }] }),
+  useCreateExpenseCategory: () => ({ mutate: vi.fn(), isPending: false }),
+  MAX_CATEGORY_NAME: 60,
+  DuplicateCategoryError: class extends Error {},
+}))
 vi.mock('../notifications/api', () => ({ useMarkTicketsSeen: () => ({ mutate: vi.fn() }), useUnseenTicketIds: () => new Set() }))
 vi.mock('../../auth/AuthProvider', () => ({ useAuth: () => ({ isAdmin: m.isAdmin, session: { user: { id: 'me' } } }) }))
 vi.mock('../../ui', async (orig) => ({ ...(await orig<typeof import('../../ui')>()), notifySuccess: m.success, notifyError: m.error }))
@@ -180,6 +185,51 @@ describe('ניהול התקלה (admin)', () => {
     expect(m.saveExpense).toHaveBeenCalledWith(expect.objectContaining({
       values: expect.objectContaining({ category_id: 'cat1', amount: 450.5, vendor: 'אינסטלטור', note: T.expenseNote('נזילה במטבח'), ticket_id: 't1' }),
     }), expect.anything())
+  })
+
+  it('"קבצים מהתקלה": the ticket\'s images and PDF are ticked, Word is not; the ticked ones are copied on save', async () => {
+    m.files = [
+      file(),
+      file({ id: 'f2', path: 't1/1b9a54c4-3e1f-4b8e-9f0a-2c6d1e7f8a90.pdf', file_name: 'quote.pdf', size_bytes: 20 }),
+      file({ id: 'f3', path: 't1/2b9a54c4-3e1f-4b8e-9f0a-2c6d1e7f8a90.docx', file_name: 'offer.docx', size_bytes: 30 }),
+    ]
+    m.suppliers = [{ id: 's1', name: 'אינסטלטור', category: '', expense_category_id: 'cat1', is_draft: false }]
+    m.details = { cost: 450.5, supplier_id: 's1', updated_at: '2026-10-02T10:00:00Z' }
+    show()
+    fireEvent.click(screen.getByRole('button', { name: T.recordExpense }))
+    const dialog = await screen.findByRole('dialog')
+    const R = he.finance.receipts
+    expect(within(dialog).getByText(R.fromTicket)).toBeInTheDocument()
+    expect(within(dialog).getByRole('checkbox', { name: R.pickTicketFile('leak.jpg') })).toBeChecked()
+    expect(within(dialog).getByRole('checkbox', { name: R.pickTicketFile('quote.pdf') })).toBeChecked()
+    const word = within(dialog).getByRole('checkbox', { name: R.pickTicketFile('offer.docx') })
+    expect(word).not.toBeChecked()
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: R.pickTicketFile('quote.pdf') }))
+    fireEvent.click(word)
+    fireEvent.click(within(dialog).getByRole('button', { name: he.finance.saveExpense }))
+    await waitFor(() => expect(m.saveExpense).toHaveBeenCalled())
+    const args = m.saveExpense.mock.calls[0]?.[0] as { ticketFiles: TicketFile[]; files: File[] }
+    expect(args.ticketFiles.map((f) => f.file_name)).toEqual(['leak.jpg', 'offer.docx'])
+    expect(args.files).toEqual([])
+  })
+
+  it('a ticket without files shows no "קבצים מהתקלה"', async () => {
+    show()
+    fireEvent.click(screen.getByRole('button', { name: T.recordExpense }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).queryByText(he.finance.receipts.fromTicket)).toBeNull()
+  })
+
+  it('a copy that fails still saves the expense and names the file', async () => {
+    m.suppliers = [{ id: 's1', name: 'אינסטלטור', category: '', expense_category_id: 'cat1', is_draft: false }]
+    m.details = { cost: 450.5, supplier_id: 's1', updated_at: '2026-10-02T10:00:00Z' }
+    m.files = [file()]
+    m.saveExpense.mockImplementation((_v: unknown, o?: { onSuccess?: (d: unknown) => void }) => o?.onSuccess?.({ id: 'x', failed: ['leak.jpg'] }))
+    show()
+    fireEvent.click(screen.getByRole('button', { name: T.recordExpense }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: he.finance.saveExpense }))
+    await waitFor(() => expect(m.error).toHaveBeenCalledWith(he.finance.receiptFailed(['leak.jpg'])))
   })
 
   it('with an expense already linked, shows it and asks before recording another', async () => {

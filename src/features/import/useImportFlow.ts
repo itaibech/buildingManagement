@@ -24,7 +24,7 @@ export interface ImportContext {
   payments: ExistingPayment[]; charges: ExistingCharge[]
   /** Settlement rows (write-offs, settlement payments) in the import year: a re-import may reopen those months. */
   settled: number
-  /** Imported expenses of the import year that have a receipt: the re-import deletes them, and their files. */
+  /** Receipts of the import year's imported expenses: the re-import deletes those expenses, and their files. */
   receipts: number
   /** Imported payments of the import year that have a transfer proof: the re-import deletes them, and their files. */
   proofs: number
@@ -49,7 +49,7 @@ export function useImportContext(year: number, budgetYear: number): ImportContex
     charges: money.data?.charges ?? [],
     settled: money.data?.settled ?? 0,
     proofs: money.data?.proofs ?? 0,
-    receipts: (expenses.data ?? []).filter((e) => e.source === 'import' && e.receipt_path).length,
+    receipts: (expenses.data ?? []).filter((e) => e.source === 'import').reduce((n, e) => n + e.receipts.length, 0),
     loading: fees.isLoading || budgets.isLoading || expenses.isLoading || categories.isLoading || chargers.isLoading || money.isLoading,
   }), [fees.data, budgets.data, expenses.data, categories.data, chargers.data, money.data, fees.isLoading, budgets.isLoading, expenses.isLoading, categories.isLoading, chargers.isLoading, money.isLoading])
 }

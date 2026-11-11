@@ -9,7 +9,8 @@ import { billingOf, useApartmentBilling, useApartments, useResidents } from '../
 import { isBudgetSource, type BudgetPayload, type BudgetSource, type BudgetSummary } from './budget'
 import type { TimelineRow } from './feeTimeline'
 import { sweepProofs } from './proofSweep'
-import { PROOF_BUCKET, proofMime, proofPath, RECEIPT_BUCKET, receiptMime, receiptPath, shiftMonth, sortBalances, type LedgerRow } from './ledger'
+import { PROOF_BUCKET, proofMime, proofPath, RECEIPT_BUCKET, shiftMonth, sortBalances, type LedgerRow } from './ledger'
+import { attachReceipts, copyTicketFiles, sortReceipts, sweepReceipts, type ExpenseReceipt, type TicketFileRef } from './receiptsApi'
 
 // 'standing_order' is written only by apply_standing_orders (automatic payments); the payment form offers the rest.
 export type PaymentMethod = 'cash' | 'transfer' | 'cheque' | 'app' | 'other' | 'standing_order'
@@ -66,7 +67,11 @@ export interface Fee { id: string; effective_from: string; amount: number }
 export interface FeeChange { apartment_id: string; effective_from: string; mode: FeeMode; amount: number | null }
 export interface Expense {
   id: string; category_id: string; category: string; spent_on: string; amount: number
-  vendor: string; note: string; receipt_path: string | null; receipt_name?: string | null; source: string; template_id: string | null; special_id?: string | null
+  vendor: string; note: string; source: string; template_id: string | null; special_id?: string | null
+  /** The ticket the expense was recorded for (0039). */
+  ticket_id?: string | null
+  /** Its receipts (0040), oldest first. */
+  receipts: ExpenseReceipt[]
 }
 export interface ExpenseInput { category_id: string; spent_on: string; amount: number; vendor: string; note: string; ticket_id?: string }
 export interface Template { id: string; category_id: string; category: string; amount: number; vendor: string; label: string }
@@ -397,19 +402,13 @@ export function useSpecialLinks(specialId: string | null) {
   })
 }
 
-/** Receipt paths in undo_special_charge's answer (only strings; anything else is ignored). */
-export function receiptsOf(data: unknown): string[] {
-  const list = data !== null && typeof data === 'object' && 'receipts' in data ? data.receipts : null
-  return Array.isArray(list) ? list.filter((p): p is string => typeof p === 'string') : []
-}
-
-/** rpc('undo_special_charge'): deletes the special charge, its linked payment and expense, then the expense's receipt file. */
+/** rpc('undo_special_charge'): deletes the special charge, its linked payment and expense, then the expense's receipt files. */
 export function useUndoSpecialCharge() {
   return useFinanceMutation(async (specialId: string) => {
-    const { data, error } = await supabase.rpc('undo_special_charge', { p_special_id: specialId })
+    const { error } = await supabase.rpc('undo_special_charge', { p_special_id: specialId })
     fail(error)
-    // The rows are gone either way; only tell the admin that the receipt file stayed behind.
-    if (await removeReceiptFiles(receiptsOf(data))) notifyError(he.finance.receiptRemoveFailed)
+    // The rows are gone either way; only tell the admin that receipt files stayed behind (queued by 0040).
+    if (await sweepReceipts()) notifyError(he.finance.receiptRemoveFailed)
     // A proof on the special charge's payment was queued by its delete.
     void sweepProofs()
   })
@@ -486,7 +485,7 @@ export function useDeleteFeeRow() {
 
 // ---------------------------------------------------------------- expenses
 
-const EXPENSE_COLUMNS = 'id, category_id, spent_on, amount, vendor, note, receipt_path, receipt_name, source, template_id, special_id, expense_categories(name)'
+const EXPENSE_COLUMNS = 'id, category_id, spent_on, amount, vendor, note, source, template_id, special_id, ticket_id, expense_categories(name), expense_receipts(id, path, file_name, mime, size_bytes, created_at)'
 
 /** The query behind useExpenses, also fetched on demand by the expense export. */
 export const expensesQuery = (year: number) => ({
@@ -495,7 +494,9 @@ export const expensesQuery = (year: number) => ({
     (await fetchAll((f, t) => supabase.from('expenses').select(EXPENSE_COLUMNS)
       .gte('spent_on', `${year}-01-01`).lt('spent_on', `${year + 1}-01-01`)
       .order('spent_on', { ascending: false }).order('created_at', { ascending: false }).order('id').range(f, t)))
-      .map(({ expense_categories, ...e }) => ({ ...e, amount: num(e.amount), category: catName(expense_categories) })),
+      .map(({ expense_categories, expense_receipts, ...e }) => ({
+        ...e, amount: num(e.amount), category: catName(expense_categories), receipts: sortReceipts(expense_receipts ?? []),
+      })),
 })
 
 /** Every expense in `year` with its category name, newest first. */
@@ -514,64 +515,44 @@ export function useFirstExpenseYear() {
   })
 }
 
-/** Uploads the receipt and links it with its file name; returns false when either step fails (the expense itself is kept). */
-async function attachReceipt(expenseId: string, file: File): Promise<boolean> {
-  const mime = receiptMime(file)
-  const path = mime ? receiptPath(expenseId, mime) : null
-  if (!mime || !path) return false
-  const up = await supabase.storage.from(RECEIPT_BUCKET).upload(path, file, { contentType: mime })
-  if (up.error) return false
-  const receipt = { receipt_path: path, receipt_name: file.name.slice(0, 255) || null }
-  // .single(): an update that matched no row (deleted meanwhile, or RLS) is a failure too.
-  const { error } = await supabase.from('expenses').update(receipt).eq('id', expenseId).select('id').single()
-  // Don't leave an orphaned object behind when the link couldn't be saved.
-  if (error) await supabase.storage.from(RECEIPT_BUCKET).remove([path])
-  return !error
+export { sweepReceipts }
+
+/** Admin: attaches more receipts to an expense; resolves to the names of the files that failed. */
+export function useAddReceipts() {
+  return useFinanceMutation(({ expenseId, files }: { expenseId: string; files: readonly File[] }) => attachReceipts(expenseId, files))
 }
 
-/**
- * Removes receipt objects; true when any stayed behind (the caller tells the admin). Storage answers a refused
- * or missing object with fewer (or no) removed entries rather than an error, so that counts as staying behind.
- */
-export async function removeReceiptFiles(paths: string[]): Promise<boolean> {
-  if (paths.length === 0) return false
-  const { data, error } = await supabase.storage.from(RECEIPT_BUCKET).remove(paths)
-  return !!error || (data?.length ?? 0) < paths.length
-}
-const removeReceiptFile = (path: string | null): Promise<boolean> => removeReceiptFiles(path ? [path] : [])
-
-type ReceiptOwner = Pick<Expense, 'id' | 'receipt_path'>
-
-/** Attaches a receipt to an expense, or replaces it: the old file is removed only after the new one is linked. */
-export function useSetReceipt() {
-  return useFinanceMutation(async ({ expense, file }: { expense: ReceiptOwner; file: File }) => {
-    if (!(await attachReceipt(expense.id, file))) throw new Error('Receipt upload failed')
-    return { oldStayed: await removeReceiptFile(expense.receipt_path) }
-  })
+/** Admin: copies a ticket's files into an expense's receipts (the ticket keeps them); resolves to the failed names. */
+export function useCopyTicketFiles() {
+  return useFinanceMutation(({ expenseId, files }: { expenseId: string; files: readonly TicketFileRef[] }) => copyTicketFiles(expenseId, files))
 }
 
-/** Unlinks an expense's receipt, then removes the file. `fileStayed` is true when the file couldn't be removed. */
+/** Removes one receipt row (its object is queued by 0040), then the queued objects. `fileStayed`: one stayed behind. */
 export function useRemoveReceipt() {
-  return useFinanceMutation(async (expense: ReceiptOwner) => {
-    fail((await supabase.from('expenses').update({ receipt_path: null, receipt_name: null }).eq('id', expense.id)).error)
-    return { fileStayed: await removeReceiptFile(expense.receipt_path) }
+  return useFinanceMutation(async (receipt: Pick<ExpenseReceipt, 'id'>) => {
+    const { data, error } = await supabase.from('expense_receipts').delete().eq('id', receipt.id).select('id')
+    fail(error)
+    if (!data?.length) throw new Error('Receipt was not removed')
+    return { fileStayed: await sweepReceipts() }
   })
 }
 
-/** Records an expense, then its optional receipt. `receiptFailed` is true when the receipt didn't make it. */
+export interface SaveExpenseArgs { values: ExpenseInput; files: readonly File[]; ticketFiles?: readonly TicketFileRef[] }
+
+/** Records an expense, then its receipts and the ticket files picked. `failed`: names of the files that didn't make it. */
 export function useSaveExpense() {
-  return useFinanceMutation(async ({ values, file }: { values: ExpenseInput; file: File | null }) => {
+  return useFinanceMutation(async ({ values, files, ticketFiles = [] }: SaveExpenseArgs) => {
     const { id } = must<{ id: string }>(await supabase.from('expenses').insert(values).select('id').single())
-    const receiptFailed = file ? !(await attachReceipt(id, file).catch(() => false)) : false
-    return { id, receiptFailed }
+    const failed = [...await attachReceipts(id, files), ...await copyTicketFiles(id, ticketFiles)]
+    return { id, failed }
   })
 }
 
 export function useDeleteExpense() {
-  return useFinanceMutation(async (expense: Pick<Expense, 'id' | 'receipt_path'>) => {
+  return useFinanceMutation(async (expense: Pick<Expense, 'id'>) => {
     fail((await supabase.from('expenses').delete().eq('id', expense.id)).error)
-    // The expense is gone either way; only tell the admin that its receipt file stayed behind.
-    if (await removeReceiptFile(expense.receipt_path)) notifyError(he.finance.receiptRemoveFailed)
+    // The receipts went with it (0040 queued their objects); only tell the admin when files stayed behind.
+    if (await sweepReceipts()) notifyError(he.finance.receiptRemoveFailed)
   })
 }
 
