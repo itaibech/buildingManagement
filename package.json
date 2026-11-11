@@ -21,7 +21,7 @@
     "@fontsource/secular-one": "^5.3.0",
     "@mantine/core": "^9.7.3",
     "@mantine/form": "^9.7.3",
-    "@mantine/hooks": "^9.7.3",
+    "@mantine/hooks": "^9.7.4",
     "@mantine/notifications": "^9.7.3",
     "@supabase/supabase-js": "^2.118.0",
     "@tabler/icons-react": "^3.49.0",
