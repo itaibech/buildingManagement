@@ -374,6 +374,11 @@ body {
 }
 
 /* Annual report ("דוח שנתי"): the same document on screen (a card) and in print (A4, a cover page). */
+/* On screen, sections after the first are laid out only when scrolled near (long tables); find-in-page still works. */
+.bm-annual-card .bm-annual-section ~ .bm-annual-section {
+  content-visibility: auto;
+  contain-intrinsic-size: auto none auto 480px;
+}
 .bm-annual {
   line-height: 1.55;
   --bm-annual-plan: #c9ced6;

@@ -61,6 +61,36 @@ export function cspPlugin(supabaseUrl: string): Plugin {
   }
 }
 
+// The two faces the first screen paints in Hebrew (body text, then titles/amounts). Others load on use (swap).
+const CRITICAL_FONTS = [/assistant-hebrew-400-normal[-.][\w-]*\.woff2$/, /secular-one-hebrew-400-normal[-.][\w-]*\.woff2$/]
+
+/** `<link rel=preload as=font>` for the critical fonts among the built asset names (always crossorigin). */
+export function fontPreloadTags(fileNames: readonly string[], base: string): HtmlTagDescriptor[] {
+  return CRITICAL_FONTS.flatMap((re) => fileNames.filter((f) => re.test(f)).slice(0, 1)).map((f) => ({
+    tag: 'link',
+    attrs: { rel: 'preload', href: base + f, as: 'font', type: 'font/woff2', crossorigin: '' },
+    injectTo: 'head',
+  }))
+}
+
+/** Preloads the self-hosted Hebrew fonts in the build, so text paints in its face without waiting for the CSS. */
+export function fontPreloadPlugin(): Plugin {
+  let base = '/'
+  return {
+    name: 'bm-font-preload',
+    apply: 'build',
+    configResolved(config) {
+      base = config.base
+    },
+    transformIndexHtml: {
+      order: 'post',
+      handler(_html, ctx) {
+        return ctx.bundle ? fontPreloadTags(Object.keys(ctx.bundle), base) : []
+      },
+    },
+  }
+}
+
 /** GitHub Pages serves 404.html for unknown paths: make it the app itself (HashRouter does the rest). */
 export function notFoundPagePlugin(): Plugin {
   return {

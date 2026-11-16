@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { buildCsp, cspMetaTag } from './vite.plugins.ts'
+import { buildCsp, cspMetaTag, fontPreloadTags } from './vite.plugins.ts'
 
 const directive = (csp: string, name: string) => csp.split('; ').find((d) => d.startsWith(`${name} `))
 
@@ -52,6 +52,35 @@ describe('cspMetaTag', () => {
       attrs: { 'http-equiv': 'Content-Security-Policy', content: "default-src 'self'" },
       injectTo: 'head-prepend',
     })
+  })
+})
+
+describe('fontPreloadTags', () => {
+  const files = [
+    'assets/index-a1.js',
+    'assets/assistant-latin-400-normal-Xy1.woff2',
+    'assets/assistant-hebrew-400-normal-Ab_2.woff2',
+    'assets/assistant-hebrew-600-normal-Cd3.woff2',
+    'assets/secular-one-hebrew-400-normal-Ef4.woff2',
+    'assets/secular-one-hebrew-400-normal-Ef4.woff',
+  ]
+
+  it('preloads only the Hebrew body and title faces, base-relative and crossorigin', () => {
+    expect(fontPreloadTags(files, '/buildingManagement/').map((t) => t.attrs)).toEqual([
+      { rel: 'preload', href: '/buildingManagement/assets/assistant-hebrew-400-normal-Ab_2.woff2', as: 'font', type: 'font/woff2', crossorigin: '' },
+      { rel: 'preload', href: '/buildingManagement/assets/secular-one-hebrew-400-normal-Ef4.woff2', as: 'font', type: 'font/woff2', crossorigin: '' },
+    ])
+  })
+
+  it('adds nothing when the fonts are not in the bundle', () => {
+    expect(fontPreloadTags(['assets/index-a1.js'], '/')).toEqual([])
+  })
+})
+
+describe('global.css', () => {
+  it('defers the on-screen annual report sections below the first, with a size placeholder', () => {
+    const css = readFileSync('src/ui/global.css', 'utf8')
+    expect(css).toMatch(/\.bm-annual-card \.bm-annual-section ~ \.bm-annual-section \{\s*content-visibility: auto;\s*contain-intrinsic-size: auto none auto 480px;/)
   })
 })
 
