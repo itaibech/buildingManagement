@@ -282,14 +282,19 @@ body {
   border-top: 1px solid rgba(107, 116, 128, 0.15);
 }
 
+/* Reduced motion, case by case (no blanket near-zero reset, which also kills state-carrying feedback).
+   Mantine's own transitions (sheets, drawers, menus, popovers, toasts) drop to zero via theme.respectReducedMotion.
+   A loader still turns, slower, because it says "working"; the skeleton pulse and progress stripes stop.
+   Colour and background transitions on buttons and links stay. Nothing here scrolls smoothly. */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+  .mantine-Loader-root,
+  .mantine-Loader-root::after,
+  .mantine-Loader-root > * {
+    animation-duration: 2.4s;
+  }
+  .mantine-Skeleton-root::after,
+  .mantine-Progress-section {
+    animation: none;
   }
 }
 
