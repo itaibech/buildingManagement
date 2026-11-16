@@ -21,8 +21,15 @@ describe('buildCsp', () => {
     expect(prod).toContain("font-src 'self'")
     expect(prod).toContain("style-src 'self' 'unsafe-inline'")
     expect(prod).toContain("object-src 'none'")
-    expect(prod).toContain("base-uri 'self'")
+    expect(prod).toContain("base-uri 'none'")
+    expect(prod).toContain("frame-src 'none'")
     expect(prod).toContain("form-action 'self'")
+  })
+
+  it('allows no inline or eval script and no third-party origin besides Supabase', () => {
+    expect(prod).not.toMatch(/script-src[^;]*('unsafe-inline'|'unsafe-eval'|https?:\/\/|\*)/)
+    const origins = prod.match(/\b(?:https?|wss?):\/\/[^\s;]+/g) ?? []
+    expect(new Set(origins)).toEqual(new Set(['https://abc.supabase.co', 'wss://abc.supabase.co']))
   })
 
   it('allows only the app’s own service worker (system notifications)', () => {
@@ -37,6 +44,12 @@ describe('buildCsp', () => {
       "connect-src 'self' http://127.0.0.1:54321 ws://127.0.0.1:54321 ws://localhost:5173 ws://127.0.0.1:5173",
     )
     expect(directive(dev, 'script-src')).toBe("script-src 'self' 'unsafe-inline'")
+  })
+
+  it('opens the HMR socket on the dev server port actually configured', () => {
+    const dev = buildCsp({ supabaseUrl: 'http://127.0.0.1:54321', dev: true, devPort: 5198 })
+    expect(directive(dev, 'connect-src')).toContain('ws://localhost:5198 ws://127.0.0.1:5198')
+    expect(directive(dev, 'connect-src')).not.toContain('5173')
   })
 
   it('refuses to build without a valid Supabase URL', () => {

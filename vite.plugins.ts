@@ -3,10 +3,11 @@ import type { HtmlTagDescriptor, Plugin } from 'vite'
 export interface CspOptions {
   supabaseUrl: string
   dev: boolean
+  /** The dev server's port, for its HMR socket (README → Development serves on 5173; agents use others). */
+  devPort?: number
 }
 
-// Vite dev server HMR socket (README → Development serves on 5173).
-const DEV_HMR = ['ws://localhost:5173', 'ws://127.0.0.1:5173']
+const devHmr = (port: number): string[] => [`ws://localhost:${port}`, `ws://127.0.0.1:${port}`]
 
 function supabaseOrigins(supabaseUrl: string): { http: string; ws: string } {
   let url: URL | null = null
@@ -25,8 +26,12 @@ function supabaseOrigins(supabaseUrl: string): { http: string; ws: string } {
  * The app's Content-Security-Policy. Fonts are self-hosted; the only third party is the Supabase project
  * (REST/Auth/Storage over https, Realtime over wss, signed storage URLs as images). Dev adds Vite's HMR socket
  * and its inline React-refresh preamble. worker-src: the notification service worker (public/notify-sw.js).
+ * style-src keeps 'unsafe-inline': Mantine writes its CSS variables into a <style> tag and component styles into
+ * style attributes, which hashes or nonces can't cover on a static host. Scripts stay 'self' only (no inline,
+ * no eval), the page can't be given a <base>, embed plugins or frames. frame-ancestors, report-to and
+ * Trusted Types need response headers or break Mantine's <style> injection; GitHub Pages sets no headers.
  */
-export function buildCsp({ supabaseUrl, dev }: CspOptions): string {
+export function buildCsp({ supabaseUrl, dev, devPort = 5173 }: CspOptions): string {
   const sb = supabaseOrigins(supabaseUrl)
   return [
     "default-src 'self'",
@@ -34,11 +39,12 @@ export function buildCsp({ supabaseUrl, dev }: CspOptions): string {
     "style-src 'self' 'unsafe-inline'",
     `img-src 'self' data: blob: ${sb.http}`,
     "font-src 'self'",
-    ['connect-src', "'self'", sb.http, sb.ws, ...(dev ? DEV_HMR : [])].join(' '),
+    ['connect-src', "'self'", sb.http, sb.ws, ...(dev ? devHmr(devPort) : [])].join(' '),
     "manifest-src 'self'",
     "worker-src 'self'",
+    "frame-src 'none'",
     "object-src 'none'",
-    "base-uri 'self'",
+    "base-uri 'none'",
     "form-action 'self'",
   ].join('; ')
 }
@@ -50,13 +56,15 @@ export function cspMetaTag(content: string): HtmlTagDescriptor {
 /** Injects the env-specific CSP <meta> into index.html (dev and build). */
 export function cspPlugin(supabaseUrl: string): Plugin {
   let dev = false
+  let devPort: number | undefined
   return {
     name: 'bm-csp',
     configResolved(config) {
       dev = config.command === 'serve'
+      devPort = config.server.port
     },
     transformIndexHtml() {
-      return [cspMetaTag(buildCsp({ supabaseUrl, dev }))]
+      return [cspMetaTag(buildCsp({ supabaseUrl, dev, devPort }))]
     },
   }
 }
