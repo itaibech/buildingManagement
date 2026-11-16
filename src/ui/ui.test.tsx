@@ -86,6 +86,25 @@ describe('theme', () => {
   })
 })
 
+describe('reduced motion', () => {
+  // The CSS side is checked in vite.plugins.test.ts (node, reads src/ui/global.css).
+  it('lets Mantine drop its transitions when the OS asks for less motion', () => {
+    expect(theme.respectReducedMotion).toBe(true)
+  })
+})
+
+describe('toasts', () => {
+  it('announce success politely (status) and errors assertively (alert)', async () => {
+    const { Notifications } = await import('@mantine/notifications')
+    const { notifyError, notifySuccess } = await import('./notify')
+    wrap(<Notifications />)
+    notifySuccess('saved')
+    notifyError('failed')
+    expect((await screen.findByText('saved')).closest('[role]')).toHaveAttribute('role', 'status')
+    expect((await screen.findByText('failed')).closest('[role]')).toHaveAttribute('role', 'alert')
+  })
+})
+
 describe('focusFirstError', () => {
   it('focuses the first invalid field of the submitted form', async () => {
     const { focusFirstError } = await import('./forms')

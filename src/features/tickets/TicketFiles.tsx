@@ -112,7 +112,7 @@ export function TicketFiles({ ticketId, files, admin }: TicketFilesProps) {
       ))}
       {admin && <Uploader ticketId={ticketId} count={files.length} />}
       <Modal opened={!!opener.preview} onClose={opener.close} size="xl" centered radius="lg" padding="xs" title={opener.preview?.name ?? ''}>
-        {opener.preview && <Image src={opener.preview.url} alt={opener.preview.name} radius={10} fit="contain" mah="80vh" />}
+        {opener.preview && <Image src={opener.preview.url} alt={opener.preview.name} radius={10} fit="contain" mah="80svh" />}
       </Modal>
       <ConfirmDialog opened={!!removing} title={T.deleteFileConfirm(removing?.file_name ?? '')} body={T.deleteFileBody}
         confirmLabel={T.deleteFileLabel} loading={remove.isPending} failed={remove.isError} onClose={() => setRemoving(null)} onConfirm={confirm} />

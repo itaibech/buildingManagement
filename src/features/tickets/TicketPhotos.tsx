@@ -12,7 +12,7 @@ function FallbackTile({ photo }: { photo: TicketPhoto }) {
   const label = isHeic(photo.path) ? he.tickets.heicFallback : he.tickets.photoFallback
   return (
     <Center h={TILE} bg="stone.1" p="xs" style={{ borderRadius: 10 }}>
-      <Anchor href={photo.url ?? undefined} download target="_blank" rel="noopener" size="sm" fw={600} ta="center" mih={44}>
+      <Anchor href={photo.url ?? undefined} download target="_blank" rel="noopener noreferrer" size="sm" fw={600} ta="center" mih={44}>
         <Stack gap={4} align="center">
           <IconDownload size={20} stroke={1.75} aria-hidden="true" />
           {label}
@@ -42,7 +42,7 @@ export function TicketPhotos({ photos }: { photos: TicketPhoto[] }) {
       </SimpleGrid>
       <Modal opened={current !== null} onClose={() => setOpen(null)} size="xl" centered radius="lg" padding="xs"
         title={open !== null ? he.tickets.photo(open + 1) : ''}>
-        {current?.url && <Image src={current.url} alt={he.tickets.photo((open ?? 0) + 1)} radius={10} fit="contain" mah="80vh" />}
+        {current?.url && <Image src={current.url} alt={he.tickets.photo((open ?? 0) + 1)} radius={10} fit="contain" mah="80svh" />}
       </Modal>
     </>
   )

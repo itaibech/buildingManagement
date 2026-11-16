@@ -1,20 +1,29 @@
 import { Box } from '@mantine/core'
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router'
 import { AuthProvider, useAuth } from './auth/AuthProvider'
 import { RequireAdmin, RequireApproved, RequirePermission } from './auth/Guard'
 import { FINANCE_NEED } from './layout/nav'
+import { whenIdle } from './lib/schedule'
 import LoginPage from './auth/LoginPage'
 import ResetPasswordPage from './auth/ResetPasswordPage'
 import Shell from './layout/Shell'
 import { ListSkeleton } from './ui'
 
+// The tab bar's pages: the likeliest next routes, fetched once the signed-in app is idle (HashRouter has no
+// document navigations, so speculation rules don't apply; warming the lazy chunks is the equivalent).
+const TAB_PAGES = {
+  more: () => import('./features/more/MorePage'),
+  announcements: () => import('./features/announcements/AnnouncementsPage'),
+  tickets: () => import('./features/tickets/TicketsPage'),
+  finance: () => import('./features/finance/FinancePage'),
+}
 const HomePage = lazy(() => import('./features/home/HomePage'))
-const MorePage = lazy(() => import('./features/more/MorePage'))
-const AnnouncementsPage = lazy(() => import('./features/announcements/AnnouncementsPage'))
-const TicketsPage = lazy(() => import('./features/tickets/TicketsPage'))
+const MorePage = lazy(TAB_PAGES.more)
+const AnnouncementsPage = lazy(TAB_PAGES.announcements)
+const TicketsPage = lazy(TAB_PAGES.tickets)
 const TicketPage = lazy(() => import('./features/tickets/TicketPage'))
-const FinancePage = lazy(() => import('./features/finance/FinancePage'))
+const FinancePage = lazy(TAB_PAGES.finance)
 const AnnualReportPage = lazy(() => import('./features/finance/AnnualReportPage'))
 const DirectoryPage = lazy(() => import('./features/tenants/DirectoryPage'))
 const MaintenancePage = lazy(() => import('./features/maintenance/MaintenancePage'))
@@ -55,10 +64,18 @@ function RecoveryRedirect() {
   return (recovery || invited) && pathname !== '/reset-password' ? <Navigate to="/reset-password" replace /> : null
 }
 
+function PrefetchTabPages() {
+  const { session } = useAuth()
+  const signedIn = session !== null
+  useEffect(() => (signedIn ? whenIdle(() => Object.values(TAB_PAGES).forEach((load) => void load())) : undefined), [signedIn])
+  return null
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <RecoveryRedirect />
+      <PrefetchTabPages />
       <Suspense fallback={fallback}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />

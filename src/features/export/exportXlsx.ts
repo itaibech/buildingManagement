@@ -1,5 +1,6 @@
 // Builds and downloads an .xlsx. SheetJS is loaded on demand (same lazy chunk as the importer).
 import { todayISO } from '../../lib/dates'
+import { yieldToMain } from '../../lib/schedule'
 import type { Rows } from './buildWorkbook'
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -17,6 +18,7 @@ export async function toXlsxBytes(sheets: Record<string, Rows>, formats?: CellFo
   const XLSX = await import('xlsx')
   const wb = XLSX.utils.book_new()
   for (const [name, rows] of Object.entries(sheets)) {
+    await yieldToMain() // one sheet per task: a year's ledger export stays off the long-task list
     const ws = XLSX.utils.aoa_to_sheet(rows)
     rows[0]?.forEach((v, c) => {
       const cell = ws[XLSX.utils.encode_cell({ r: 0, c })]

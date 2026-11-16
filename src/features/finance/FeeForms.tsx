@@ -1,7 +1,7 @@
 import { Alert, Button, Group, Input, SegmentedControl, Stack, Text } from '@mantine/core'
 import { useState, type FormEvent } from 'react'
 import { he } from '../../lib/he'
-import { FEE_MODES, isFeeMode, notifyInfo, notifySuccess, type FeeMode } from '../../ui'
+import { FEE_MODES, focusFirstError, isFeeMode, notifyInfo, notifySuccess, type FeeMode } from '../../ui'
 import { useSetApartmentFee } from './api'
 import { affectsPast, currentMonth, restoreAfterExempt, restoreLabel, type TimelineRow } from './feeTimeline'
 import { MonthField, MoneyInput } from './fields'
@@ -22,9 +22,9 @@ export function FeeChangeForm({ apartmentId, onDone, onCancel }: { apartmentId: 
   const [mode, setMode] = useState<FeeMode>('custom')
   const [amount, setAmount] = useState<number | string>('')
   const [error, setError] = useState<string | null>(null)
-  const submit = (e: FormEvent): void => {
+  const submit = (e: FormEvent<HTMLFormElement>): void => {
     e.preventDefault()
-    if (mode === 'custom' && !(typeof amount === 'number' && amount >= 0)) { setError(he.finance.errors.nonNegative); return }
+    if (mode === 'custom' && !(typeof amount === 'number' && amount >= 0)) { setError(he.finance.errors.nonNegative); focusFirstError(null, null, e); return }
     save.mutate({ apartment_id: apartmentId, effective_from: month, mode, amount: mode === 'custom' && typeof amount === 'number' ? amount : null },
       { onSuccess: (changed) => { saved(changed); onDone() } })
   }

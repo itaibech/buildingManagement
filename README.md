@@ -392,7 +392,8 @@ optional, git-ignored `supabase/seed.local.sql`; `db:reset` loads it after `seed
 Never commit real names, phone numbers or the committee's workbook.
 
 The Content-Security-Policy is injected at build time from `VITE_SUPABASE_URL` (`vite.plugins.ts`), so
-dev, preview and production each allow only their own Supabase origin. To check the production build
+dev, preview and production each allow only their own Supabase origin (dev also allows the HMR socket on
+the port it serves on, e.g. `npx vite --port 5198`). To check the production build
 locally against the local stack: `npm run build && npm run preview` (http://localhost:4173/buildingManagement/).
 
 To try email locally, serve the function in dry run (nothing is delivered):

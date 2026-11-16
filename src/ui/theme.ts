@@ -38,6 +38,8 @@ export const theme = createTheme({
   radius: { xs: '4px', sm: '6px', md: '10px', lg: '12px', xl: '16px' },
   defaultRadius: 'md',
   focusRing: 'auto',
+  // Mantine transitions (Modal, Drawer, Menu, Popover, Collapse, notifications) honour prefers-reduced-motion.
+  respectReducedMotion: true,
   components: {
     Card: Card.extend({ defaultProps: { radius: 'lg', withBorder: true, shadow: 'none', padding: 'lg' }, styles: { root: { borderColor: CARD_BORDER } } }),
     Paper: Paper.extend({ styles: { root: { borderColor: CARD_BORDER } } }),

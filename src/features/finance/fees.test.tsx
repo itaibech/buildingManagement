@@ -86,6 +86,17 @@ describe('FeeChangeForm', () => {
     expect(toast.success).not.toHaveBeenCalled()
   })
 
+  it('a custom fee without an amount: the error is linked and focus moves to the field', async () => {
+    wrap(<FeeChangeForm apartmentId="a1" onDone={() => undefined} />)
+    fireEvent.click(screen.getByRole('button', { name: he.fees.save }))
+    const error = await screen.findByText(he.finance.errors.nonNegative)
+    const amount = screen.getByLabelText(he.fees.amount, { exact: false })
+    await waitFor(() => expect(document.activeElement).toBe(amount))
+    expect(amount).toHaveAttribute('aria-invalid', 'true')
+    expect(amount.getAttribute('aria-describedby')?.split(' ')).toContain(error.id)
+    expect(db.rpcCalls).toEqual([])
+  })
+
   it('warns when the month is before the current one', () => {
     wrap(<><PastWarning month="2000-01-01" /><PastWarning month={currentMonth()} /></>)
     expect(screen.getAllByText(he.fees.pastWarning)).toHaveLength(1)

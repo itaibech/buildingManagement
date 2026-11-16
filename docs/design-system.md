@@ -130,7 +130,9 @@ Mobile (<768)                        Desktop (≥768)
 ## Motion and quality floor
 
 - Motion only in response to user actions (sheet open, item marked done).
-  Honor `prefers-reduced-motion`.
+  Honor `prefers-reduced-motion` case by case, not with a blanket reset: Mantine's transitions go to zero
+  (`theme.respectReducedMotion`), loaders turn slower, skeleton pulses and progress stripes stop, colour
+  transitions stay (`global.css`).
 - Visible focus ring (`enamel`, 2px offset). AA contrast.
 - Dates are DD/MM/YYYY and money is ₪ via `formatILS`.
 - Copy: plain verbs, sentence case. Errors say what happened and what to do.

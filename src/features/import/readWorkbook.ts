@@ -1,6 +1,7 @@
 // Reads the uploaded workbook in the browser. SheetJS is loaded on demand so it never weighs on other pages.
 // The file is untrusted: we only read cell values (no formulas, HTML, styles or macros are used).
 import { he } from '../../lib/he'
+import { yieldToMain } from '../../lib/schedule'
 import type { ParsedWorkbook } from './buildImport'
 import { ImportError, MAX_COLS, MAX_ROWS, parseBudgetSheet, parseExpensesSheet, parseIncomeSheet } from './parseWorkbook'
 
@@ -36,14 +37,20 @@ export async function openWorkbook(data: ArrayBuffer): Promise<{ names: string[]
   return { names: wb.SheetNames, rows }
 }
 
-/** Parse workbook bytes into the import model. Throws ImportError with a Hebrew message. */
+/**
+ * Parse workbook bytes into the import model. Throws ImportError with a Hebrew message.
+ * Yields to the main thread between the unzip and each sheet, so the wizard stays responsive on a phone.
+ */
 export async function readWorkbook(data: ArrayBuffer): Promise<ReadResult> {
   const { rows } = await openWorkbook(data)
+  await yieldToMain()
   const incomeRows = rows(SHEETS.income)
   if (!incomeRows) throw new ImportError(he.import.errors.noIncome)
   const income = parseIncomeSheet(incomeRows)
   const warnings = [...income.warnings]
+  await yieldToMain()
   const expenses = parseExpensesSheet(rows(SHEETS.expenses) ?? [], income.year, warnings)
+  await yieldToMain()
   const budget = parseBudgetSheet(rows(SHEETS.budget) ?? [])
   return { parsed: { income, expenses, budget }, warnings }
 }
