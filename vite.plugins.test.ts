@@ -55,6 +55,21 @@ describe('cspMetaTag', () => {
   })
 })
 
+describe('global.css reduced motion', () => {
+  const css = readFileSync('src/ui/global.css', 'utf8')
+  const reduce = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)'))
+
+  it('has no blanket near-zero reset of every animation and transition', () => {
+    expect(css).not.toMatch(/\*,\s*\*::before,\s*\*::after\s*\{[^}]*animation-duration/)
+    expect(css).not.toMatch(/0\.01ms/)
+  })
+
+  it('slows the loader (it carries state) and stops the decorative loops', () => {
+    expect(reduce).toMatch(/\.mantine-Loader-root[^{]*\{\s*animation-duration: 2\.4s/)
+    expect(reduce).toMatch(/\.mantine-Skeleton-root::after,\s*\.mantine-Progress-section\s*\{\s*animation: none/)
+  })
+})
+
 describe('index.html', () => {
   it('declares the light-only colour scheme so native controls never render dark', () => {
     expect(readFileSync('index.html', 'utf8')).toContain('<meta name="color-scheme" content="light" />')

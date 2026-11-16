@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { MantineProvider } from '@mantine/core'
 import { render, screen } from '@testing-library/react'
-import { readFileSync } from 'node:fs'
 import type { ReactNode } from 'react'
 import { describe, expect, it } from 'vitest'
 import { AptPlate, EmptyState, ListSkeleton, Money, StatusBadge } from '.'
@@ -88,21 +87,9 @@ describe('theme', () => {
 })
 
 describe('reduced motion', () => {
-  const css = readFileSync('src/ui/global.css', 'utf8')
-  const reduce = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)'))
-
+  // The CSS side is checked in vite.plugins.test.ts (node, reads src/ui/global.css).
   it('lets Mantine drop its transitions when the OS asks for less motion', () => {
     expect(theme.respectReducedMotion).toBe(true)
-  })
-
-  it('has no blanket near-zero reset of every animation and transition', () => {
-    expect(css).not.toMatch(/\*,\s*\*::before,\s*\*::after\s*\{[^}]*animation-duration/)
-    expect(css).not.toMatch(/0\.01ms/)
-  })
-
-  it('slows the loader (it carries state) and stops the decorative loops', () => {
-    expect(reduce).toMatch(/\.mantine-Loader-root[^{]*\{\s*animation-duration: 2\.4s/)
-    expect(reduce).toMatch(/\.mantine-Skeleton-root::after,\s*\.mantine-Progress-section\s*\{\s*animation: none/)
   })
 })
 
