@@ -106,6 +106,18 @@ describe('reduced motion', () => {
   })
 })
 
+describe('toasts', () => {
+  it('announce success politely (status) and errors assertively (alert)', async () => {
+    const { Notifications } = await import('@mantine/notifications')
+    const { notifyError, notifySuccess } = await import('./notify')
+    wrap(<Notifications />)
+    notifySuccess('saved')
+    notifyError('failed')
+    expect((await screen.findByText('saved')).closest('[role]')).toHaveAttribute('role', 'status')
+    expect((await screen.findByText('failed')).closest('[role]')).toHaveAttribute('role', 'alert')
+  })
+})
+
 describe('focusFirstError', () => {
   it('focuses the first invalid field of the submitted form', async () => {
     const { focusFirstError } = await import('./forms')

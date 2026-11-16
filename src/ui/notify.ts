@@ -1,8 +1,10 @@
 import { notifications } from '@mantine/notifications'
 
+// Toasts are live regions: an error interrupts (Mantine's default role="alert"); success and info wait their turn.
+
 /** App-wide success toast. Message is the action in the past tense, e.g. "ההודעה פורסמה". */
 export function notifySuccess(message: string): void {
-  notifications.show({ message, color: 'paid', autoClose: 4000, withBorder: true })
+  notifications.show({ message, color: 'paid', autoClose: 4000, withBorder: true, role: 'status' })
 }
 
 /** App-wide error toast; stays a little longer so it can be read. */
@@ -12,5 +14,5 @@ export function notifyError(message: string): void {
 
 /** Neutral toast: nothing went wrong, but nothing changed either (e.g. a no-op save). */
 export function notifyInfo(message: string): void {
-  notifications.show({ message, color: 'stone', autoClose: 4000, withBorder: true })
+  notifications.show({ message, color: 'stone', autoClose: 4000, withBorder: true, role: 'status' })
 }

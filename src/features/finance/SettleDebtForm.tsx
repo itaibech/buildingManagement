@@ -3,7 +3,7 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { todayISO } from '../../lib/dates'
 import { formatDate, formatILS, monthLabel } from '../../lib/format'
 import { he } from '../../lib/he'
-import { notifyError, notifySuccess } from '../../ui'
+import { focusFirstError, notifyError, notifySuccess } from '../../ui'
 import { useBuilding } from '../settings/api'
 import { SETTLE_METHODS, useSettleDebt, type PaymentMethod, type SettleMode } from './api'
 import type { LedgerRow } from './ledger'
@@ -106,9 +106,9 @@ function useSettleForm({ apartmentId, rows, onDone }: SettleDebtFormProps) {
   const pastYear = plan.some((p) => yearOf(p.month) < yearOf(todayISO()))
   const today = todayChoice ?? pastYear
   const autoToday = todayChoice === null && pastYear
-  const submit = (e: FormEvent) => {
+  const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (mode === 'write_off' && !note.trim()) return setReasonError(he.finance.settle.reasonRequired)
+    if (mode === 'write_off' && !note.trim()) { setReasonError(he.finance.settle.reasonRequired); return focusFirstError(null, null, e) }
     settle.mutate({ apartmentId, months: plan.map((p) => p.month), mode, method, dateMode: today ? 'today' : 'debt_month', note: note.trim(), proof: mode === 'pay' ? proof : null },
       { onSuccess: (r) => { (r.proofFailed ? notifyError : notifySuccess)(r.proofFailed ? he.finance.proof.failed : he.finance.settle.done); onDone() } })
   }
