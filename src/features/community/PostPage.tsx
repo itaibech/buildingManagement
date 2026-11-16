@@ -16,6 +16,8 @@ import { PostForm } from './PostForm'
 const C = he.community
 const M = C.moderation
 const ICON = { size: 18, stroke: 1.75 } as const
+// The photo's box is sized before the signed URL loads (no layout shift); "contain" shows the whole picture.
+const PHOTO_BOX = { aspectRatio: '4 / 3' } as const
 
 type Dialog = 'edit' | 'delete' | 'hide' | 'remove' | null
 interface Role { mine: boolean; admin: boolean }
@@ -89,7 +91,7 @@ function Summary({ post, mine, menu }: { post: PostDetail; mine: boolean; menu: 
         <AuthorLine author={post.author} at={post.created_at} />
         <Notices post={post} mine={mine} />
         {post.body && <Text style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{post.body}</Text>}
-        {post.photoUrl && <Image src={post.photoUrl} alt={C.photoAlt(post.title)} radius={10} fit="contain" mah={360} bg="stone.1" />}
+        {post.photoUrl && <Image src={post.photoUrl} alt={C.photoAlt(post.title)} radius={10} fit="contain" w="100%" mah={360} bg="stone.1" style={PHOTO_BOX} />}
         {mine && <Group><ResolveButton post={post} /></Group>}
       </Stack>
     </Card>

@@ -112,7 +112,7 @@ export function NotificationBell({ sheet = false }: { sheet?: boolean }) {
       </Popover.Target>
       <Popover.Dropdown p="sm" aria-label={he.notifications.title}>
         <Text className="bm-display" fz="lg" mb={4}>{he.notifications.title}</Text>
-        <ScrollArea.Autosize mah="70vh" type="auto">
+        <ScrollArea.Autosize mah="70svh" type="auto">
           {opened && <NotificationPanel onClose={close} />}
         </ScrollArea.Autosize>
       </Popover.Dropdown>

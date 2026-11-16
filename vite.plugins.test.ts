@@ -55,6 +55,12 @@ describe('cspMetaTag', () => {
   })
 })
 
+describe('index.html', () => {
+  it('declares the light-only colour scheme so native controls never render dark', () => {
+    expect(readFileSync('index.html', 'utf8')).toContain('<meta name="color-scheme" content="light" />')
+  })
+})
+
 describe('PWA manifest', () => {
   const manifest = JSON.parse(readFileSync('public/manifest.webmanifest', 'utf8')) as {
     name: string; lang: string; dir: string; theme_color: string; start_url: string; icons: { src: string }[]

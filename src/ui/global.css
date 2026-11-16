@@ -215,7 +215,6 @@ body {
 
 /* Sideways-scrolling tab list: fade the end edge (left in RTL) while more tabs are hidden there. */
 .bm-tabs-scroll[data-more] {
-  -webkit-mask-image: linear-gradient(to left, transparent 0, #000 40px);
   mask-image: linear-gradient(to left, transparent 0, #000 40px);
 }
 
@@ -630,7 +629,6 @@ body {
   }
   .bm-annual-print {
     font-size: 10.5pt;
-    -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
   .bm-annual-print .bm-annual-cover {

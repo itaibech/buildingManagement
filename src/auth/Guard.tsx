@@ -19,7 +19,7 @@ export function RequireApproved() {
   if (!session) return <Navigate to="/login" replace />
   if (error || permissionsError) {
     return (
-      <Center mih="100vh" p="md">
+      <Center mih="100svh" p="md">
         <Stack align="center">
           <Text>{error ? he.profileLoadError : he.permissions.loadError}</Text>
           <Button onClick={retry}>{he.retry}</Button>
